@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"olympsis-server/auth"
 	"olympsis-server/database"
+	"olympsis-server/field"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -27,9 +28,11 @@ func main() {
 	// authentication service
 	authAPI := auth.NewAuthAPI(l, r, d)
 	userAPI := user.NewUserAPI(l, r, d)
+	fieldAPI := field.NewFieldAPI(l, r, d)
 
 	authAPI.Ready()
 	userAPI.Ready()
+	fieldAPI.Ready()
 
 	port := os.Getenv("PORT")
 
