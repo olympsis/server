@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"olympsis-server/auth"
+	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/field"
 	"olympsis-server/user"
@@ -25,14 +26,15 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
-	// authentication service
 	authAPI := auth.NewAuthAPI(l, r, d)
 	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
+	clubAPI := club.NewClubAPI(l, r, d)
 
 	authAPI.Ready()
 	userAPI.Ready()
 	fieldAPI.Ready()
+	clubAPI.Ready()
 
 	port := os.Getenv("PORT")
 

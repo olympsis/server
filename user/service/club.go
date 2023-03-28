@@ -38,7 +38,7 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 		// set the status to the value found in the request
 		filter := bson.M{"_id": oid}
 		changes := bson.M{"$set": bson.M{"status": req.Status}}
-		_, err = u.Database.CLubInvCol.UpdateOne(context.TODO(), filter, changes)
+		_, err = u.Database.ClubInvCol.UpdateOne(context.TODO(), filter, changes)
 		if err != nil {
 			u.Log.Error(err.Error())
 		}
@@ -46,7 +46,7 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 		if req.Status == "accepted" {
 			// update club members
 			var inv ClubInvite
-			err = u.Database.CLubInvCol.FindOne(context.Background(), filter).Decode(&inv)
+			err = u.Database.ClubInvCol.FindOne(context.Background(), filter).Decode(&inv)
 			if err != nil {
 				u.Log.Error(err.Error())
 				http.Error(rw, "Not Found", http.StatusNotFound)
@@ -115,7 +115,7 @@ func (u *Service) GetClubInvites() http.HandlerFunc {
 
 		filter := bson.M{"uuid": uuid, "status": "pending"}
 		var invs []ClubInvite
-		cur, err := u.Database.CLubInvCol.Find(context.TODO(), filter)
+		cur, err := u.Database.ClubInvCol.Find(context.TODO(), filter)
 
 		if err != nil {
 			if err == mongo.ErrNoDocuments {

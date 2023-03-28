@@ -11,16 +11,17 @@ import (
 )
 
 type Database struct {
-	Logger       *logrus.Logger
-	Client       *mongo.Client
-	AuthCol      *mongo.Collection
-	UserCol      *mongo.Collection
-	ClubCol      *mongo.Collection
-	EventCol     *mongo.Collection
-	FieldCol     *mongo.Collection
-	PostCol      *mongo.Collection
-	CLubInvCol   *mongo.Collection
-	FriendReqCol *mongo.Collection
+	Logger             *logrus.Logger
+	Client             *mongo.Client
+	AuthCol            *mongo.Collection
+	UserCol            *mongo.Collection
+	ClubCol            *mongo.Collection
+	EventCol           *mongo.Collection
+	FieldCol           *mongo.Collection
+	PostCol            *mongo.Collection
+	ClubInvCol         *mongo.Collection
+	FriendReqCol       *mongo.Collection
+	ClubApplicationCol *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {
@@ -57,8 +58,9 @@ func (d *Database) EstablishConnection() {
 		d.EventCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("EVENT_COL"))
 		d.FieldCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("FIELD_COL"))
 		d.PostCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("POST_COL"))
-		d.CLubInvCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CINVITE_COL"))
+		d.ClubInvCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CINVITE_COL"))
 		d.FriendReqCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("FREQUEST_COL"))
+		d.ClubApplicationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CAPPICATIONS_COL"))
 
 		d.Logger.Info("Database connection successful.")
 	}

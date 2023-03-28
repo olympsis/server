@@ -16,6 +16,7 @@ ENV FIELD_COL=fields
 ENV POST_COL=posts
 ENV CINVITE_COL=clubInvites
 ENV FREQUEST_COL=friendRequests
+ENV CAPPICATIONS_COL=clubApplications
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 EXPOSE 80
