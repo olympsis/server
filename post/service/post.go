@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"olympsis-server/database"
 	"os"
 	"strings"
 	"time"
@@ -15,16 +16,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type PostService struct {
-	cl   *mongo.Client
-	col  *mongo.Collection
-	cCol *mongo.Collection
-	uCol *mongo.Collection
-	log  *logrus.Logger
-	rtr  *mux.Router
+type Service struct {
+	Database *database.Database
+	Logger   *logrus.Logger
+	Router   *mux.Router
 }
 
 type Post struct {
@@ -151,35 +148,8 @@ Create new Post service struct
 
   - Create and Returns a pointer to a new post service struct
 */
-func NewPostService(l *logrus.Logger, r *mux.Router) *PostService {
-	return &PostService{log: l, rtr: r}
-}
-
-/*
-Connect to Database
-
-  - Initiates connection to MongoDB
-
-  - Grabs Enviroment Variables
-*/
-func (p *PostService) ConnectToDatabase() (bool, error) {
-	p.log.Info("Connecting to Database...")
-	cl, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(os.Getenv("DATABASE")))
-
-	// logs connection result and sets client
-	if err != nil {
-		p.log.Error("Failed to connect to Database!")
-		p.log.Error(err.Error())
-		return false, err
-	} else {
-		p.cl = cl // set controller client to client
-		p.log.Info("Database connection successful.")
-		// set the collections
-		p.col = p.cl.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("POST_COL"))
-		p.cCol = p.cl.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("COMMENTS_COL"))
-		p.uCol = p.cl.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CLUB_COL"))
-		return true, nil
-	}
+func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
+	return &Service{Logger: l, Router: r, Database: d}
 }
 
 /*
@@ -196,7 +166,7 @@ Get Posts (GET)
 
   - Writes list of posts objects back to client
 */
-func (p *PostService) GetPosts() http.HandlerFunc {
+func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		club := r.URL.Query().Get("clubId")
 
@@ -211,7 +181,7 @@ func (p *PostService) GetPosts() http.HandlerFunc {
 		filter := bson.M{"clubId": coid}
 
 		var posts []Post
-		cur, err := p.col.Find(context.TODO(), filter)
+		cur, err := p.Database.PostCol.Find(context.TODO(), filter)
 
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -231,7 +201,7 @@ func (p *PostService) GetPosts() http.HandlerFunc {
 			var post Post
 			err := cur.Decode(&post)
 			if err != nil {
-				p.log.Error(err)
+				p.Logger.Error(err)
 			}
 			posts = append(posts, post)
 		}
@@ -266,7 +236,7 @@ Returns:
 
 		- Writes a post object back to client
 */
-func (p *PostService) GetPost() http.HandlerFunc {
+func (p *Service) GetPost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
@@ -282,7 +252,7 @@ func (p *PostService) GetPost() http.HandlerFunc {
 		// find post  in database
 		var post Post
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		err := p.col.FindOne(context.TODO(), filter).Decode(&post)
+		err := p.Database.PostCol.FindOne(context.TODO(), filter).Decode(&post)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				rw.WriteHeader(http.StatusNotFound)
@@ -313,7 +283,7 @@ Http handler
 
   - Writes object back to client
 */
-func (p *PostService) CreatePost() http.HandlerFunc {
+func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab uuid
 		bearerToken := r.Header.Get("Authorization")
@@ -354,18 +324,18 @@ func (p *PostService) CreatePost() http.HandlerFunc {
 		}
 
 		// create post in database
-		_, err = p.col.InsertOne(context.TODO(), post)
+		_, err = p.Database.PostCol.InsertOne(context.TODO(), post)
 		if err != nil {
-			p.log.Error(err)
+			p.Logger.Error(err)
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
 		}
 
 		// create comments thread in database
-		_, err = p.cCol.InsertOne(context.TODO(), thread)
+		_, err = p.Database.CommentsCol.InsertOne(context.TODO(), thread)
 		if err != nil {
-			p.log.Error(err)
+			p.Logger.Error(err)
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
@@ -378,9 +348,9 @@ func (p *PostService) CreatePost() http.HandlerFunc {
 		// grab club info for notifications
 		var club Club
 		filter := bson.M{"_id": post.ClubId}
-		err = p.uCol.FindOne(context.Background(), filter).Decode(&club)
+		err = p.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 		if err != nil {
-			p.log.Error(err)
+			p.Logger.Error(err)
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
@@ -411,7 +381,7 @@ Returns:
 
 		- Writes object back to client
 */
-func (p *PostService) UpdatePost() http.HandlerFunc {
+func (p *Service) UpdatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab post id from path
 		vars := mux.Vars(r)
@@ -434,7 +404,7 @@ func (p *PostService) UpdatePost() http.HandlerFunc {
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			p.log.Error(err)
+			p.Logger.Error(err)
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
@@ -452,10 +422,10 @@ func (p *PostService) UpdatePost() http.HandlerFunc {
 			change["images"] = req.Images
 		}
 
-		// update club user in database
-		_, err = p.col.UpdateOne(context.TODO(), filter, update)
+		// update post
+		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
-			p.log.Error(err)
+			p.Logger.Error(err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
@@ -482,7 +452,7 @@ Returns:
 
 		- Writes OK back to client if successful
 */
-func (p *PostService) DeletePost() http.HandlerFunc {
+func (p *Service) DeletePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
 		vars := mux.Vars(r)
@@ -505,13 +475,13 @@ func (p *PostService) DeletePost() http.HandlerFunc {
 		id := vars["id"]
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			p.log.Debug(err.Error())
+			p.Logger.Debug(err.Error())
 		}
 
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		_, err = p.col.DeleteOne(context.TODO(), filter)
+		_, err = p.Database.PostCol.DeleteOne(context.TODO(), filter)
 		if err != nil {
-			p.log.Debug(err.Error())
+			p.Logger.Debug(err.Error())
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
@@ -535,7 +505,7 @@ Returns:
 	Http handler
 		- Writes back like object to client
 */
-func (p *PostService) AddLike() http.HandlerFunc {
+func (p *Service) AddLike() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
@@ -556,7 +526,7 @@ func (p *PostService) AddLike() http.HandlerFunc {
 		filter := bson.M{"_id": oid}
 		change := bson.M{"$push": bson.M{"likes": req}}
 
-		_, err := p.col.UpdateOne(context.TODO(), filter, change)
+		_, err := p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
@@ -582,7 +552,7 @@ Returns:
 	Http handler
 		- Writes back OK to client
 */
-func (p *PostService) RemoveLike() http.HandlerFunc {
+func (p *Service) RemoveLike() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
@@ -601,7 +571,7 @@ func (p *PostService) RemoveLike() http.HandlerFunc {
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"likes": bson.M{"_id": loid}}}
 
-		_, err := p.col.UpdateOne(context.TODO(), match, change)
+		_, err := p.Database.PostCol.UpdateOne(context.TODO(), match, change)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
@@ -615,7 +585,7 @@ func (p *PostService) RemoveLike() http.HandlerFunc {
 
 /* COMMENTS */
 
-func (p *PostService) GetComments() http.HandlerFunc {
+func (p *Service) GetComments() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
@@ -632,7 +602,7 @@ func (p *PostService) GetComments() http.HandlerFunc {
 		// find post  in database
 		var thread CommentThread
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		err := p.cCol.FindOne(context.TODO(), filter).Decode(&thread)
+		err := p.Database.CommentsCol.FindOne(context.TODO(), filter).Decode(&thread)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				rw.WriteHeader(http.StatusNotFound)
@@ -679,7 +649,7 @@ Returns:
 	Http handler
 		- Writes back like object to client
 */
-func (p *PostService) AddComment() http.HandlerFunc {
+func (p *Service) AddComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
@@ -700,7 +670,7 @@ func (p *PostService) AddComment() http.HandlerFunc {
 		filter := bson.M{"_id": oid}
 		change := bson.M{"$push": bson.M{"comments": req}}
 
-		_, err := p.cCol.UpdateOne(context.TODO(), filter, change)
+		_, err := p.Database.CommentsCol.UpdateOne(context.TODO(), filter, change)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
@@ -726,7 +696,7 @@ Returns:
 	Http handler
 		- Writes back OK to client
 */
-func (p *PostService) RemoveComment() http.HandlerFunc {
+func (p *Service) RemoveComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
@@ -745,7 +715,7 @@ func (p *PostService) RemoveComment() http.HandlerFunc {
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"comments": bson.M{"_id": coid}}}
 
-		_, err := p.cCol.UpdateOne(context.TODO(), match, change)
+		_, err := p.Database.CommentsCol.UpdateOne(context.TODO(), match, change)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
@@ -757,7 +727,7 @@ func (p *PostService) RemoveComment() http.HandlerFunc {
 	}
 }
 
-func (p *PostService) FetchUser(r http.Request, user string) LookUpUser {
+func (p *Service) FetchUser(r http.Request, user string) LookUpUser {
 	bearerToken := r.Header.Get("Authorization")
 	tokenSplit := strings.Split(bearerToken, "Bearer ")
 	token := tokenSplit[1]
@@ -765,7 +735,7 @@ func (p *PostService) FetchUser(r http.Request, user string) LookUpUser {
 
 	req, err := http.NewRequest("GET", "http://lookup.olympsis.internal/v1/lookup/"+user, nil)
 	if err != nil {
-		p.log.Error(err)
+		p.Logger.Error(err)
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -773,7 +743,7 @@ func (p *PostService) FetchUser(r http.Request, user string) LookUpUser {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		p.log.Error(err)
+		p.Logger.Error(err)
 	}
 
 	defer resp.Body.Close()
@@ -781,12 +751,12 @@ func (p *PostService) FetchUser(r http.Request, user string) LookUpUser {
 	var lookup LookUpUser
 	err = json.NewDecoder(resp.Body).Decode(&lookup)
 	if err != nil {
-		p.log.Error(err)
+		p.Logger.Error(err)
 	}
 	return lookup
 }
 
-func (p *PostService) SendNotificationToTopic(r http.Request, t string, b string, tpc string) (bool, error) {
+func (p *Service) SendNotificationToTopic(r http.Request, t string, b string, tpc string) (bool, error) {
 	bearerToken := r.Header.Get("Authorization")
 	tokenSplit := strings.Split(bearerToken, "Bearer ")
 	token := tokenSplit[1]
@@ -800,13 +770,13 @@ func (p *PostService) SendNotificationToTopic(r http.Request, t string, b string
 
 	data, err := json.Marshal(request)
 	if err != nil {
-		p.log.Error(err.Error())
+		p.Logger.Error(err.Error())
 		return false, err
 	}
 
 	req, err := http.NewRequest("POST", "http://pushnote.olympsis.internal/v1/pushnote/topic", bytes.NewBuffer(data))
 	if err != nil {
-		p.log.Error(err.Error())
+		p.Logger.Error(err.Error())
 		return false, err
 	}
 
@@ -815,7 +785,7 @@ func (p *PostService) SendNotificationToTopic(r http.Request, t string, b string
 
 	resp, err := client.Do(req)
 	if err != nil {
-		p.log.Error(err.Error())
+		p.Logger.Error(err.Error())
 		return false, err
 	}
 
@@ -837,7 +807,7 @@ Returns:
 	role - role of user
 	error -  if there is an error return error else nil
 */
-func (p *PostService) ValidateAndParseJWTToken(tokenString string) (string, string, float64, error) {
+func (p *Service) ValidateAndParseJWTToken(tokenString string) (string, string, float64, error) {
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("KEY")), nil
@@ -865,20 +835,20 @@ Returns:
 	Http handler
 	- Passes the request to the next handler
 */
-func (p *PostService) Middleware(next http.Handler) http.Handler {
+func (p *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		bearerToken := r.Header.Get("Authorization")
 		tokenSplit := strings.Split(bearerToken, "Bearer ")
 
 		if bearerToken == "" {
-			p.log.Error("no auth token")
+			p.Logger.Error("no auth token")
 			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		token := tokenSplit[1]
 		if token == "" {
-			p.log.Error("no auth token")
+			p.Logger.Error("no auth token")
 			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -886,7 +856,7 @@ func (p *PostService) Middleware(next http.Handler) http.Handler {
 		_, _, _, err := p.ValidateAndParseJWTToken(token)
 
 		if err != nil {
-			p.log.Error("bad auth token")
+			p.Logger.Error("bad auth token")
 			http.Error(rw, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -895,14 +865,14 @@ func (p *PostService) Middleware(next http.Handler) http.Handler {
 }
 
 // Later we want to ping the db and if the db goes down or something is wrong with this service we want to restart it.
-func (p *PostService) Healthz() http.HandlerFunc {
+func (p *Service) Healthz() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte("ok"))
 	}
 }
 
-func (p *PostService) WhoAmi() http.HandlerFunc {
+func (p *Service) WhoAmi() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`

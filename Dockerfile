@@ -15,6 +15,7 @@ ENV EVENT_COL=events
 ENV FIELD_COL=fields
 ENV POST_COL=posts
 ENV CINVITE_COL=clubInvites
+ENV COMMENTS_COL=comments
 ENV FREQUEST_COL=friendRequests
 ENV CAPPICATIONS_COL=clubApplications
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
