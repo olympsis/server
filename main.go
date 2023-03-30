@@ -10,6 +10,7 @@ import (
 	"olympsis-server/field"
 	"olympsis-server/lookup"
 	"olympsis-server/post"
+	"olympsis-server/pushnote"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -36,6 +37,7 @@ func main() {
 	postAPI := post.NewPostAPI(l, r, d)
 	eventAPI := event.NewEventAPI(l, r, d)
 	lookupAPI := lookup.NewLookUpAPI(l, r, d)
+	pushNoteAPI := pushnote.NewPushNoteAPI(l, r)
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -44,6 +46,7 @@ func main() {
 	postAPI.Ready()
 	eventAPI.Ready()
 	lookupAPI.Ready()
+	pushNoteAPI.Ready()
 
 	port := os.Getenv("PORT")
 
