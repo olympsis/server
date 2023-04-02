@@ -11,6 +11,7 @@ import (
 	"olympsis-server/lookup"
 	"olympsis-server/post"
 	"olympsis-server/pushnote"
+	"olympsis-server/storage"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -38,6 +39,7 @@ func main() {
 	eventAPI := event.NewEventAPI(l, r, d)
 	lookupAPI := lookup.NewLookUpAPI(l, r, d)
 	pushNoteAPI := pushnote.NewPushNoteAPI(l, r)
+	storageAPI := storage.NewStorageAPI(l, r)
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -47,6 +49,7 @@ func main() {
 	eventAPI.Ready()
 	lookupAPI.Ready()
 	pushNoteAPI.Ready()
+	storageAPI.Ready()
 
 	port := os.Getenv("PORT")
 
@@ -54,7 +57,7 @@ func main() {
 	s := &http.Server{
 		Addr:         `:` + port,
 		Handler:      r,
-		IdleTimeout:  30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
