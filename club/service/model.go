@@ -2,6 +2,8 @@ package service
 
 import (
 	"olympsis-server/database"
+	lService "olympsis-server/lookup/service"
+	"olympsis-server/pushnote/service"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -9,9 +11,11 @@ import (
 )
 
 type Service struct {
-	Database *database.Database
-	Logger   *logrus.Logger
-	Router   *mux.Router
+	Database      *database.Database
+	Logger        *logrus.Logger
+	Router        *mux.Router
+	NotifService  *service.Service
+	LookUpService *lService.Service
 }
 
 type Club struct {
@@ -30,11 +34,16 @@ type Club struct {
 }
 
 type Member struct {
-	ID       primitive.ObjectID `json:"id" bson:"_id"`
-	UUID     string             `json:"uuid" bson:"uuid"`
-	Role     string             `json:"role" bson:"role"`
-	Data     *LookUpUser        `json:"data,omitempty" bson:"data,omitempty"`
-	JoinedAt int64              `json:"joinedAt" bson:"joinedAt"`
+	ID       primitive.ObjectID   `json:"id" bson:"_id"`
+	UUID     string               `json:"uuid" bson:"uuid"`
+	Role     string               `json:"role" bson:"role"`
+	Data     *lService.LookUpUser `json:"data,omitempty" bson:"data,omitempty"`
+	JoinedAt int64                `json:"joinedAt" bson:"joinedAt"`
+}
+
+type CreateClubResponse struct {
+	Token string `json:"token"`
+	Club  Club   `json:"club"`
 }
 
 type ClubsResponse struct {
@@ -43,12 +52,12 @@ type ClubsResponse struct {
 }
 
 type ClubApplication struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	UUID      string             `json:"uuid" bson:"uuid"`
-	ClubId    primitive.ObjectID `json:"clubId,omitempty" bson:"clubId,omitempty"`
-	Data      *LookUpUser        `json:"data,omitempty" bson:"data,omitempty"`
-	Status    string             `json:"status" bson:"status"`
-	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
+	ID        primitive.ObjectID   `json:"id" bson:"_id"`
+	UUID      string               `json:"uuid" bson:"uuid"`
+	ClubId    primitive.ObjectID   `json:"clubId,omitempty" bson:"clubId,omitempty"`
+	Data      *lService.LookUpUser `json:"data,omitempty" bson:"data,omitempty"`
+	Status    string               `json:"status" bson:"status"`
+	CreatedAt int64                `json:"createdAt" bson:"createdAt"`
 }
 
 type ClubInvitation struct {

@@ -18,8 +18,10 @@ func NewPushNoteAPI(l *logrus.Logger, r *mux.Router) *PushNoteAPI {
 }
 
 func (p *PushNoteAPI) Ready() {
+	p.Service.CreateNewClient()
 	p.Router.Handle("/v1/pushnote/device", p.Service.SendPushNotification()).Methods("POST")
-	p.Router.Handle("/v1/pushnote/topic", p.Service.SendPushNotificationToTopic()).Methods("POST")
-	p.Router.Handle("/v1/pushnote/topic", p.Service.SubscribeToTopic()).Methods("PUT")
-	p.Router.Handle("/v1/pushnote/topic", p.Service.UnSubscribeFromTopic()).Methods("DELETE")
+}
+
+func (p *PushNoteAPI) GetService() *service.Service {
+	return p.Service
 }

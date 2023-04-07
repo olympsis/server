@@ -4,18 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"context"
-	"fmt"
-	"log"
-
 	"github.com/gorilla/mux"
 	"github.com/sideshow/apns2"
-	"github.com/sideshow/apns2/token"
+	"github.com/sideshow/apns2/certificate"
+	"github.com/sideshow/apns2/payload"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/api/option"
-
-	firebase "firebase.google.com/go/v4"
-	"firebase.google.com/go/v4/messaging"
 )
 
 /*
@@ -26,219 +19,50 @@ func NewNotificationService(l *logrus.Logger, r *mux.Router) *Service {
 }
 
 /*
-Create apns client from p8 file, keyid and teamid
+Create apns client from p12 file
 */
-func (n *Service) CreateNewClient() {
-	authKey, err := token.AuthKeyFromFile("./files/AuthKey_B9S6C6UY9C.p8")
+func (p *Service) CreateNewClient() {
+	cert, err := certificate.FromP12File("./pushnote/files/cert.p12", "")
 	if err != nil {
-		n.Logger.Fatal("token error:", err)
+		p.Logger.Fatal("token error:", err)
 	}
 
-	token := &token.Token{
-		AuthKey: authKey,
-		// KeyID from developer account (Certificates, Identifiers & Profiles -> Keys)
-		KeyID: "B9S6C6UY9C",
-		// TeamID from developer account (View Account -> Membership)
-		TeamID: "5A6H49Q85D",
-	}
-
-	n.client = apns2.NewTokenClient(token)
+	p.Client = apns2.NewClient(cert).Development()
 }
 
-/*
-Firebase app to handle notifications in the meantime
-*/
-func (n *Service) CreateFirebaseApp() {
-	opt := option.WithCredentialsFile("./files/diesel-nova-366902-firebase-adminsdk-4b4gi-451ebcb17f.json")
-	app, err := firebase.NewApp(context.Background(), nil, opt)
+func (p *Service) SendPushNotification() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		var req NotificationRequest
+
+		// decode request
+		json.NewDecoder(r.Body).Decode(&req)
+
+		// loop through tokens and send request
+		for index := range req.Tokens {
+			p.PushNote(req.Title, req.Body, req.Tokens[index])
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+	}
+}
+
+func (p *Service) PushNote(t string, b string, tk string) {
+	notification := &apns2.Notification{}
+	notification.DeviceToken = tk
+	notification.Topic = "com.coronislabs.Olympsis"
+	notification.Payload = payload.NewPayload().AlertTitle(t).AlertBody(b).Badge(1)
+	notification.Priority = 5
+
+	res, err := p.Client.Push(notification)
 	if err != nil {
-		n.Logger.Error("error initializing app: " + err.Error())
+		p.Logger.Error("There was an error", err)
 		return
 	}
-	n.fApp = app
-}
 
-func (n *Service) SendPushNotification() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		var req NotificationRequest
-
-		// decode request
-		json.NewDecoder(r.Body).Decode(&req)
-
-		if len(req.Tokens) < 2 {
-			n.sendToToken(req)
-		} else {
-			n.sendMulticastAndHandleErrors(req)
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
+	if res.Sent() {
+		p.Logger.Debug("Sent:", res.ApnsID)
+	} else {
+		p.Logger.Debug("Not Sent: %v %v %v\n", res.StatusCode, res.ApnsID, res.Reason)
 	}
-}
-
-func (n *Service) SendPushNotificationToTopic() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		var req NotificationRequest
-
-		// decode request
-		json.NewDecoder(r.Body).Decode(&req)
-
-		n.sendToTopic(req)
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-	}
-}
-
-func (n *Service) SubscribeToTopic() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		var req NotificationRequest
-
-		// decode request
-		json.NewDecoder(r.Body).Decode(&req)
-
-		n.subscribeToTopic(req)
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-	}
-}
-
-func (n *Service) UnSubscribeFromTopic() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		var req NotificationRequest
-
-		// decode request
-		json.NewDecoder(r.Body).Decode(&req)
-
-		n.unsubscribeFromTopic(req)
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-	}
-}
-
-func (n *Service) sendToToken(req NotificationRequest) {
-
-	ctx := context.Background()
-	client, err := n.fApp.Messaging(ctx)
-	if err != nil {
-		n.Logger.Error("error getting Messaging client: %v\n", err)
-	}
-
-	registrationToken := req.Tokens[0]
-
-	message := &messaging.Message{
-		Notification: &messaging.Notification{
-			Title: req.Title,
-			Body:  req.Body,
-		},
-		Token: registrationToken,
-	}
-
-	response, err := client.Send(ctx, message)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	n.Logger.Info("Successfully sent message:", response)
-}
-
-func (n *Service) sendToTopic(req NotificationRequest) {
-
-	topic := req.Topic
-	ctx := context.Background()
-	client, err := n.fApp.Messaging(ctx)
-	if err != nil {
-		log.Fatalf("error getting Messaging client: %v\n", err)
-	}
-
-	message := &messaging.Message{
-		Notification: &messaging.Notification{
-			Title: req.Title,
-			Body:  req.Body,
-		},
-		Topic: topic,
-	}
-
-	response, err := client.Send(ctx, message)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println("Successfully sent message:", response)
-}
-
-func (n *Service) sendMulticastAndHandleErrors(req NotificationRequest) {
-
-	registrationTokens := req.Tokens
-
-	ctx := context.Background()
-	client, err := n.fApp.Messaging(ctx)
-	if err != nil {
-		log.Fatalf("error getting Messaging client: %v\n", err)
-	}
-
-	message := &messaging.MulticastMessage{
-		Notification: &messaging.Notification{
-			Title: req.Title,
-			Body:  req.Body,
-		},
-		Tokens: registrationTokens,
-	}
-
-	br, err := client.SendMulticast(context.Background(), message)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	if br.FailureCount > 0 {
-		var failedTokens []string
-		for idx, resp := range br.Responses {
-			if !resp.Success {
-				// The order of responses corresponds to the order of the registration tokens.
-				failedTokens = append(failedTokens, registrationTokens[idx])
-			}
-		}
-
-		fmt.Printf("List of tokens that caused failures: %v\n", failedTokens)
-	}
-}
-
-func (n *Service) subscribeToTopic(req NotificationRequest) {
-	topic := req.Topic
-
-	registrationTokens := req.Tokens
-
-	ctx := context.Background()
-	client, err := n.fApp.Messaging(ctx)
-	if err != nil {
-		log.Fatalf("error getting Messaging client: %v\n", err)
-	}
-
-	response, err := client.SubscribeToTopic(ctx, registrationTokens, topic)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println(response.SuccessCount, "tokens were subscribed successfully")
-}
-
-func (n *Service) unsubscribeFromTopic(req NotificationRequest) {
-	topic := req.Topic
-
-	registrationTokens := req.Tokens
-
-	ctx := context.Background()
-	client, err := n.fApp.Messaging(ctx)
-	if err != nil {
-		log.Fatalf("error getting Messaging client: %v\n", err)
-	}
-
-	response, err := client.UnsubscribeFromTopic(ctx, registrationTokens, topic)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println(response.SuccessCount, "tokens were unsubscribed successfully")
 }

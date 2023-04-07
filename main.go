@@ -31,15 +31,19 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
+	pushNoteAPI := pushnote.NewPushNoteAPI(l, r)
+	storageAPI := storage.NewStorageAPI(l, r)
+	lookupAPI := lookup.NewLookUpAPI(l, r, d)
+
 	authAPI := auth.NewAuthAPI(l, r, d)
 	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
-	clubAPI := club.NewClubAPI(l, r, d)
+	clubAPI := club.NewClubAPI(l, r, d, pushNoteAPI.GetService(), lookupAPI.GetService())
 	postAPI := post.NewPostAPI(l, r, d)
 	eventAPI := event.NewEventAPI(l, r, d)
-	lookupAPI := lookup.NewLookUpAPI(l, r, d)
-	pushNoteAPI := pushnote.NewPushNoteAPI(l, r)
-	storageAPI := storage.NewStorageAPI(l, r)
+
+	pushNoteAPI.Ready()
+	storageAPI.Ready()
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -48,8 +52,6 @@ func main() {
 	postAPI.Ready()
 	eventAPI.Ready()
 	lookupAPI.Ready()
-	pushNoteAPI.Ready()
-	storageAPI.Ready()
 
 	port := os.Getenv("PORT")
 

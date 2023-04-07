@@ -23,3 +23,7 @@ func (l *LookupAPI) Ready() {
 	l.Router.Handle("/lookup/username/{username}", l.Service.LookUpUserUsername()).Methods("GET")
 	l.Router.Handle("/lookup/batch/id", l.Service.BatchLookupById()).Methods("POST")
 }
+
+func (l *LookupAPI) GetService() *service.Service {
+	return l.Service
+}

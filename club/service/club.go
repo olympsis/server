@@ -5,7 +5,6 @@ import (
 	"errors"
 )
 
-// Insert new user into database
 func (s *Service) InsertClub(ctx context.Context, club *Club) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
@@ -15,7 +14,6 @@ func (s *Service) InsertClub(ctx context.Context, club *Club) error {
 	return nil
 }
 
-// Get user from database
 func (s *Service) FindClub(ctx context.Context, filter interface{}, club *Club) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
@@ -47,6 +45,23 @@ func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]Cl
 }
 
 func (s *Service) UpdateAClub(ctx context.Context, filter interface{}, update interface{}, club *Club) error {
+	pong := s.Database.PingDatabase()
+	if !pong {
+		return errors.New("failed to connect to database")
+	}
+
+	// update user
+	_, err := s.Database.EventCol.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+
+	// find and return updated user
+	err = s.FindClub(ctx, filter, club)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
