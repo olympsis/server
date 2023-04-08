@@ -3,14 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"olympsis-server/auth/apple"
 	"olympsis-server/database"
+	"olympsis-server/utils"
 	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -66,7 +65,7 @@ func (a *Service) SignUp() http.HandlerFunc {
 			// Find the 10-char Key ID value from the portal
 			keyID := "S3HDPU4ZC5"
 
-			file, err := os.ReadFile("./files/AuthKey_S3HDPU4ZC5.p8")
+			file, err := os.ReadFile("./auth/files/AuthKey_S3HDPU4ZC5.p8")
 			if err != nil {
 				a.Log.Error(err.Error())
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -106,7 +105,7 @@ func (a *Service) SignUp() http.HandlerFunc {
 			}
 
 			uuid := uuid.New().String()
-			token, err := a.GenerateToken(uuid, request.Provider)
+			token, err := utils.GenerateAuthToken(uuid, request.Provider)
 			if err != nil {
 				a.Log.Error(err.Error())
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -169,7 +168,7 @@ func (a *Service) Login() http.HandlerFunc {
 			// Find the 10-char Key ID value from the portal
 			keyID := "S3HDPU4ZC5"
 
-			file, err := os.ReadFile("./files/AuthKey_S3HDPU4ZC5.p8")
+			file, err := os.ReadFile("./auth/files/AuthKey_S3HDPU4ZC5.p8")
 			if err != nil {
 				a.Log.Error(err.Error())
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -228,7 +227,7 @@ func (a *Service) Login() http.HandlerFunc {
 			}
 
 			// generate token for api
-			token, err := a.GenerateToken(user.UUID, user.Provider)
+			token, err := utils.GenerateAuthToken(user.UUID, user.Provider)
 			if err != nil {
 				a.Log.Error(err.Error())
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -268,21 +267,19 @@ Returns:
 func (a *Service) Delete() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := a.GrabToken(r)
+		token, err := utils.GetTokenFromHeader(r)
 		if err != nil {
 			a.Log.Error(err.Error())
 			http.Error(rw, "Forbidden", http.StatusForbidden)
 			return
 		}
 
-		claims, err := a.DecodeToken(token)
+		uuid, _, _, err := utils.ValidateAuthToken(token)
 		if err != nil {
 			a.Log.Error("Failed to Decode Token: " + err.Error())
 			http.Error(rw, "Forbidden", http.StatusForbidden)
 			return
 		}
-
-		uuid := claims["sub"].(string)
 
 		// find user
 		var user AuthUser
@@ -308,7 +305,7 @@ func (a *Service) Delete() http.HandlerFunc {
 		// Find the 10-char Key ID value from the portal
 		keyID := "S3HDPU4ZC5"
 
-		file, err := os.ReadFile("./files/AuthKey_S3HDPU4ZC5.p8")
+		file, err := os.ReadFile("./auth/files/AuthKey_S3HDPU4ZC5.p8")
 		if err != nil {
 			a.Log.Error(err.Error())
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -381,88 +378,4 @@ func (a *Service) AppleNotifications() http.HandlerFunc {
 
 		a.Log.Info(request.Payload)
 	}
-}
-
-/*
-Generate an Authentication Token
-  - Generates auth token
-  - uses go jwt
-
-Args:
-
-	uuid - user id
-	provider - auth provider
-
-Returns:
-
-	string - string of jwt token
-	error -  if there is an error return error else nil
-*/
-func (a *Service) GenerateToken(uuid string, provider string) (string, error) {
-	var key = []byte(os.Getenv("KEY"))
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
-
-	claims["iss"] = "https://api.olympsis.com"
-	claims["sub"] = uuid
-	claims["pod"] = provider
-	claims["iat"] = time.Now().Unix()
-
-	ts, err := token.SignedString(key)
-
-	if err != nil {
-		a.Log.Error("Failed to Generate token: " + err.Error())
-		return "", err
-	}
-
-	return ts, nil
-}
-
-/*
-Decode an Authentication Token
-  - Decodes auth token
-  - uses go jwt
-
-Args:
-
-	token - string of token
-
-Returns:
-
-	claims - jwt claims
-	error -  if there is an error return error else nil
-*/
-func (a *Service) DecodeToken(token string) (jwt.MapClaims, error) {
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
-	})
-
-	if err != nil {
-		return nil, err
-	} else {
-		return claims, nil
-	}
-}
-
-/*
-Grab Token from request
-
-Args:
-
-	r - http request
-
-Returns:
-
-	string - token
-	error -  if there is an error return error else nil
-*/
-func (a *Service) GrabToken(r *http.Request) (string, error) {
-	bearerToken := r.Header.Get("Authorization")
-
-	if bearerToken == "" {
-		return "", errors.New("no token found")
-	}
-
-	return bearerToken, nil
 }

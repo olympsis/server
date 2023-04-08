@@ -1,5 +1,5 @@
 VERSION 	 := v0.1
-SERVICE_NAME := olympsis-server
+SERVICE_NAME := olympsis/server
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
@@ -32,11 +32,10 @@ docker:
 	docker push $(SERVICE_NAME):$(VERSION)
 
 local:
-	docker build . -t $(SERVICE_NAME) --build-arg VERSION=$(VERSION)
-	docker tag $(SERVICE_NAME):latest $(SERVICE_NAME):$(VERSION)
+	docker build . -t $(SERVICE_NAME)
 
 run:
-	docker run -p 80:80 $(SERVICE_NAME):$(VERSION)
+	docker run -p 80:80 $(SERVICE_NAME):latest
 
 mongo:
 	docker run -p 27017:27017 -d -e MONGO_INITDB_ROOT_USERNAME=service -e MONGO_INITDB_ROOT_PASSWORD=qN1PHHgo6L942AvpTgGQ mongo:latest
