@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -11,11 +12,22 @@ import (
 )
 
 func GetTokenFromHeader(r *http.Request) (string, error) {
-	token := r.Header.Get("Authorization")
-	if token == "" {
-		return "", errors.New("no auth token found")
+	// Get the authorization header from the request
+	authHeader := r.Header.Get("Authorization")
+
+	// Check if the authorization header is present
+	if authHeader == "" {
+		return "", errors.New("authorization header not present")
 	}
-	return token, nil
+
+	// Split the authorization header into the bearer and token parts
+	authHeaderParts := strings.Split(authHeader, " ")
+	if len(authHeaderParts) != 2 || authHeaderParts[0] != "Bearer" {
+		return "", errors.New("invalid authorization header format")
+	}
+
+	// Return the token string
+	return authHeaderParts[1], nil
 }
 
 func GetClubTokenFromHeader(r *http.Request) (string, error) {

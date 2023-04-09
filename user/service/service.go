@@ -70,7 +70,7 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusNotFound)
+				rw.WriteHeader(http.StatusOK)
 				rw.Write([]byte(`{ "isFound": false }`))
 				return
 			}

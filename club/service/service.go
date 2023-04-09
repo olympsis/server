@@ -73,7 +73,18 @@ func (c *Service) GetClubs() http.HandlerFunc {
 				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusNoContent)
 				return
+			} else {
+				c.Logger.Error(err.Error())
+				rw.Header().Set("Content-Type", "application/json")
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
 			}
+		}
+
+		if !cur.Next(context.Background()) {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusNoContent)
+			return
 		}
 
 		for cur.Next(context.TODO()) {

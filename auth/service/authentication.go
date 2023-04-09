@@ -51,8 +51,8 @@ func (a *Service) SignUp() http.HandlerFunc {
 
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "bad body in request" }`))
+			a.Log.Error(err.Error())
+			http.Error(rw, "bad body", http.StatusBadRequest)
 		}
 
 		if request.Provider == "https://appleid.apple.com" {
