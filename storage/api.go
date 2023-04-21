@@ -19,6 +19,6 @@ func NewStorageAPI(l *logrus.Logger, r *mux.Router) *StorageAPI {
 
 func (s *StorageAPI) Ready() {
 	s.Service.ConnectToClient()
-	s.Router.Handle("/v1/storage/{fileBucket}/{fileName}", s.Service.UploadObject()).Methods("POST")
-	s.Router.Handle("/v1/storage/{fileBucket}/{fileName}", s.Service.DeleteObject()).Methods("DELETE")
+	s.Router.Handle("/v1/storage/{fileBucket}", s.Service.UploadObject()).Methods("POST")
+	s.Router.Handle("/v1/storage/{fileBucket}", s.Service.DeleteObject()).Methods("DELETE")
 }

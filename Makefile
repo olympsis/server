@@ -1,8 +1,28 @@
-VERSION 	 := v0.1
+VERSION 	 := v0.1.1
 SERVICE_NAME := olympsis/server
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
+
+export PORT=80
+export DB_ADDR=192.168.1.205
+export DB_USR=service
+export DB_PASS=qN1PHHgo6L942AvpTgGQ
+export DB_NAME=olympsis
+export STORAGE_ADDR=192.168.1.205:9000
+export STORAGE_ACCESS_KEY=p4eHM3a4v3wGB2ro
+export STORAGE_SECRET_KEY=WbPjehYtD3wO4V4PNlYwJwWiPRy6qqqN
+export AUTH_COL=auth
+export USER_COL=users 
+export CLUB_COL=clubs 
+export EVENT_COL=events
+export FIELD_COL=fields
+export POST_COL=posts
+export CINVITE_COL=clubInvites
+export COMMENTS_COL=comments 
+export FREQUEST_COL=friendRequests
+export CAPPICATIONS_COL=clubApplications 
+export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 .PHONY: all dep build clean test coverage coverhtml lint
 
@@ -33,9 +53,10 @@ docker:
 
 local:
 	docker build . -t $(SERVICE_NAME)
+	docker run -p 8080:8080 $(SERVICE_NAME):latest
 
 run:
-	docker run -p 80:80 $(SERVICE_NAME):latest
+	go run -x main.go
 
 mongo:
 	docker run -p 27017:27017 -d -e MONGO_INITDB_ROOT_USERNAME=service -e MONGO_INITDB_ROOT_PASSWORD=qN1PHHgo6L942AvpTgGQ mongo:latest

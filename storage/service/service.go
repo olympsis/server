@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"io"
+	"errors"
 	"net/http"
 	"os"
 
@@ -36,11 +36,13 @@ func (s *Service) ConnectToClient() {
 func (s *Service) UploadObject() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		fileName := vars["fileName"]
 		fileBucket := vars["fileBucket"]
 
-		if len(fileName) < 40 {
-			http.Error(rw, "invalid file name", http.StatusBadRequest)
+		// Get the filename from the request header.
+		fileName, err := GrabFileName(&r.Header)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			http.Error(rw, "no file name", http.StatusBadRequest)
 			return
 		}
 
@@ -49,31 +51,13 @@ func (s *Service) UploadObject() http.HandlerFunc {
 			return
 		}
 
-		// any requests bigger than 1MB gets denied
-		r.Body = http.MaxBytesReader(rw, r.Body, 1<<20+512) // Max request size to 1MB
-		err := r.ParseMultipartForm(1 << 20)                // Max 1MB in memory
-		if err != nil {
-			s.Logger.Error(err.Error())
-			http.Error(rw, "request too big", http.StatusBadRequest)
-			return
-		}
-
-		// Get the image file from the form data
-		f, err := GrabFileFromRequest(r, fileName)
-		if err != nil {
-			s.Logger.Error(err.Error())
-			http.Error(rw, "failed to grab image from body", http.StatusInternalServerError)
-			return
-		}
-
 		// Upload the image to bucket
-		err = s.UploadImage(f, fileBucket, fileName)
+		err = s.UploadImage(r, fileBucket, fileName)
 		if err != nil {
 			s.Logger.Error(err.Error())
 			http.Error(rw, "failed to upload image", http.StatusInternalServerError)
 			return
 		}
-		defer f.Close()
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -83,11 +67,13 @@ func (s *Service) UploadObject() http.HandlerFunc {
 func (s *Service) DeleteObject() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		fileName := vars["fileName"]
 		fileBucket := vars["fileBucket"]
 
-		if len(fileName) < 40 {
-			http.Error(rw, "invalid file name", http.StatusBadRequest)
+		// Get the filename from the request header.
+		fileName, err := GrabFileName(&r.Header)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			http.Error(rw, "no file name", http.StatusBadRequest)
 			return
 		}
 
@@ -96,7 +82,7 @@ func (s *Service) DeleteObject() http.HandlerFunc {
 			return
 		}
 
-		err := s.DeleteImage(fileBucket, fileName)
+		err = s.DeleteImage(fileBucket, fileName)
 		if err != nil {
 			s.Logger.Error(err.Error())
 			http.Error(rw, "failed to delete image", http.StatusInternalServerError)
@@ -108,32 +94,9 @@ func (s *Service) DeleteObject() http.HandlerFunc {
 	}
 }
 
-func GrabFileFromRequest(r *http.Request, name string) (*os.File, error) {
-	file, _, err := r.FormFile("image")
-	if err != nil {
-		return nil, err
-	}
-
-	// Open a new file for writing the image data
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(f, file)
-	if err != nil {
-		return nil, err
-	}
-
-	return f, nil
-}
-
-func (s *Service) UploadImage(file *os.File, bucket string, name string) error {
-	contentType := "image/jpeg"
-	filePath := `/app/` + name
-
+func (s *Service) UploadImage(req *http.Request, bucket string, name string) error {
 	// Upload the file to the bucket using PutObject
-	_, err := s.Client.FPutObject(context.Background(), bucket, name, filePath, minio.PutObjectOptions{ContentType: contentType})
+	_, err := s.Client.PutObject(context.Background(), bucket, name, req.Body, req.ContentLength, minio.PutObjectOptions{})
 	if err != nil {
 		return err
 	}
@@ -148,4 +111,14 @@ func (s *Service) DeleteImage(bucket string, name string) error {
 		return err
 	}
 	return nil
+}
+
+func GrabFileName(h *http.Header) (string, error) {
+	// Get the filename from the request header.
+	fileName := h.Get("X-Filename")
+	if fileName == "" {
+		return "", errors.New("missing X-Filename header")
+	} else {
+		return fileName, nil
+	}
 }
