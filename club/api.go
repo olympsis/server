@@ -41,5 +41,4 @@ func (s *ClubAPI) Ready() {
 
 	// invites
 	s.Router.Handle("/v1/clubs/invites", s.Service.CreateInvitation()).Methods("POST")
-
 }

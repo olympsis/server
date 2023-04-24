@@ -11,7 +11,6 @@ import (
 	"olympsis-server/lookup"
 	"olympsis-server/post"
 	"olympsis-server/pushnote"
-	"olympsis-server/storage"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -32,7 +31,6 @@ func main() {
 	d.EstablishConnection()
 
 	pushNoteAPI := pushnote.NewPushNoteAPI(l, r)
-	storageAPI := storage.NewStorageAPI(l, r)
 	lookupAPI := lookup.NewLookUpAPI(l, r, d)
 
 	authAPI := auth.NewAuthAPI(l, r, d)
@@ -43,7 +41,6 @@ func main() {
 	eventAPI := event.NewEventAPI(l, r, d)
 
 	pushNoteAPI.Ready()
-	storageAPI.Ready()
 
 	authAPI.Ready()
 	userAPI.Ready()

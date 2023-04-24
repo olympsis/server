@@ -31,7 +31,7 @@ func GetTokenFromHeader(r *http.Request) (string, error) {
 }
 
 func GetClubTokenFromHeader(r *http.Request) (string, error) {
-	token := r.Header.Get("Club Admin Token")
+	token := r.Header.Get("X-Admin-Token")
 	if token == "" {
 		return "", errors.New("no club token found")
 	}
@@ -89,9 +89,18 @@ func ValidateAuthToken(s string) (string, string, float64, error) {
 	if err != nil {
 		return "", "", 0, err
 	} else {
-		uuid := claims["uuid"].(string)
-		provider := claims["provider"].(string)
-		createdAt := claims["createdAt"].(float64)
+		uuid, ok := claims["sub"].(string)
+		if !ok {
+			return "", "", 0, errors.New("sub claim not found")
+		}
+		provider, ok := claims["pod"].(string)
+		if !ok {
+			return "", "", 0, errors.New("pod claim not found")
+		}
+		createdAt, ok := claims["iat"].(float64)
+		if !ok {
+			return "", "", 0, errors.New("iat claim not found")
+		}
 		return uuid, provider, createdAt, nil
 	}
 }

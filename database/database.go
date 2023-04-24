@@ -34,7 +34,7 @@ func (d *Database) EstablishConnection() {
 	d.Logger.Info("Connecting to Database...")
 
 	credential := options.Credential{
-		AuthSource: os.Getenv("admin"),
+		AuthSource: "admin",
 		Username:   os.Getenv("DB_USR"),
 		Password:   os.Getenv("DB_PASS"),
 	}

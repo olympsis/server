@@ -44,20 +44,14 @@ func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]Cl
 	return nil
 }
 
-func (s *Service) UpdateAClub(ctx context.Context, filter interface{}, update interface{}, club *Club) error {
+func (s *Service) UpdateAClub(ctx context.Context, filter interface{}, update interface{}) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
 	}
 
 	// update user
-	_, err := s.Database.EventCol.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	// find and return updated user
-	err = s.FindClub(ctx, filter, club)
+	_, err := s.Database.ClubCol.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}

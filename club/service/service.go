@@ -45,7 +45,6 @@ func (c *Service) GetClubs() http.HandlerFunc {
 		city := r.URL.Query().Get("city")
 		state := r.URL.Query().Get("state")
 		country := r.URL.Query().Get("country")
-
 		if country == "" {
 			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusBadRequest)
@@ -66,43 +65,21 @@ func (c *Service) GetClubs() http.HandlerFunc {
 		}
 
 		var clubs []Club
-		cur, err := c.Database.ClubCol.Find(context.TODO(), filter)
-
+		err := c.FindClubs(context.TODO(), filter, &clubs)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
+				c.Logger.Error(err.Error())
 				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusNoContent)
 				return
 			} else {
 				c.Logger.Error(err.Error())
-				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		}
 
-		if !cur.Next(context.Background()) {
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		for cur.Next(context.TODO()) {
-			var club Club
-			err := cur.Decode(&club)
-			if err != nil {
-				c.Logger.Error(err)
-			}
-			// fetch user data
-			for i := 0; i < len(club.Members); i++ {
-				usr := c.LookUpService.FetchData(club.Members[i].UUID)
-				club.Members[i].Data = usr
-			}
-			clubs = append(clubs, club)
-		}
-
 		if len(clubs) == 0 {
-			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -112,7 +89,6 @@ func (c *Service) GetClubs() http.HandlerFunc {
 			Clubs:      clubs,
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
@@ -160,11 +136,11 @@ func (c *Service) GetClub() http.HandlerFunc {
 			}
 		}
 
-		// fetch member data
-		for i := 0; i < len(club.Members); i++ {
-			usr := c.LookUpService.FetchData(club.Members[i].UUID)
-			club.Members[i].Data = usr
-		}
+		// // fetch member data
+		// for i := 0; i < len(club.Members); i++ {
+		// 	usr := c.LookUpService.FetchData(club.Members[i].UUID)
+		// 	club.Members[i].Data = usr
+		// }
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -235,7 +211,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		}
 
 		// create club in database
-		_, err = c.Database.ClubCol.InsertOne(context.TODO(), club)
+		err = c.InsertClub(context.TODO(), &club)
 		if err != nil {
 			c.Logger.Error(err.Error())
 			http.Error(rw, "failed to create club", http.StatusInternalServerError)
@@ -372,7 +348,14 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 
 		// update club data in database
 		var club Club
-		err = c.UpdateAClub(context.Background(), filter, update, &club)
+		err = c.UpdateAClub(context.Background(), filter, update)
+		if err != nil {
+			c.Logger.Error(err.Error())
+			http.Error(rw, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		err = c.FindClub(context.TODO(), filter, &club)
 		if err != nil {
 			c.Logger.Error(err.Error())
 			http.Error(rw, "internal server error", http.StatusInternalServerError)
@@ -470,6 +453,18 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 	}
 }
 
+/*
+Change Member Rank (PUT)
+
+  - Updates a member's rank
+
+  - Grab parameters and update
+
+Returns:
+
+	Http handler
+		- Writes OK back to client if successful
+*/
 func (c *Service) ChangeMemberRank() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
@@ -615,6 +610,18 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 	}
 }
 
+/*
+Kick Member (PUT)
+
+  - Removes member from club
+
+  - Grab parameters and update
+
+Returns:
+
+	Http handler
+		- Writes OK back to client if successful
+*/
 func (c *Service) KickMember() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
@@ -737,6 +744,18 @@ func (c *Service) KickMember() http.HandlerFunc {
 	}
 }
 
+/*
+Leave Club (PUT)
+
+  - Leave club
+
+  - Grab parameters and update
+
+Returns:
+
+	Http handler
+		- Writes OK back to client if successful
+*/
 func (c *Service) LeaveClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
