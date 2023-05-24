@@ -2,6 +2,7 @@ package user
 
 import (
 	"olympsis-server/database"
+	"olympsis-server/middleware"
 	"olympsis-server/user/service"
 
 	"github.com/gorilla/mux"
@@ -22,7 +23,7 @@ func (u *UserAPI) Ready() {
 
 	// handlers for http requests
 	u.Router.Handle("/v1/users/username", u.Service.CheckUsername()).Methods("GET")
-	u.Router.Handle("/v1/users/user", u.Service.GetUserData()).Methods("GET")
+	u.Router.Handle("/v1/users/user", middleware.Chain(u.Service.GetUserData(), middleware.Logging(), middleware.UserMiddleware())).Methods("GET")
 	u.Router.Handle("/v1/users", u.Service.CreateUserData()).Methods("POST")
 	u.Router.Handle("/v1/users/user", u.Service.UpdateUserData()).Methods("PUT")
 	u.Router.Handle("/v1/users/user", u.Service.DeleteUserData()).Methods("DELETE")

@@ -27,6 +27,7 @@ type EventsResponse struct {
 	TotalEvents int     `json:"total_events"`
 	Events      []Event `json:"events"`
 }
+
 type Participant struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`

@@ -173,24 +173,11 @@ Returns:
 func (u *Service) UpdateUserData() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
-
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// decode request
 		var req models.User
-		err = json.NewDecoder(r.Body).Decode(&req)
+		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			u.Log.Debug(err.Error())
 			http.Error(rw, "Bad Request", http.StatusBadRequest)
@@ -244,32 +231,20 @@ Returns:
 */
 func (u *Service) GetUserData() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// find user data in database
 		var user models.User
 		filter := bson.M{"uuid": uuid}
-		err = u.FindUser(context.Background(), filter, &user)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "user not found" }`))
-				return
-			}
+		err := u.FindUser(context.Background(), filter, &user)
+
+		// username is a temp fix because empty users are not throwing an error
+		if err != nil || user.UserName == "" {
+			http.Error(rw, "user data not found", http.StatusNotFound)
+			return
 		}
+
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(user)
