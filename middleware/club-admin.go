@@ -3,10 +3,10 @@ package middleware
 import "net/http"
 
 /*
-Super Admin Middleware
-  - used for routes that require the user to be a super admin
+Club Admin Middleware
+  - used for routes that require club admin access
 */
-func SuperAdminMiddleware() Middleware {
+func ClubAdminMiddleware() Middleware {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 		}
