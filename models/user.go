@@ -4,7 +4,7 @@ import "go.mongodb.org/mongo-driver/bson/primitive"
 
 /*
 User Data
-- 	Contains user identifiable data
+  - Contains user identifiable data
 */
 type User struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id"`

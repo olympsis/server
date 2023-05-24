@@ -21,8 +21,9 @@ func NewAuthAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *AuthAPI 
 func (s *AuthAPI) Ready() {
 
 	// routes
-	s.Router.Handle("/v1/auth/signup", s.Service.SignUp()).Methods("POST")
-	s.Router.Handle("/v1/auth/login", s.Service.Login()).Methods("PUT")
-	s.Router.Handle("/v1/auth/delete", s.Service.Delete()).Methods("DELETE")
-	s.Router.Handle("/v1/auth/apple/notification", s.Service.AppleNotifications()).Methods("POST")
+	s.Router.Handle("/auth/signup", s.Service.SignUp()).Methods("POST")
+	s.Router.Handle("/auth/login", s.Service.Login()).Methods("POST")
+	s.Router.Handle("/auth/logout", s.Service.Logout()).Methods("POST")
+	s.Router.Handle("/auth/delete", s.Service.Delete()).Methods("DELETE")
+	s.Router.Handle("/auth/apple/notification", s.Service.AppleNotifications()).Methods("POST")
 }

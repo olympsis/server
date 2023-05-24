@@ -2,6 +2,10 @@ package models
 
 import "go.mongodb.org/mongo-driver/bson/primitive"
 
+/*
+Post
+  - Post objects for feed
+*/
 type Post struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	ClubId    primitive.ObjectID `json:"club_id" bson:"club_id"`
@@ -15,6 +19,10 @@ type Post struct {
 	CreatedAt int64              `json:"created_at" bson:"created_at"`
 }
 
+/*
+Comment
+  - Comments on post
+*/
 type Comment struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`
@@ -22,6 +30,10 @@ type Comment struct {
 	CreatedAt int64              `json:"created_at" bson:"created_at"`
 }
 
+/*
+Posts Response
+  - array of posts
+*/
 type PostsResponse struct {
 	TotalPosts int    `json:"total_posts"`
 	Posts      []Post `json:"posts"`

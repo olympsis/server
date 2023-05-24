@@ -2,6 +2,10 @@ package models
 
 import "go.mongodb.org/mongo-driver/bson/primitive"
 
+/*
+Club
+  - Club object
+*/
 type Club struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	Name        string             `json:"name" bson:"name"`
@@ -34,9 +38,7 @@ type ClubInvite struct {
 
 /*
 Friend Requests
-
   - total number of friend request
-
   - friend requests
 */
 type ClubInvites struct {

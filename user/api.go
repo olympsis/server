@@ -21,29 +21,42 @@ func NewUserAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *UserAPI 
 
 func (u *UserAPI) Ready() {
 
-	// handlers for http requests
-	u.Router.Handle("/v1/users/username", u.Service.CheckUsername()).Methods("GET")
-	u.Router.Handle("/v1/users/user", middleware.Chain(u.Service.GetUserData(), middleware.Logging(), middleware.UserMiddleware())).Methods("GET")
-	u.Router.Handle("/v1/users", u.Service.CreateUserData()).Methods("POST")
-	u.Router.Handle("/v1/users/user", u.Service.UpdateUserData()).Methods("PUT")
-	u.Router.Handle("/v1/users/user", u.Service.DeleteUserData()).Methods("DELETE")
+	/*
+		ROUTES
+	*/
 
-	// friends
-	u.Router.Handle("/v1/users/friends/requests", u.Service.GetFriendRequests()).Methods("GET")
-	u.Router.Handle("/v1/users/friends/requests", u.Service.CreateFriendRequest()).Methods("POST")
-	u.Router.Handle("/v1/users/friends/requests/{id}", u.Service.UpdateFriendRequest()).Methods("PUT")
-	u.Router.Handle("/v1/users/friends/requests/{id}", u.Service.DeleteFriendRequest()).Methods("DELETE")
-	u.Router.Handle("/v1/users/friends/{id}", u.Service.RemoveFriend()).Methods("DELETE")
+	// search username availability
+	u.Router.Handle("/users/username",
+		middleware.Chain(
+			u.Service.CheckUsername(),
+			middleware.Logging(),
+		),
+	).Methods("GET")
 
-	// badges
-	u.Router.Handle("/v1/users/badges", u.Service.AddBadge()).Methods("POST")
-	u.Router.Handle("/v1/users/badges/{id}", u.Service.RemoveBadge()).Methods("DELETE")
+	// get user data
+	u.Router.Handle("/users/user",
+		middleware.Chain(
+			u.Service.GetUserData(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
 
-	// trophies
-	u.Router.Handle("/v1/users/trophies", u.Service.AddTrophy()).Methods("POST")
-	u.Router.Handle("/v1/users/trophies/{id}", u.Service.RemoveTrophy()).Methods("DELETE")
+	// create user data
+	u.Router.Handle("/users",
+		middleware.Chain(
+			u.Service.CreateUserData(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
 
-	// club invites
-	u.Router.Handle("/v1/users/club/invites", u.Service.GetClubInvites()).Methods("GET")
-	u.Router.Handle("/v1/users/club/invites/{id}", u.Service.UpdateClubInvite()).Methods("PUT")
+	// update user data
+	u.Router.Handle("/users/user",
+		middleware.Chain(
+			u.Service.UpdateUserData(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
 }

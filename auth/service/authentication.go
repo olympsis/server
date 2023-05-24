@@ -76,7 +76,7 @@ func NewAuthService(l *logrus.Logger, r *mux.Router, d *database.Database) *Serv
 
 /*
 Create User (PUT)
-  - Creates new user for playfest (sign up)
+  - Creates new user for olympsis (sign up)
   - Grab request body
   - Create AuthUser data in auth databse
   - Generate JWT auth token
@@ -178,7 +178,7 @@ func (a *Service) SignUp() http.HandlerFunc {
 
 /*
 Login User (POST)
-  - Logs user into playfest
+  - Logs user into olympsis
   - Grab token from header
   - Generate new JWT auth token
   - Update AuthUser data in auth databse
@@ -297,8 +297,25 @@ func (a *Service) Login() http.HandlerFunc {
 }
 
 /*
+Logout User (POST)
+  - logout user out of olympsis
+
+Returns:
+
+	Http handler
+		- Writes token back to client
+		- Writes userData back to client
+*/
+
+func (a *Service) Logout() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+
+	}
+}
+
+/*
 Delete User (DELETE)
-  - Deletes auth user from playfest
+  - Deletes auth user from olympsis
 
 Returns:
 
