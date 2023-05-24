@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"olympsis-server/models"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -42,7 +43,7 @@ func (u *Service) GetFriends() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// find user data in database
-		var user User
+		var user models.User
 		filter := bson.D{primitive.E{Key: "uuid", Value: uuid}}
 		err = u.FindUser(context.Background(), filter, &user)
 		if err != nil {
@@ -87,7 +88,7 @@ func (u *Service) GetFriendRequests() http.HandlerFunc {
 
 		uuid := claims["sub"].(string)
 		filter := bson.M{"requestee": uuid, "status": "pending"}
-		var reqs []FriendRequest
+		var reqs []models.FriendRequest
 		cur, err := u.Database.FriendReqCol.Find(context.TODO(), filter)
 
 		if err != nil {
@@ -100,13 +101,13 @@ func (u *Service) GetFriendRequests() http.HandlerFunc {
 
 		// fetch requests
 		for cur.Next(context.TODO()) {
-			var fReq FriendRequest
+			var fReq models.FriendRequest
 			err := cur.Decode(&fReq)
 			if err != nil {
 				u.Log.Error(err)
 			}
-			lookup := u.FetchUser(*r, fReq.Requestor)
-			fReq.RequestorData = lookup
+			// lookup := u.FetchUser(*r, fReq.Requestor)
+			// fReq.RequestorData = lookup
 			reqs = append(reqs, fReq)
 		}
 
@@ -118,7 +119,7 @@ func (u *Service) GetFriendRequests() http.HandlerFunc {
 			return
 		}
 
-		resp := FriendRequests{
+		resp := models.FriendRequests{
 			TotalRequests: len(reqs),
 			Requests:      reqs,
 		}
@@ -160,13 +161,13 @@ func (u *Service) CreateFriendRequest() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// decode body
-		var req NewFriendRequest
+		var req models.FriendRequest
 		json.NewDecoder(r.Body).Decode(&req)
 
-		fReq := FriendRequest{
+		fReq := models.FriendRequest{
 			ID:        primitive.NewObjectID(),
 			Requestor: uuid,
-			Requestee: req.UUID,
+			Requestee: req.Requestee,
 			Status:    "pending",
 			CreatedAt: time.Now().Unix(),
 		}
@@ -178,8 +179,8 @@ func (u *Service) CreateFriendRequest() http.HandlerFunc {
 		}
 
 		// fetch requestee data and device token to notify them
-		var requestee User
-		filter := bson.M{"uuid": req.UUID}
+		var requestee models.User
+		filter := bson.M{"uuid": req.Requestee}
 		err = u.Database.UserCol.FindOne(context.Background(), filter).Decode(&requestee)
 		if err != nil {
 			u.Log.Error(err)
@@ -192,7 +193,7 @@ func (u *Service) CreateFriendRequest() http.HandlerFunc {
 		}
 
 		// send notification
-		u.sendNotification(*r, "Friend Request", "You have a new friend request.", []string{requestee.DeviceToken})
+		// u.sendNotification(*r, "Friend Request", "You have a new friend request.", []string{requestee.DeviceToken})
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
@@ -232,7 +233,7 @@ func (u *Service) UpdateFriendRequest() http.HandlerFunc {
 		}
 
 		// we're decoding a request here but the only thing we need is `status` so we can change it from pending to accepted or declined
-		var req FriendRequest
+		var req models.FriendRequest
 		json.NewDecoder(r.Body).Decode(&req)
 
 		// set the status to the value found in the request
@@ -246,7 +247,7 @@ func (u *Service) UpdateFriendRequest() http.HandlerFunc {
 		if req.Status == "accepted" {
 			// now we need to update both the requestor and requestee data to reflect that they are now friends.
 			// first we fetch the friend request and we use the requestor and requestee id's on there
-			var request FriendRequest
+			var request models.FriendRequest
 			err = u.Database.FriendReqCol.FindOne(context.Background(), filter).Decode(&request)
 			u.Log.Info(request.Requestor)
 			if err != nil {
@@ -258,7 +259,7 @@ func (u *Service) UpdateFriendRequest() http.HandlerFunc {
 
 			// friend object for requestee or the person calling this function to accept the request
 			filter = bson.M{"uuid": request.Requestee}
-			friend := Friend{
+			friend := models.Friend{
 				ID:        primitive.NewObjectID(),
 				UUID:      request.Requestor,
 				CreatedAt: timestamp,
@@ -266,7 +267,7 @@ func (u *Service) UpdateFriendRequest() http.HandlerFunc {
 
 			// friend object for requestor or the person that sent the friend request
 			rFilter := bson.M{"uuid": request.Requestor}
-			rFriend := Friend{
+			rFriend := models.Friend{
 				ID:        primitive.NewObjectID(),
 				UUID:      request.Requestee,
 				CreatedAt: timestamp,
@@ -286,8 +287,8 @@ func (u *Service) UpdateFriendRequest() http.HandlerFunc {
 				u.Log.Error("Failed to update Requestor's friends: " + err.Error())
 			}
 
-			lookup := u.FetchUser(*r, request.Requestor)
-			friend.Data = lookup
+			// lookup := u.FetchUser(*r, request.Requestor)
+			// friend.Data = lookup
 
 			// return friend object
 			rw.Header().Set("Content-Type", "application/json")

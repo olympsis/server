@@ -1,12 +1,12 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/models"
 	"os"
 	"time"
 
@@ -17,6 +17,21 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+/*
+Authentication Service
+- reference object for auth service
+*/
+type Service struct {
+	// database
+	Database *database.Database
+
+	// logrus logger to Log information about service and errors
+	Log *logrus.Logger
+
+	// mux Router to complete http requests
+	Router *mux.Router
+}
 
 /*
 Creates New Auth Service
@@ -64,7 +79,7 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 		defer c()
 
 		// find user data in database
-		var user User
+		var user models.User
 		filter := bson.D{primitive.E{Key: "userName", Value: userName}}
 		err := u.Database.UserCol.FindOne(context.TODO(), filter).Decode(&user)
 		if err != nil {
@@ -114,7 +129,7 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// decode request
-		var req User
+		var req models.User
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			u.Log.Error(err.Error())
@@ -122,7 +137,7 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 			return
 		}
 
-		user := User{
+		user := models.User{
 			ID:         primitive.NewObjectID(),
 			UUID:       uuid,
 			UserName:   req.UserName,
@@ -174,7 +189,7 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// decode request
-		var req User
+		var req models.User
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			u.Log.Debug(err.Error())
@@ -245,7 +260,7 @@ func (u *Service) GetUserData() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// find user data in database
-		var user User
+		var user models.User
 		filter := bson.M{"uuid": uuid}
 		err = u.FindUser(context.Background(), filter, &user)
 		if err != nil {
@@ -301,94 +316,6 @@ func (u *Service) DeleteUserData() http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 	}
-}
-
-/*
-Peek User
-  - Peeks at user and return data
-
-Args:
-
-	r - http request
-	user - user id
-
-Returns:
-
-	LookUpUser - data on requested user
-*/
-func (u *Service) FetchUser(r http.Request, user string) LookUpUser {
-	token, err := u.GrabToken(&r)
-	if err != nil {
-		u.Log.Error(err.Error())
-	}
-	client := &http.Client{}
-
-	req, err := http.NewRequest("GET", "http://lookup.olympsis.internal/v1/lookup/"+user, nil)
-	if err != nil {
-		u.Log.Error(err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		u.Log.Error(err)
-	}
-
-	defer resp.Body.Close()
-
-	var lookup LookUpUser
-	err = json.NewDecoder(resp.Body).Decode(&lookup)
-	if err != nil {
-		u.Log.Error(err)
-	}
-	return lookup
-}
-
-/*
-Send Notification
-  - send a notification to user
-
-Args:
-
-	r - http request
-	title - title of notification
-	body - body of notification
-	tokens - user tokens to notify
-*/
-func (u *Service) sendNotification(r http.Request, title string, body string, tokens []string) {
-	token, err := u.GrabToken(&r)
-	if err != nil {
-		u.Log.Error(err.Error())
-	}
-	client := &http.Client{}
-
-	request := NotificationRequest{
-		Tokens: tokens,
-		Title:  title,
-		Body:   body,
-	}
-
-	data, err := json.Marshal(request)
-	if err != nil {
-		u.Log.Error(err.Error())
-	}
-
-	req, err := http.NewRequest("POST", "http://pushnote.olympsis.internal/v1/pushnote/device", bytes.NewBuffer(data))
-	if err != nil {
-		u.Log.Error(err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		u.Log.Error(err)
-	}
-
-	defer resp.Body.Close()
 }
 
 /*

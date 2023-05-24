@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"olympsis-server/models"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -39,10 +40,10 @@ func (u *Service) AddBadge() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// decode body
-		var req Badge
+		var req models.Badge
 		json.NewDecoder(r.Body).Decode(&req)
 
-		badge := Badge{
+		badge := models.Badge{
 			ID:          primitive.NewObjectID(),
 			Name:        req.Name,
 			Title:       req.Title,
@@ -155,10 +156,10 @@ func (u *Service) AddTrophy() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		// decode body
-		var req Badge
+		var req models.Badge
 		json.NewDecoder(r.Body).Decode(&req)
 
-		trophy := Trophy{
+		trophy := models.Trophy{
 			ID:          primitive.NewObjectID(),
 			Name:        req.Name,
 			Title:       req.Title,

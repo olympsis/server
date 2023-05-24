@@ -3,14 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"olympsis-server/database"
-	"os"
+	"olympsis-server/utils"
 	"strconv"
 	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -42,21 +40,19 @@ Returns:
 func (e *Service) CreateEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := e.GrabToken(r)
+		token, err := utils.GetTokenFromHeader(r)
 		if err != nil {
 			e.Logger.Error(err.Error())
 			http.Error(rw, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		claims, err := e.DecodeToken(token)
+		uuid, _, _, err := utils.ValidateAuthToken(token)
 		if err != nil {
 			e.Logger.Error("Failed to Decode Token: " + err.Error())
 			http.Error(rw, "forbidden", http.StatusForbidden)
 			return
 		}
-
-		uuid := claims["sub"].(string)
 
 		// decode request
 		var req Event
@@ -94,18 +90,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			return
 		}
 
-		// subscribe owner to events
-		var ownerData UserData
-		err = e.FetchDataAboutUser(uuid, &ownerData)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		} else {
-			e.SubscribeToEventTopic(event.ID.Hex(), []string{ownerData.DeviceToken})
-		}
-
-		if event.Visibility == "club" || event.Visibility == "public" {
-			e.SendNotificationToTopic("New Event!", event.Title+" Event created by "+ownerData.FirstName+" "+ownerData.LastName, event.ClubID.Hex())
-		}
+		// TODO subscribe owner to events
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(event)
@@ -145,14 +130,7 @@ func (e *Service) GetEvent() http.HandlerFunc {
 			}
 		}
 
-		var ownerData UserData
-		err = e.FetchDataAboutUser(event.OwnerID, &ownerData)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		} else {
-			// add data to event
-			event.OwnerData = &ownerData
-		}
+		// TODO Fetch data about owner
 
 		// add user data to participants
 		for ptp := range event.Participants {
@@ -182,21 +160,20 @@ Returns:
 */
 func (e *Service) GetEventsByLocation() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		/*
+			token, err := utils.GetTokenFromHeader(r)
+			if err != nil {
+				e.Logger.Error(err.Error())
+				http.Error(rw, "unauthorized", http.StatusUnauthorized)
+				return
+			}
 
-		token, err := e.GrabToken(r)
-		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
-
-		claims, err := e.DecodeToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		_ = claims["sub"].(string)
+			_, _, _, err := utils.ValidateAuthToken(token)
+			if err != nil {
+				e.Logger.Error("Failed to Decode Token: " + err.Error())
+				http.Error(rw, "forbidden", http.StatusForbidden)
+				return
+			}*/
 
 		// query params
 		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
@@ -227,7 +204,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 				}},
 		}
 
-		cur, err := e.Database.FieldCol.Find(context.Background(), filter)
+		err := e.FindEvents(context.Background(), filter, &events)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, "no events found", http.StatusNotFound)
@@ -236,20 +213,10 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		// if there are no fields then there should be no events
-		if cur == nil {
+		if len(events) == 0 {
 			rw.Header().Set("Content-Type", "application/json")
 			http.Error(rw, "no events found", http.StatusNoContent)
 			return
-		}
-
-		// loop through the fields we found
-		for cur.Next(context.TODO()) {
-			var field Field
-			err := cur.Decode(&field)
-			if err != nil {
-				e.Logger.Error(err)
-			}
-			fields = append(fields, field)
 		}
 
 		// loop through the fields and find the correspoding events
@@ -272,27 +239,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 					return
 				}
 			}
-			for x := range events {
-				// owner data
-				var ownerData UserData
-				err = e.FetchDataAboutUser(events[x].OwnerID, &ownerData)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				} else {
-					events[x].OwnerData = &ownerData
-				}
-
-				// participants data
-				for ptp := range events[x].Participants {
-					var participantData UserData
-					err = e.FetchDataAboutUser(events[x].Participants[ptp].UUID, &participantData)
-					if err != nil {
-						e.Logger.Error(err.Error())
-					} else {
-						events[x].Participants[ptp].Data = &participantData
-					}
-				}
-			}
+			//TODO fetch owner data for all events
 		}
 
 		if len(events) == 0 {
@@ -462,20 +409,19 @@ Returns:
 func (e *Service) AddParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := e.GrabToken(r)
+		token, err := utils.GetTokenFromHeader(r)
 		if err != nil {
 			e.Logger.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
-
-		claims, err := e.DecodeToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
+			http.Error(rw, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		uuid := claims["sub"].(string)
+		uuid, _, _, err := utils.ValidateAuthToken(token)
+		if err != nil {
+			e.Logger.Error("Failed to Decode Token: " + err.Error())
+			http.Error(rw, "forbidden", http.StatusForbidden)
+			return
+		}
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -594,20 +540,19 @@ Returns:
 func (e *Service) RemoveParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := e.GrabToken(r)
+		token, err := utils.GetTokenFromHeader(r)
 		if err != nil {
 			e.Logger.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
-
-		claims, err := e.DecodeToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
+			http.Error(rw, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		uuid := claims["sub"].(string)
+		uuid, _, _, err := utils.ValidateAuthToken(token)
+		if err != nil {
+			e.Logger.Error("Failed to Decode Token: " + err.Error())
+			http.Error(rw, "forbidden", http.StatusForbidden)
+			return
+		}
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -660,20 +605,19 @@ Returns:
 func (e *Service) SubscribeToEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := e.GrabToken(r)
+		token, err := utils.GetTokenFromHeader(r)
 		if err != nil {
 			e.Logger.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
-
-		claims, err := e.DecodeToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
+			http.Error(rw, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		uuid := claims["sub"].(string)
+		uuid, _, _, err := utils.ValidateAuthToken(token)
+		if err != nil {
+			e.Logger.Error("Failed to Decode Token: " + err.Error())
+			http.Error(rw, "forbidden", http.StatusForbidden)
+			return
+		}
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -703,52 +647,4 @@ func (e *Service) SubscribeToEvent() http.HandlerFunc {
 			e.SubscribeToEventTopic(event.ID.Hex(), []string{userData.DeviceToken})
 		}
 	}
-}
-
-/*
-Decode an Authentication Token
-  - Decodes auth token
-  - uses go jwt
-
-Args:
-
-	token - string of token
-
-Returns:
-
-	claims - jwt claims
-	error -  if there is an error return error else nil
-*/
-func (e *Service) DecodeToken(token string) (jwt.MapClaims, error) {
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
-	})
-
-	if err != nil {
-		return nil, err
-	} else {
-		return claims, nil
-	}
-}
-
-/*
-Grab Token from request
-Args:
-
-	r - http request
-
-Returns:
-
-	string - token
-	error -  if there is an error return error else nil
-*/
-func (e *Service) GrabToken(r *http.Request) (string, error) {
-	bearerToken := r.Header.Get("Authorization")
-
-	if bearerToken == "" {
-		return "", errors.New("no token found")
-	}
-
-	return bearerToken, nil
 }

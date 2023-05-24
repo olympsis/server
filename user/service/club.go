@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"olympsis-server/models"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -32,7 +33,7 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 		}
 
 		// we're decoding a request here but the only thing we need is `status` so we can change it from pending to accepted or declined
-		var req ClubInvite
+		var req models.ClubInvite
 		json.NewDecoder(r.Body).Decode(&req)
 
 		// set the status to the value found in the request
@@ -45,7 +46,7 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 
 		if req.Status == "accepted" {
 			// update club members
-			var inv ClubInvite
+			var inv models.ClubInvite
 			err = u.Database.ClubInvCol.FindOne(context.Background(), filter).Decode(&inv)
 			if err != nil {
 				u.Log.Error(err.Error())
@@ -62,7 +63,7 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 				u.Log.Error(err.Error())
 			}
 
-			member := Member{
+			member := models.Member{
 				ID:       primitive.NewObjectID(),
 				UUID:     inv.UUID,
 				Role:     "member",
@@ -82,7 +83,7 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 				u.Log.Error(err.Error())
 			}
 
-			var club Club
+			var club models.Club
 			err = u.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 			if err != nil {
 				u.Log.Error(err.Error())
@@ -114,7 +115,7 @@ func (u *Service) GetClubInvites() http.HandlerFunc {
 		uuid := claims["sub"].(string)
 
 		filter := bson.M{"uuid": uuid, "status": "pending"}
-		var invs []ClubInvite
+		var invs []models.ClubInvite
 		cur, err := u.Database.ClubInvCol.Find(context.TODO(), filter)
 
 		if err != nil {
@@ -127,13 +128,13 @@ func (u *Service) GetClubInvites() http.HandlerFunc {
 
 		// fetch invites
 		for cur.Next(context.TODO()) {
-			var cInv ClubInvite
+			var cInv models.ClubInvite
 			err := cur.Decode(&cInv)
 			if err != nil {
 				u.Log.Error(err)
 			}
 
-			var club Club
+			var club models.Club
 			oid, err := primitive.ObjectIDFromHex(cInv.ClubId)
 			if err != nil {
 				u.Log.Error(err.Error())
@@ -143,8 +144,6 @@ func (u *Service) GetClubInvites() http.HandlerFunc {
 			if err != nil {
 				u.Log.Error(err)
 			}
-			cInv.Data = club
-			invs = append(invs, cInv)
 		}
 
 		// fetch requestor info
@@ -155,7 +154,7 @@ func (u *Service) GetClubInvites() http.HandlerFunc {
 			return
 		}
 
-		resp := ClubInvites{
+		resp := models.ClubInvites{
 			TotalInvites: len(invs),
 			Invites:      invs,
 		}

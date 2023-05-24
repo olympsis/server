@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"olympsis-server/auth/apple"
 	"olympsis-server/database"
+	"olympsis-server/models"
 	"olympsis-server/utils"
 	"os"
 	"time"
@@ -47,7 +48,7 @@ Returns:
 */
 func (a *Service) SignUp() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var request SignInRequest
+		var request models.AuthRequest
 
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
@@ -112,7 +113,7 @@ func (a *Service) SignUp() http.HandlerFunc {
 				return
 			}
 
-			user := AuthUser{
+			user := models.AuthUser{
 				UUID:        uuid,
 				FirstName:   request.FirstName,
 				LastName:    request.LastName,
@@ -150,7 +151,7 @@ Returns:
 */
 func (a *Service) Login() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var request LogInRequest
+		var request models.AuthRequest
 
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
@@ -212,7 +213,7 @@ func (a *Service) Login() http.HandlerFunc {
 			email := (*claim)["email"].(string)
 
 			// find user
-			var user AuthUser
+			var user models.AuthUser
 			filter := bson.M{"email": email}
 			err = a.FindUser(context.Background(), filter, &user)
 			if err != nil {
@@ -282,7 +283,7 @@ func (a *Service) Delete() http.HandlerFunc {
 		}
 
 		// find user
-		var user AuthUser
+		var user models.AuthUser
 		filter := bson.M{"uuid": uuid}
 		err = a.FindUser(context.Background(), filter, &user)
 		if err != nil {

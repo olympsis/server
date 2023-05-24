@@ -25,7 +25,7 @@ type Service struct {
 }
 
 type Post struct {
-	ID        primitive.ObjectID `json:"_id" bson:"_id"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	Owner     string             `json:"owner" bson:"owner"`
 	ClubId    primitive.ObjectID `json:"clubId" bson:"clubId"`
 	Body      string             `json:"body" bson:"body"`
@@ -41,20 +41,20 @@ type Owner struct {
 }
 
 type Like struct {
-	ID        primitive.ObjectID `json:"_id" bson:"_id"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`
 	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
 }
 
 type Comment struct {
-	ID        primitive.ObjectID `json:"_id" bson:"_id"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`
 	Text      string             `json:"text" bson:"text"`
 	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
 }
 
 type CommentThread struct {
-	ID       primitive.ObjectID `json:"_id" bson:"_id"`
+	ID       primitive.ObjectID `json:"_d" bson:"_id"`
 	Comments []Comment          `json:"comments" bson:"comments"`
 }
 
@@ -89,7 +89,7 @@ Trophy
   - Trophy object
 */
 type Trophy struct {
-	ID          primitive.ObjectID `json:"_id" bson:"_id"`
+	ID          primitive.ObjectID `json:"id" bson:"_id"`
 	Name        string             `json:"name" bson:"name"`
 	Title       string             `json:"title" bson:"title"`
 	ImageURL    string             `json:"imageURL" bson:"imageURL"`
@@ -103,7 +103,7 @@ Badge
   - Badge object
 */
 type Badge struct {
-	ID          primitive.ObjectID `json:"_id" bson:"_id"`
+	ID          primitive.ObjectID `json:"_d" bson:"_id"`
 	Name        string             `json:"name" bson:"name"`
 	Title       string             `json:"title" bson:"title"`
 	ImageURL    string             `json:"imageURL" bson:"imageURL"`
@@ -117,7 +117,7 @@ Friend
   - Friend object
 */
 type Friend struct {
-	ID        primitive.ObjectID `json:"_id" bson:"_id"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`
 	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
 }

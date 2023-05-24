@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"olympsis-server/models"
 )
 
 // Insert new user into database
-func (a *Service) InsertUser(ctx context.Context, user *AuthUser) error {
+func (a *Service) InsertUser(ctx context.Context, user *models.AuthUser) error {
 	pong := a.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -16,7 +17,7 @@ func (a *Service) InsertUser(ctx context.Context, user *AuthUser) error {
 }
 
 // Get user from database
-func (a *Service) FindUser(ctx context.Context, filter interface{}, user *AuthUser) error {
+func (a *Service) FindUser(ctx context.Context, filter interface{}, user *models.AuthUser) error {
 	pong := a.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -26,7 +27,7 @@ func (a *Service) FindUser(ctx context.Context, filter interface{}, user *AuthUs
 }
 
 // get users from database
-func (a *Service) FindUsers(ctx context.Context, filter interface{}, users *[]AuthUser) error {
+func (a *Service) FindUsers(ctx context.Context, filter interface{}, users *[]models.AuthUser) error {
 	pong := a.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -38,7 +39,7 @@ func (a *Service) FindUsers(ctx context.Context, filter interface{}, users *[]Au
 	}
 
 	for cursor.Next(context.TODO()) {
-		var user AuthUser
+		var user models.AuthUser
 		err := cursor.Decode(&user)
 		if err != nil {
 			return err
@@ -49,7 +50,7 @@ func (a *Service) FindUsers(ctx context.Context, filter interface{}, users *[]Au
 }
 
 // update user in database
-func (a *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *AuthUser) error {
+func (a *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *models.AuthUser) error {
 	pong := a.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -71,7 +72,7 @@ func (a *Service) UpdateUser(ctx context.Context, filter interface{}, update int
 }
 
 // update users in database
-func (a *Service) UpdateUsers(ctx context.Context, filter interface{}, update interface{}, users *[]AuthUser) error {
+func (a *Service) UpdateUsers(ctx context.Context, filter interface{}, update interface{}, users *[]models.AuthUser) error {
 	pong := a.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -90,7 +91,7 @@ func (a *Service) UpdateUsers(ctx context.Context, filter interface{}, update in
 	}
 
 	for cursor.Next(context.TODO()) {
-		var user AuthUser
+		var user models.AuthUser
 		err := cursor.Decode(&user)
 		if err != nil {
 			return err
