@@ -27,25 +27,13 @@ Returns:
 */
 func (u *Service) GetFriends() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// find user data in database
 		var user models.User
 		filter := bson.D{primitive.E{Key: "uuid", Value: uuid}}
-		err = u.FindUser(context.Background(), filter, &user)
+		err := u.FindUser(context.Background(), filter, &user)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, "Not Found", http.StatusNotFound)
@@ -73,20 +61,9 @@ Returns:
 */
 func (u *Service) GetFriendRequests() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
-		uuid := claims["sub"].(string)
 		filter := bson.M{"requestee": uuid, "status": "pending"}
 		var reqs []models.FriendRequest
 		cur, err := u.Database.FriendReqCol.Find(context.TODO(), filter)
@@ -145,20 +122,8 @@ Returns:
 */
 func (u *Service) CreateFriendRequest() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// decode body
 		var req models.FriendRequest
@@ -172,7 +137,7 @@ func (u *Service) CreateFriendRequest() http.HandlerFunc {
 			CreatedAt: time.Now().Unix(),
 		}
 
-		_, err = u.Database.FriendReqCol.InsertOne(context.TODO(), fReq)
+		_, err := u.Database.FriendReqCol.InsertOne(context.TODO(), fReq)
 		if err != nil {
 			u.Log.Error(err)
 			return
@@ -314,20 +279,8 @@ Returns:
 */
 func (u *Service) DeleteFriendRequest() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// grab application id from path
 		vars := mux.Vars(r)
@@ -372,20 +325,8 @@ Returns:
 */
 func (u *Service) RemoveFriend() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// grab club id from path
 		vars := mux.Vars(r)

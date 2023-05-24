@@ -24,20 +24,8 @@ Returns:
 */
 func (u *Service) AddBadge() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// decode body
 		var req models.Badge
@@ -56,7 +44,7 @@ func (u *Service) AddBadge() http.HandlerFunc {
 		filter := bson.M{"uuid": uuid}
 		changes := bson.M{"$push": bson.M{"badges": badge}}
 
-		_, err = u.Database.UserCol.UpdateOne(context.TODO(), filter, changes)
+		_, err := u.Database.UserCol.UpdateOne(context.TODO(), filter, changes)
 		if err != nil {
 			u.Log.Debug(err.Error())
 		}
@@ -82,20 +70,8 @@ Returns:
 */
 func (u *Service) RemoveBadge() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// grab badge id from path
 		vars := mux.Vars(r)
@@ -140,20 +116,8 @@ Returns:
 */
 func (u *Service) AddTrophy() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// decode body
 		var req models.Badge
@@ -172,7 +136,7 @@ func (u *Service) AddTrophy() http.HandlerFunc {
 		filter := bson.M{"uuid": uuid}
 		changes := bson.M{"$push": bson.M{"trophies": trophy}}
 
-		_, err = u.Database.UserCol.UpdateOne(context.TODO(), filter, changes)
+		_, err := u.Database.UserCol.UpdateOne(context.TODO(), filter, changes)
 		if err != nil {
 			u.Log.Debug(err.Error())
 		}
@@ -198,20 +162,9 @@ Returns:
 */
 func (u *Service) RemoveTrophy() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
-		uuid := claims["sub"].(string)
 		// grab club id from path
 		vars := mux.Vars(r)
 

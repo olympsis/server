@@ -3,14 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/models"
-	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -66,8 +63,8 @@ Returns:
 func (u *Service) CheckUsername() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// grab uuid from query
-		keys, ok := r.URL.Query()["userName"]
+		// grab username from query
+		keys, ok := r.URL.Query()["username"]
 		if !ok || len(keys[0]) < 1 {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": "no userName found in request" }`))
@@ -80,19 +77,18 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 
 		// find user data in database
 		var user models.User
-		filter := bson.D{primitive.E{Key: "userName", Value: userName}}
+		filter := bson.D{primitive.E{Key: "username", Value: userName}}
 		err := u.Database.UserCol.FindOne(context.TODO(), filter).Decode(&user)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusOK)
-				rw.Write([]byte(`{ "isFound": false }`))
+				rw.Write([]byte(`{ "is_available": true }`))
 				return
 			}
 		}
-		rw.Header().Set("Content-Type", "application/json")
+
 		rw.WriteHeader(http.StatusFound)
-		rw.Write([]byte(`{ "isFound": true }`))
+		rw.Write([]byte(`{ "is_available": false }`))
 	}
 }
 
@@ -113,24 +109,11 @@ Returns:
 func (u *Service) CreateUserData() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
-
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// decode request
 		var req models.User
-		err = json.NewDecoder(r.Body).Decode(&req)
+		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			u.Log.Error(err.Error())
 			http.Error(rw, "Bad Request", http.StatusBadRequest)
@@ -142,7 +125,7 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 			UUID:       uuid,
 			UserName:   req.UserName,
 			Sports:     req.Sports,
-			Visibility: "public",
+			Visibility: req.Visibility,
 		}
 
 		// insert auth user in database
@@ -211,7 +194,6 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 			u.Log.Debug(err)
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(req)
 	}
@@ -263,24 +245,12 @@ Returns:
 */
 func (u *Service) DeleteUserData() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		// delete user data from database
 		filter := bson.M{"uuid": uuid}
-		err = u.DeleteUser(context.Background(), filter)
+		err := u.DeleteUser(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				rw.WriteHeader(http.StatusNotFound)
@@ -291,52 +261,4 @@ func (u *Service) DeleteUserData() http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 	}
-}
-
-/*
-Decode an Authentication Token
-  - Decodes auth token
-  - uses go jwt
-
-Args:
-
-	token - string of token
-
-Returns:
-
-	claims - jwt claims
-	error -  if there is an error return error else nil
-*/
-func (u *Service) DecodeToken(token string) (jwt.MapClaims, error) {
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
-	})
-
-	if err != nil {
-		return nil, err
-	} else {
-		return claims, nil
-	}
-}
-
-/*
-Grab Token from request
-Args:
-
-	r - http request
-
-Returns:
-
-	string - token
-	error -  if there is an error return error else nil
-*/
-func (u *Service) GrabToken(r *http.Request) (string, error) {
-	bearerToken := r.Header.Get("Authorization")
-
-	if bearerToken == "" {
-		return "", errors.New("no token found")
-	}
-
-	return bearerToken, nil
 }

@@ -99,20 +99,8 @@ func (u *Service) UpdateClubInvite() http.HandlerFunc {
 
 func (u *Service) GetClubInvites() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		token, err := u.GrabToken(r)
-		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-		}
 
-		claims, err := u.DecodeToken(token)
-		if err != nil {
-			u.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid := claims["sub"].(string)
+		uuid := r.Header.Get("UUID")
 
 		filter := bson.M{"uuid": uuid, "status": "pending"}
 		var invs []models.ClubInvite
