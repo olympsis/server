@@ -3,6 +3,7 @@ package field
 import (
 	"olympsis-server/database"
 	"olympsis-server/field/service"
+	"olympsis-server/middleware"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -19,19 +20,32 @@ func NewFieldAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *FieldAP
 }
 
 func (s *FieldAPI) Ready() {
+	/*
+		ROUTES
+	*/
 
 	// get fields
-	s.Router.Handle("/v1/fields", s.Service.GetFields()).Methods("GET")
+	s.Router.Handle(
+		"/fields", middleware.Chain(s.Service.GetFields(), middleware.Logging()),
+	).Methods("GET")
 
 	// get a field
-	s.Router.Handle("/v1/fields/{id}", s.Service.GetAField()).Methods("GET")
+	s.Router.Handle(
+		"/fields/{id}", middleware.Chain(s.Service.GetAField(), middleware.Logging()),
+	).Methods("GET")
 
 	// create field
-	s.Router.Handle("/v1/fields", s.Service.InsertAField()).Methods("POST")
+	s.Router.Handle(
+		"/fields", middleware.Chain(s.Service.InsertAField(), middleware.Logging()),
+	).Methods("POST")
 
 	// update a field
-	s.Router.Handle("/v1/fields/{id}", s.Service.UpdateAField()).Methods("PUT")
+	s.Router.Handle(
+		"/fields/{id}", middleware.Chain(s.Service.UpdateAField(), middleware.Logging()),
+	).Methods("PUT")
 
 	// delete a field
-	s.Router.Handle("/v1/fields/{id}", s.Service.DeleteAField()).Methods("DELETE")
+	s.Router.Handle(
+		"/fields/{id}", middleware.Chain(s.Service.DeleteAField(), middleware.Logging()),
+	).Methods("DELETE")
 }

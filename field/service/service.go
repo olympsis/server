@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/models"
 	"os"
 	"strconv"
 
@@ -16,6 +17,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+/*
+Field Service Struct
+*/
+type Service struct {
+	Database *database.Database
+
+	// logrus logger to Log information about service and errors
+	Log *logrus.Logger
+
+	// mux Router to complete http requests
+	Router *mux.Router
+}
 
 /*
 Create new field service struct
@@ -40,7 +54,7 @@ Returns:
 */
 func (f *Service) InsertAField() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var req Field
+		var req models.Field
 
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -50,18 +64,17 @@ func (f *Service) InsertAField() http.HandlerFunc {
 			return
 		}
 
-		field := Field{
-			ID:        primitive.NewObjectID(),
-			Owner:     req.Owner,
-			Name:      req.Name,
-			Notes:     req.Notes,
-			Sports:    req.Sports,
-			Images:    req.Images,
-			Location:  req.Location,
-			City:      req.City,
-			State:     req.State,
-			Country:   req.Country,
-			Ownership: req.Ownership,
+		field := models.Field{
+			ID:          primitive.NewObjectID(),
+			Owner:       req.Owner,
+			Name:        req.Name,
+			Description: req.Description,
+			Sports:      req.Sports,
+			Images:      req.Images,
+			Location:    req.Location,
+			City:        req.City,
+			State:       req.State,
+			Country:     req.Country,
 		}
 
 		// create auth user in database
@@ -103,8 +116,8 @@ func (f *Service) GetFields() http.HandlerFunc {
 
 		}
 
-		var fields []Field
-		loc := GeoJSON{
+		var fields []models.Field
+		loc := models.GeoJSON{
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
@@ -131,7 +144,7 @@ func (f *Service) GetFields() http.HandlerFunc {
 			return
 		}
 
-		resp := FieldsResponse{
+		resp := models.FieldsResponse{
 			TotalFields: len(fields),
 			Fields:      fields,
 		}
@@ -164,7 +177,7 @@ func (f *Service) GetAField() http.HandlerFunc {
 		id := vars["id"]
 
 		// find field data in database
-		var field Field
+		var field models.Field
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
 		err := f.FindField(context.Background(), filter, &field)
@@ -195,7 +208,7 @@ Returns:
 */
 func (f *Service) UpdateAField() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var req Field
+		var req models.Field
 
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -217,14 +230,13 @@ func (f *Service) UpdateAField() http.HandlerFunc {
 		changes := bson.M{}
 		updates := bson.M{"$set": changes}
 
-		if req.Owner != "" {
-			changes["owner"] = req.Owner
-		}
+		changes["owner"] = req.Owner
+
 		if req.Name != "" {
 			changes["name"] = req.Name
 		}
-		if req.Notes != "" {
-			changes["notes"] = req.Notes
+		if req.Description != "" {
+			changes["notes"] = req.Description
 		}
 		if len(req.Sports) != 0 {
 			changes["sports"] = req.Sports
@@ -244,11 +256,8 @@ func (f *Service) UpdateAField() http.HandlerFunc {
 		if req.Country != "" {
 			changes["country"] = req.Country
 		}
-		if req.Ownership != "" {
-			changes["ownership"] = req.Ownership
-		}
 
-		var field Field
+		var field models.Field
 		err = f.UpdateField(context.Background(), filter, updates, &field)
 		if err != nil {
 			f.Log.Error(err.Error())
