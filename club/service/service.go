@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"olympsis-server/database"
-	lService "olympsis-server/lookup/service"
-	"olympsis-server/pushnote/service"
+	"olympsis-server/models"
+	notif "olympsis-server/pushnote/service"
+	search "olympsis-server/search"
 	"olympsis-server/utils"
 	"time"
 
@@ -17,13 +18,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+type Service struct {
+	Database      *database.Database
+	Logger        *logrus.Logger
+	Router        *mux.Router
+	NotifService  *notif.Service
+	SearchService *search.Service
+}
+
 /*
 Create new Club service struct
 
   - Create and Returns a pointer to a new club service struct
 */
-func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *service.Service, lk *lService.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, LookUpService: lk}
+func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
 }
 
 /*
@@ -64,7 +73,7 @@ func (c *Service) GetClubs() http.HandlerFunc {
 			filter["state"] = state
 		}
 
-		var clubs []Club
+		var clubs []models.Club
 		err := c.FindClubs(context.TODO(), filter, &clubs)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -84,7 +93,7 @@ func (c *Service) GetClubs() http.HandlerFunc {
 			return
 		}
 
-		resp := ClubsResponse{
+		resp := models.ClubsResponse{
 			TotalClubs: len(clubs),
 			Clubs:      clubs,
 		}
@@ -125,7 +134,7 @@ func (c *Service) GetClub() http.HandlerFunc {
 		defer ctx()
 
 		// find club data in database
-		var club Club
+		var club models.Club
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
 		err := c.FindClub(context.Background(), filter, &club)
 		if err != nil {
@@ -179,7 +188,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		}
 
 		// decode request
-		var req Club
+		var req models.Club
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			c.Logger.Error("failed to decode request")
@@ -188,24 +197,24 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		}
 
 		timeStamp := time.Now().Unix()
-		member := Member{
+		member := models.Member{
 			ID:       primitive.NewObjectID(),
 			UUID:     uuid,
 			Role:     "owner",
 			JoinedAt: timeStamp,
 		}
 
-		club := Club{
+		club := models.Club{
 			ID:          primitive.NewObjectID(),
 			Name:        req.Name,
 			Description: req.Description,
-			IsPrivate:   req.IsPrivate,
+			Visibility:  req.Visibility,
 			Sport:       req.Sport,
 			City:        req.City,
 			State:       req.State,
 			Country:     req.Country,
 			ImageURL:    req.ImageURL,
-			Members:     []Member{member},
+			Members:     []models.Member{member},
 			Rules:       req.Rules,
 			CreatedAt:   timeStamp,
 		}
@@ -234,7 +243,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 			return
 		}
 
-		resp := CreateClubResponse{
+		resp := models.CreateClubResponse{
 			Token: token,
 			Club:  club,
 		}
@@ -304,7 +313,7 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 			return
 		}
 
-		var req Club
+		var req models.Club
 
 		// decode request
 		err = json.NewDecoder(r.Body).Decode(&req)
@@ -347,7 +356,7 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 		}
 
 		// update club data in database
-		var club Club
+		var club models.Club
 		err = c.UpdateAClub(context.Background(), filter, update)
 		if err != nil {
 			c.Logger.Error(err.Error())
@@ -430,7 +439,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		}
 
 		// check if club exists
-		var _club Club
+		var _club models.Club
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&_club)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -536,11 +545,11 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// json request
-		var req ChangeRoleRequest
+		var req models.ChangeRoleRequest
 		json.NewDecoder(r.Body).Decode(&req)
 
 		// fetch club data to get member position in array
-		var club Club
+		var club models.Club
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -558,7 +567,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			}
 		}
 
-		member := Member{
+		member := models.Member{
 			ID:       memOID,
 			UUID:     club.Members[index].UUID,
 			Role:     req.Role,
@@ -583,17 +592,17 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// grab user data for device token for notifications
-		usr := c.LookUpService.FetchData(member.UUID)
-		text := ""
-		if req.Role == "admin" {
-			text = "You've been promoted to Admin"
-		} else if req.Role == "moderator" {
-			text = "You've been promoted to Moderator"
-		} else {
-			text = "You've been demoted"
-		}
+		//usr := c.LookUpService.FetchData(member.UUID)
+		// text := ""
+		// if req.Role == "admin" {
+		// 	text = "You've been promoted to Admin"
+		// } else if req.Role == "moderator" {
+		// 	text = "You've been promoted to Moderator"
+		// } else {
+		// 	text = "You've been demoted"
+		// }
 
-		c.NotifService.PushNote(club.Name, text, usr.DeviceToken)
+		//c.NotifService.PushNote(club.Name, text, usr.DeviceToken)
 
 		// fetch updated club data
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
@@ -694,7 +703,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 
 		// fetch club
 		filter := bson.M{"_id": oid}
-		var club Club
+		var club models.Club
 		err = c.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -724,7 +733,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// fetch user token
-		usr := c.LookUpService.FetchData(club.Members[index].UUID)
+		// usr := c.LookUpService.FetchData(club.Members[index].UUID)
 
 		// remove member from club
 		filter = bson.M{"_id": oid}
@@ -737,7 +746,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// notify user
-		c.NotifService.PushNote(club.Name, "You've been kicked out of "+club.Name, usr.DeviceToken)
+		// c.NotifService.PushNote(club.Name, "You've been kicked out of "+club.Name, usr.DeviceToken)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -878,7 +887,7 @@ func (c *Service) GetApplications() http.HandlerFunc {
 		defer ctx()
 
 		filter := bson.M{"clubId": oid}
-		var apps []ClubApplication
+		var apps []models.ClubApplication
 		cur, err := c.Database.ClubApplicationCol.Find(context.TODO(), filter)
 
 		if err != nil {
@@ -890,13 +899,13 @@ func (c *Service) GetApplications() http.HandlerFunc {
 		}
 
 		for cur.Next(context.TODO()) {
-			var app ClubApplication
+			var app models.ClubApplication
 			err := cur.Decode(&app)
 			if err != nil {
 				c.Logger.Error(err)
 			}
-			u := c.LookUpService.FetchData(app.UUID)
-			app.Data = u
+			// u := c.LookUpService.FetchData(app.UUID)
+			// app.Data = u
 			apps = append(apps, app)
 		}
 
@@ -907,7 +916,7 @@ func (c *Service) GetApplications() http.HandlerFunc {
 			return
 		}
 
-		resp := ClubApplicationsResponse{
+		resp := models.ClubApplicationsResponse{
 			TotalApplications: len(apps),
 			Applications:      apps,
 		}
@@ -961,7 +970,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		}
 
 		// check if an application already exists
-		var _app ClubApplication
+		var _app models.ClubApplication
 		filter := bson.M{"uuid": uuid, "clubId": oid}
 		err = c.Database.ClubApplicationCol.FindOne(context.Background(), filter).Decode(&_app)
 		if err != nil {
@@ -974,10 +983,10 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		}
 
 		timeStamp := time.Now().Unix()
-		app := ClubApplication{
+		app := models.ClubApplication{
 			ID:        primitive.NewObjectID(),
 			UUID:      uuid,
-			ClubId:    oid,
+			ClubID:    oid,
 			Status:    "pending",
 			CreatedAt: timeStamp,
 		}
@@ -1071,7 +1080,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			return
 		}
 
-		var req ApplicationUpdateRequest
+		var req models.ApplicationUpdateRequest
 		// decode request
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
@@ -1097,7 +1106,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 		if req.Status == "accepted" {
 
 			// check if application exists
-			var app ClubApplication
+			var app models.ClubApplication
 			filter := bson.M{"_id": aoid}
 			err = c.Database.ClubApplicationCol.FindOne(context.TODO(), filter).Decode(&app)
 			if err != nil {
@@ -1132,7 +1141,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 					return
 				}
 
-				member := Member{ // member object to put in club
+				member := models.Member{ // member object to put in club
 					ID:       primitive.NewObjectID(), // unique member identifier
 					UUID:     app.UUID,                // user uuid
 					Role:     "member",                // user role
@@ -1151,7 +1160,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				}
 
 				// find club info
-				var club Club
+				var club models.Club
 				err = c.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 				if err != nil {
 					c.Logger.Error(err)
@@ -1161,10 +1170,10 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				}
 
 				// find user device token
-				usr := c.LookUpService.FetchData(member.UUID)
+				// usr := c.LookUpService.FetchData(member.UUID)
 
-				// notify user they were accepted to the club
-				c.NotifService.PushNote("Club Application", club.Name+" accepted your application.", usr.DeviceToken)
+				// // notify user they were accepted to the club
+				// c.NotifService.PushNote("Club Application", club.Name+" accepted your application.", usr.DeviceToken)
 
 				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusOK)
@@ -1300,7 +1309,7 @@ func (c *Service) CreateInvitation() http.HandlerFunc {
 			return
 		}
 
-		var req ClubInvitation
+		var req models.ClubInvitation
 
 		_, ctx := context.WithTimeout(context.Background(), 30*time.Second)
 		defer ctx()
@@ -1314,10 +1323,10 @@ func (c *Service) CreateInvitation() http.HandlerFunc {
 		}
 
 		timeStamp := time.Now().Unix()
-		inv := ClubInvitation{
+		inv := models.ClubInvitation{
 			ID:        primitive.NewObjectID(),
 			UUID:      req.UUID,
-			ClubId:    req.ClubId,
+			ClubID:    req.ClubID,
 			Status:    "pending",
 			CreatedAt: timeStamp,
 		}

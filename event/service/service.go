@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"olympsis-server/database"
-	"olympsis-server/utils"
+	"olympsis-server/models"
+	notif "olympsis-server/pushnote/service"
+	search "olympsis-server/search"
 	"strconv"
 	"strings"
 	"time"
@@ -18,10 +20,29 @@ import (
 )
 
 /*
+Field Service Struct
+*/
+type Service struct {
+	Database *database.Database
+
+	// logrus logger to Logger information about service and errors
+	Logger *logrus.Logger
+
+	// mux Router to complete http requests
+	Router *mux.Router
+
+	// notif service
+	NotifService *notif.Service
+
+	// search service
+	SearchService *search.Service
+}
+
+/*
 Create new field service struct
 */
-func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Logger: l, Router: r, Database: d}
+func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
 }
 
 /*
@@ -41,32 +62,20 @@ Returns:
 func (e *Service) CreateEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		uuid, _, _, err := utils.ValidateAuthToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "forbidden", http.StatusForbidden)
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req Event
-		err = json.NewDecoder(r.Body).Decode(&req)
+		var req models.Event
+		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
 		}
 
-		event := Event{
+		event := models.Event{
 			ID:              primitive.NewObjectID(),
-			OwnerID:         uuid,
+			Poster:          uuid,
 			ClubID:          req.ClubID,
 			FieldId:         req.FieldId,
 			ImageURL:        req.ImageURL,
@@ -75,8 +84,8 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			Sport:           req.Sport,
 			StartTime:       req.StartTime,
 			MaxParticipants: req.MaxParticipants,
-			Participants:    []Participant{},
-			Likes:           []Like{},
+			Participants:    req.Participants,
+			Likes:           []models.Like{},
 			Level:           req.Level,
 			Status:          "pending",
 			Visibility:      req.Visibility,
@@ -120,7 +129,7 @@ func (e *Service) GetEvent() http.HandlerFunc {
 		id := vars["id"]
 
 		// find field data in database
-		var event Event
+		var event models.Event
 		OID, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.D{primitive.E{Key: "_id", Value: OID}}
 		err := e.FindEvent(context.TODO(), filter, &event)
@@ -134,15 +143,15 @@ func (e *Service) GetEvent() http.HandlerFunc {
 		// TODO Fetch data about owner
 
 		// add user data to participants
-		for ptp := range event.Participants {
-			var participantData UserData
-			err = e.FetchDataAboutUser(event.Participants[ptp].UUID, &participantData)
-			if err != nil {
-				e.Logger.Error(err.Error())
-			} else {
-				event.Participants[ptp].Data = &participantData
-			}
-		}
+		// for ptp := range event.Participants {
+		// 	var participantData UserData
+		// 	err = e.FetchDataAboutUser(event.Participants[ptp].UUID, &participantData)
+		// 	if err != nil {
+		// 		e.Logger.Error(err.Error())
+		// 	} else {
+		// 		//event.Participants[ptp].Data = &participantData
+		// 	}
+		// }
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -189,10 +198,10 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 
 		splicedSports := strings.Split(sports, ",")
 
-		var events []Event
-		var fields []Field
+		var events []models.Event
+		var fields []models.Field
 
-		loc := GeoJSON{
+		loc := models.GeoJSON{
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
@@ -253,7 +262,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			return
 		}
 
-		resp := EventsResponse{
+		resp := models.EventsResponse{
 			TotalEvents: len(events),
 			Events:      events,
 		}
@@ -290,7 +299,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		id := vars["id"]
 
 		// decode request
-		var req Event
+		var req models.Event
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
@@ -334,7 +343,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			changes["visibility"] = req.Visibility
 		}
 
-		var event Event
+		var event models.Event
 
 		err = e.UpdateEvent(context.Background(), filter, updates, &event)
 		if err != nil {
@@ -394,6 +403,8 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 			http.Error(rw, "failed to delete event", http.StatusInternalServerError)
 		}
 
+		// delete notification topic
+
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -415,19 +426,7 @@ Returns:
 func (e *Service) AddParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		uuid, _, _, err := utils.ValidateAuthToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "forbidden", http.StatusForbidden)
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -437,7 +436,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req Participant
+		var req models.Participant
 		// decode request
 		json.NewDecoder(r.Body).Decode(&req)
 
@@ -447,9 +446,9 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 
 		// find event data in database
-		var event Event
+		var event models.Event
 		filter := bson.M{"_id": oid}
-		err = e.FindEvent(context.Background(), filter, &event)
+		err := e.FindEvent(context.Background(), filter, &event)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, "event not found", http.StatusNotFound)
@@ -470,25 +469,24 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		if len(event.Participants) >= int(event.MaxParticipants) {
 
 			// add owner data to event
-			var data UserData
-			err = e.FetchDataAboutUser(event.OwnerID, &data)
-			if err != nil {
-				e.Logger.Error(err.Error())
-			}
-			event.OwnerData = &data
+			// var data UserData
+			// err = e.FetchDataAboutUser(event.Poster, &data)
+			// if err != nil {
+			// 	e.Logger.Error(err.Error())
+			// }
 
 			// fetch participants data
-			for ptp := range event.Participants {
-				var participantData UserData
-				err = e.FetchDataAboutUser(event.Participants[ptp].UUID, &participantData)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				} else {
-					event.Participants[ptp].Data = &participantData
-				}
-			}
+			// for ptp := range event.Participants {
+			// 	var participantData UserData
+			// 	err = e.FetchDataAboutUser(event.Participants[ptp].UUID, &participantData)
+			// 	if err != nil {
+			// 		e.Logger.Error(err.Error())
+			// 	} else {
+			// 		//event.Participants[ptp].Data = &participantData
+			// 	}
+			// }
 
-			errResponse := FullEventError{
+			errResponse := models.FullEventError{
 				MSG:   "event capacity is full",
 				Event: event,
 			}
@@ -500,7 +498,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// participant object
-		part := &Participant{
+		part := &models.Participant{
 			ID:        primitive.NewObjectID(),
 			UUID:      uuid,
 			Status:    req.Status,
@@ -515,13 +513,13 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// subscribe user to notifications
-		var userData UserData
-		err = e.FetchDataAboutUser(uuid, &userData)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		} else {
-			e.SubscribeToEventTopic(event.ID.Hex(), []string{userData.DeviceToken})
-		}
+		// var userData UserData
+		// err = e.FetchDataAboutUser(uuid, &userData)
+		// if err != nil {
+		// 	e.Logger.Error(err.Error())
+		// } else {
+		// 	//e.SubscribeToEventTopic(event.ID.Hex(), []string{userData.DeviceToken})
+		// }
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -546,19 +544,7 @@ Returns:
 func (e *Service) RemoveParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		uuid, _, _, err := utils.ValidateAuthToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "forbidden", http.StatusForbidden)
-			return
-		}
+		// uuid := r.Header.Get("UUID")
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -576,8 +562,8 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"participants": bson.M{"_id": poid}}}
 
-		var event Event
-		err = e.UpdateEvent(context.Background(), match, change, &event)
+		var event models.Event
+		err := e.UpdateEvent(context.Background(), match, change, &event)
 		if err != nil {
 			e.Logger.Error(err.Error())
 			http.Error(rw, "failed to update event", http.StatusInternalServerError)
@@ -585,13 +571,6 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// unsubscribe user from notifications
-		var userData UserData
-		err = e.FetchDataAboutUser(uuid, &userData)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		} else {
-			e.UnsubscribeFromEventTopic(id, []string{userData.DeviceToken})
-		}
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
@@ -611,19 +590,7 @@ Returns:
 func (e *Service) SubscribeToEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		uuid, _, _, err := utils.ValidateAuthToken(token)
-		if err != nil {
-			e.Logger.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "forbidden", http.StatusForbidden)
-			return
-		}
+		// uuid := r.Header.Get("UUID")
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -636,21 +603,15 @@ func (e *Service) SubscribeToEvent() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 
 		// fetch event
-		var event Event
+		var event models.Event
 		filter := bson.M{"_id": oid}
-		err = e.FindEvent(context.Background(), filter, &event)
+		err := e.FindEvent(context.Background(), filter, &event)
 		if err != nil {
 			http.Error(rw, "event not found", http.StatusNotFound)
 			return
 		}
 
-		// fetch device token
-		var userData UserData
-		err = e.FetchDataAboutUser(uuid, &userData)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		} else {
-			e.SubscribeToEventTopic(event.ID.Hex(), []string{userData.DeviceToken})
-		}
+		// subscribe to event
+
 	}
 }

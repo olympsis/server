@@ -3,6 +3,8 @@ package event
 import (
 	"olympsis-server/database"
 	"olympsis-server/event/service"
+	notif "olympsis-server/pushnote/service"
+	search "olympsis-server/search"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -14,8 +16,8 @@ type EventAPI struct {
 	Service *service.Service
 }
 
-func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *EventAPI {
-	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d)}
+func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *EventAPI {
+	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d, n, sh)}
 }
 
 func (e *EventAPI) Ready() {

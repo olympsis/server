@@ -3,8 +3,8 @@ package club
 import (
 	"olympsis-server/club/service"
 	"olympsis-server/database"
-	lkup "olympsis-server/lookup/service"
 	notif "olympsis-server/pushnote/service"
+	search "olympsis-server/search"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -16,8 +16,8 @@ type ClubAPI struct {
 	Service *service.Service
 }
 
-func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, lk *lkup.Service) *ClubAPI {
-	return &ClubAPI{Logger: l, Router: r, Service: service.NewClubService(l, r, d, n, lk)}
+func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *ClubAPI {
+	return &ClubAPI{Logger: l, Router: r, Service: service.NewClubService(l, r, d, n, sh)}
 }
 
 func (s *ClubAPI) Ready() {

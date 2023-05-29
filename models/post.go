@@ -9,7 +9,7 @@ Post
 type Post struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	ClubId    primitive.ObjectID `json:"club_id" bson:"club_id"`
-	Poster    string             `json:"poster" bson:"poster"`
+	Poster    string             `json:"poster,omitempty" bson:"poster,omitempty"`
 	Title     string             `json:"title" bson:"title"`
 	Body      string             `json:"body" bson:"body"`
 	EventId   primitive.ObjectID `json:"event_id,omitempty" bson:"event_id,omitempty"`

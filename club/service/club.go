@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"olympsis-server/models"
 )
 
-func (s *Service) InsertClub(ctx context.Context, club *Club) error {
+func (s *Service) InsertClub(ctx context.Context, club *models.Club) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -14,7 +15,7 @@ func (s *Service) InsertClub(ctx context.Context, club *Club) error {
 	return nil
 }
 
-func (s *Service) FindClub(ctx context.Context, filter interface{}, club *Club) error {
+func (s *Service) FindClub(ctx context.Context, filter interface{}, club *models.Club) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -23,7 +24,7 @@ func (s *Service) FindClub(ctx context.Context, filter interface{}, club *Club) 
 	return nil
 }
 
-func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]Club) error {
+func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]models.Club) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -34,7 +35,7 @@ func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]Cl
 	}
 
 	for cursor.Next(context.TODO()) {
-		var club Club
+		var club models.Club
 		err = cursor.Decode(&club)
 		if err != nil {
 			return err
@@ -59,7 +60,7 @@ func (s *Service) UpdateAClub(ctx context.Context, filter interface{}, update in
 	return nil
 }
 
-func (s *Service) UpdateClubs(ctx context.Context, filter interface{}, update interface{}, clubs *[]Club) error {
+func (s *Service) UpdateClubs(ctx context.Context, filter interface{}, update interface{}, clubs *[]models.Club) error {
 	return nil
 }
 

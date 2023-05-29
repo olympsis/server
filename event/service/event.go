@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"olympsis-server/models"
 )
 
 // Insert new event into database
-func (s *Service) InsertEvent(ctx context.Context, event *Event) error {
+func (s *Service) InsertEvent(ctx context.Context, event *models.Event) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -16,7 +17,7 @@ func (s *Service) InsertEvent(ctx context.Context, event *Event) error {
 }
 
 // Get event from database
-func (s *Service) FindEvent(ctx context.Context, filter interface{}, event *Event) error {
+func (s *Service) FindEvent(ctx context.Context, filter interface{}, event *models.Event) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -26,7 +27,7 @@ func (s *Service) FindEvent(ctx context.Context, filter interface{}, event *Even
 }
 
 // get events from database
-func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]Event) error {
+func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]models.Event) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -38,7 +39,7 @@ func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]
 	}
 
 	for cursor.Next(context.TODO()) {
-		var event Event
+		var event models.Event
 		err := cursor.Decode(&event)
 		if err != nil {
 			return err
@@ -49,7 +50,7 @@ func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]
 }
 
 // update user in database
-func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}, event *Event) error {
+func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}, event *models.Event) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -71,7 +72,7 @@ func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update in
 }
 
 // update event in database
-func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}, events *[]Event) error {
+func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}, events *[]models.Event) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")

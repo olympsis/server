@@ -8,9 +8,9 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/event"
 	"olympsis-server/field"
-	"olympsis-server/lookup"
 	"olympsis-server/post"
-	pushService "olympsis-server/pushnote/service"
+	notif "olympsis-server/pushnote/service"
+	search "olympsis-server/search"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -33,19 +33,19 @@ func main() {
 	d.EstablishConnection()
 
 	// notifications service
-	notif := pushService.NewNotificationService(l, r)
-	notif.CreateNewClient()
-	notif.ConnectToDatabase()
+	n := notif.NewNotificationService(l, r)
+	n.CreateNewClient()
+	n.ConnectToDatabase()
 
 	// search service
-	lookupAPI := lookup.NewLookUpAPI(l, r, d)
+	sh := search.NewSearchService(l, d)
 
 	authAPI := auth.NewAuthAPI(l, r, d)
 	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
-	clubAPI := club.NewClubAPI(l, r, d, notif, lookupAPI.GetService())
-	postAPI := post.NewPostAPI(l, r, d)
-	eventAPI := event.NewEventAPI(l, r, d)
+	clubAPI := club.NewClubAPI(l, r, d, n, sh)
+	postAPI := post.NewPostAPI(l, r, d, n, sh)
+	eventAPI := event.NewEventAPI(l, r, d, n, sh)
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -53,7 +53,6 @@ func main() {
 	clubAPI.Ready()
 	postAPI.Ready()
 	eventAPI.Ready()
-	lookupAPI.Ready()
 
 	port := os.Getenv("PORT")
 

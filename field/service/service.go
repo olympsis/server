@@ -112,7 +112,7 @@ func (f *Service) GetFields() http.HandlerFunc {
 		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
 		sports := r.URL.Query().Get("sports")
 
-		if longitude == 0 || latitude == 0 {
+		if longitude == 0 || latitude == 0 || sports == "" {
 			http.Error(rw, "you need longitude/latitude", http.StatusBadRequest)
 			return
 		}

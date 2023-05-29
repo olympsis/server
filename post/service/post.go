@@ -1,16 +1,15 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"olympsis-server/database"
-	"os"
-	"strings"
+	"olympsis-server/models"
+	notif "olympsis-server/pushnote/service"
+	search "olympsis-server/search"
 	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,128 +18,11 @@ import (
 )
 
 type Service struct {
-	Database *database.Database
-	Logger   *logrus.Logger
-	Router   *mux.Router
-}
-
-type Post struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	Owner     string             `json:"owner" bson:"owner"`
-	ClubId    primitive.ObjectID `json:"clubId" bson:"clubId"`
-	Body      string             `json:"body" bson:"body"`
-	Images    []string           `json:"images" bson:"images"`
-	Likes     []Like             `json:"likes" bson:"likes"`
-	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
-}
-
-type Owner struct {
-	UUID     string `json:"uuid" bson:"uuid"`
-	Username string `json:"username" bson:"username"`
-	ImageURL string `json:"imageURL" bson:"imageURL"`
-}
-
-type Like struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	UUID      string             `json:"uuid" bson:"uuid"`
-	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
-}
-
-type Comment struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	UUID      string             `json:"uuid" bson:"uuid"`
-	Text      string             `json:"text" bson:"text"`
-	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
-}
-
-type CommentThread struct {
-	ID       primitive.ObjectID `json:"_d" bson:"_id"`
-	Comments []Comment          `json:"comments" bson:"comments"`
-}
-
-type CommentThreadResponse struct {
-	TotalComments int       `json:"totalComments"`
-	Comments      []Comment `json:"comments"`
-}
-
-type PostsResponse struct {
-	TotalPosts int    `json:"totalPosts"`
-	Posts      []Post `json:"posts"`
-}
-
-/*
-Lookup User
-- contains identifiable user data that others can see
-*/
-type LookUpUser struct {
-	FirstName string   `json:"firstName" bson:"firstName"`
-	LastName  string   `json:"lastName" bson:"lastName"`
-	Username  string   `json:"username" bson:"username"`
-	ImageURL  string   `json:"imageURL" bson:"imageURL"`
-	Clubs     []string `json:"clubs" bson:"clubs"`
-	Sports    []string `json:"sports" bson:"sports"`
-	Badges    []Badge  `json:"badges" bson:"badges"`
-	Trophies  []Trophy `json:"trophies" bson:"trophies"`
-	Friends   []Friend `json:"friends" bson:"friends"`
-}
-
-/*
-Trophy
-  - Trophy object
-*/
-type Trophy struct {
-	ID          primitive.ObjectID `json:"id" bson:"_id"`
-	Name        string             `json:"name" bson:"name"`
-	Title       string             `json:"title" bson:"title"`
-	ImageURL    string             `json:"imageURL" bson:"imageURL"`
-	EventId     primitive.ObjectID `json:"eventId" bson:"eventId"`
-	Description string             `json:"description" bson:"description"`
-	AchievedAt  int64              `json:"achievedAt" bson:"achievedAt"`
-}
-
-/*
-Badge
-  - Badge object
-*/
-type Badge struct {
-	ID          primitive.ObjectID `json:"_d" bson:"_id"`
-	Name        string             `json:"name" bson:"name"`
-	Title       string             `json:"title" bson:"title"`
-	ImageURL    string             `json:"imageURL" bson:"imageURL"`
-	EventId     primitive.ObjectID `json:"eventId" bson:"eventId"`
-	Description string             `json:"description" bson:"description"`
-	AchievedAt  int64              `json:"achievedAt" bson:"achievedAt"`
-}
-
-/*
-Friend
-  - Friend object
-*/
-type Friend struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	UUID      string             `json:"uuid" bson:"uuid"`
-	CreatedAt int64              `json:"createdAt" bson:"createdAt"`
-}
-
-type NotificationRequest struct {
-	Tokens []string `json:"tokens"`
-	Title  string   `json:"title"`
-	Body   string   `json:"body"`
-	Topic  string   `json:"topic"`
-}
-
-type Club struct {
-	ID          primitive.ObjectID `json:"id" bson:"_id"`
-	Name        string             `json:"name" bson:"name"`
-	Description string             `json:"description,omitempty" bson:"description,omitempty"`
-	Sport       string             `json:"sport" bson:"sport"`
-	City        string             `json:"city" bson:"city"`
-	State       string             `json:"state" bson:"state"`
-	Country     string             `json:"country" bson:"country"`
-	ImageURL    string             `json:"imageURL,omitempty" bson:"imageURL,omitempty"`
-	IsPrivate   bool               `json:"isPrivate" bson:"isPrivate"`
-	Rules       []string           `json:"rules,omitempty" bson:"rules,omitempty"`
-	CreatedAt   int64              `json:"createdAt" bson:"createdAt"`
+	Database      *database.Database
+	Logger        *logrus.Logger
+	Router        *mux.Router
+	SearchService *search.Service
+	NotifService  *notif.Service
 }
 
 /*
@@ -148,8 +30,8 @@ Create new Post service struct
 
   - Create and Returns a pointer to a new post service struct
 */
-func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Logger: l, Router: r, Database: d}
+func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
 }
 
 /*
@@ -180,7 +62,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		coid, _ := primitive.ObjectIDFromHex(club)
 		filter := bson.M{"clubId": coid}
 
-		var posts []Post
+		var posts []models.Post
 		cur, err := p.Database.PostCol.Find(context.TODO(), filter)
 
 		if err != nil {
@@ -198,7 +80,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		}
 
 		for cur.Next(context.TODO()) {
-			var post Post
+			var post models.Post
 			err := cur.Decode(&post)
 			if err != nil {
 				p.Logger.Error(err)
@@ -212,7 +94,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			return
 		}
 
-		resp := PostsResponse{
+		resp := models.PostsResponse{
 			TotalPosts: len(posts),
 			Posts:      posts,
 		}
@@ -250,7 +132,7 @@ func (p *Service) GetPost() http.HandlerFunc {
 		defer ctx()
 
 		// find post  in database
-		var post Post
+		var post models.Post
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
 		err := p.Database.PostCol.FindOne(context.TODO(), filter).Decode(&post)
 		if err != nil {
@@ -286,20 +168,12 @@ Http handler
 func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab uuid
-		bearerToken := r.Header.Get("Authorization")
-		tokenSplit := strings.Split(bearerToken, "Bearer ")
-		token := tokenSplit[1]
-		uuid, _, _, err := p.ValidateAndParseJWTToken(token)
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte(`{ "msg": "unable to parse token." }`))
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
-		var req Post
+		var req models.Post
 
 		// decode request
-		err = json.NewDecoder(r.Body).Decode(&req)
+		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
@@ -308,19 +182,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 		timeStamp := time.Now().Unix()
 		req.CreatedAt = timeStamp
-		post := Post{
+		post := models.Post{
 			ID:        primitive.NewObjectID(),
-			Owner:     req.Owner,
+			Poster:    uuid,
 			ClubId:    req.ClubId,
 			Body:      req.Body,
 			Images:    req.Images,
-			Likes:     []Like{},
+			Likes:     []models.Like{},
 			CreatedAt: timeStamp,
-		}
-
-		thread := CommentThread{
-			ID:       post.ID,
-			Comments: []Comment{},
 		}
 
 		// create post in database
@@ -332,21 +201,12 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			return
 		}
 
-		// create comments thread in database
-		_, err = p.Database.CommentsCol.InsertOne(context.TODO(), thread)
-		if err != nil {
-			p.Logger.Error(err)
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-			return
-		}
-
 		// grab user info for notifications
-		user := p.FetchUser(*r, uuid)
-		fN := user.FirstName + " " + user.LastName
+		// user := p.FetchUser(*r, uuid)
+		// fN := user.FirstName + " " + user.LastName
 
 		// grab club info for notifications
-		var club Club
+		var club models.Club
 		filter := bson.M{"_id": post.ClubId}
 		err = p.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 		if err != nil {
@@ -357,7 +217,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		// send notification to club members
-		p.SendNotificationToTopic(*r, club.Name, fN+" posted in "+club.Name, club.ID.Hex())
+		//p.SendNotificationToTopic(*r, club.Name, fN+" posted in "+club.Name, club.ID.Hex())
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(post)
@@ -399,7 +259,7 @@ func (p *Service) UpdatePost() http.HandlerFunc {
 
 		id := vars["id"]
 
-		var req Post
+		var req models.Post
 
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -516,7 +376,7 @@ func (p *Service) AddLike() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req Like
+		var req models.Like
 		// decode request
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		req.ID = primitive.NewObjectID()
@@ -583,58 +443,6 @@ func (p *Service) RemoveLike() http.HandlerFunc {
 	}
 }
 
-/* COMMENTS */
-
-func (p *Service) GetComments() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		// grab id from path
-		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no post id found in request." }`))
-			return
-		}
-		id := vars["id"]
-		oid, _ := primitive.ObjectIDFromHex(id)
-		_, ctx := context.WithTimeout(context.Background(), 30*time.Second)
-		defer ctx()
-
-		// find post  in database
-		var thread CommentThread
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		err := p.Database.CommentsCol.FindOne(context.TODO(), filter).Decode(&thread)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "post does not exist" }`))
-				return
-			}
-		}
-
-		var comments []Comment
-
-		for i := range thread.Comments {
-			comment := thread.Comments[i]
-			comments = append(comments, comment)
-		}
-
-		if len(comments) == 0 {
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		resp := CommentThreadResponse{
-			TotalComments: len(comments),
-			Comments:      comments,
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
-	}
-}
-
 /*
 Add Comment (POST)
 
@@ -660,7 +468,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req Comment
+		var req models.Comment
 		// decode request
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		req.ID = primitive.NewObjectID()
@@ -724,162 +532,5 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`OK`))
-	}
-}
-
-func (p *Service) FetchUser(r http.Request, user string) LookUpUser {
-	bearerToken := r.Header.Get("Authorization")
-	tokenSplit := strings.Split(bearerToken, "Bearer ")
-	token := tokenSplit[1]
-	client := &http.Client{}
-
-	req, err := http.NewRequest("GET", "http://lookup.olympsis.internal/v1/lookup/"+user, nil)
-	if err != nil {
-		p.Logger.Error(err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		p.Logger.Error(err)
-	}
-
-	defer resp.Body.Close()
-
-	var lookup LookUpUser
-	err = json.NewDecoder(resp.Body).Decode(&lookup)
-	if err != nil {
-		p.Logger.Error(err)
-	}
-	return lookup
-}
-
-func (p *Service) SendNotificationToTopic(r http.Request, t string, b string, tpc string) (bool, error) {
-	bearerToken := r.Header.Get("Authorization")
-	tokenSplit := strings.Split(bearerToken, "Bearer ")
-	token := tokenSplit[1]
-	client := &http.Client{}
-
-	request := NotificationRequest{
-		Title: t,
-		Body:  b,
-		Topic: tpc,
-	}
-
-	data, err := json.Marshal(request)
-	if err != nil {
-		p.Logger.Error(err.Error())
-		return false, err
-	}
-
-	req, err := http.NewRequest("POST", "http://pushnote.olympsis.internal/v1/pushnote/topic", bytes.NewBuffer(data))
-	if err != nil {
-		p.Logger.Error(err.Error())
-		return false, err
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		p.Logger.Error(err.Error())
-		return false, err
-	}
-
-	defer resp.Body.Close()
-	return true, nil
-}
-
-/*
-Validate an Parse JWT Token
-
-  - parse jwt token
-
-  - return values
-
-Returns:
-
-	uuid - string of the user id token
-	createdAt - string of the session token created date
-	role - role of user
-	error -  if there is an error return error else nil
-*/
-func (p *Service) ValidateAndParseJWTToken(tokenString string) (string, string, float64, error) {
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
-	})
-
-	if err != nil {
-		return "", "", 0, err
-	} else {
-		uuid := claims["uuid"].(string)
-		provider := claims["provider"].(string)
-		createdAt := claims["createdAt"].(float64)
-		return uuid, provider, createdAt, nil
-	}
-}
-
-/*
-Middleware
-
-  - Makes sure user is authenticated before taking requests
-
-  - If there is no token or a bad token it returns the request with a unauthorized or forbidden error
-
-Returns:
-
-	Http handler
-	- Passes the request to the next handler
-*/
-func (p *Service) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		bearerToken := r.Header.Get("Authorization")
-		tokenSplit := strings.Split(bearerToken, "Bearer ")
-
-		if bearerToken == "" {
-			p.Logger.Error("no auth token")
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		token := tokenSplit[1]
-		if token == "" {
-			p.Logger.Error("no auth token")
-			http.Error(rw, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		_, _, _, err := p.ValidateAndParseJWTToken(token)
-
-		if err != nil {
-			p.Logger.Error("bad auth token")
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(rw, r)
-	})
-}
-
-// Later we want to ping the db and if the db goes down or something is wrong with this service we want to restart it.
-func (p *Service) Healthz() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte("ok"))
-	}
-}
-
-func (p *Service) WhoAmi() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`
-		{
-			"version": "0.1.6",
-			"service": "post"
-		}
-		`))
 	}
 }
