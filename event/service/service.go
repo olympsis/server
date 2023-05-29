@@ -7,6 +7,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -179,12 +180,14 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
 		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
 		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
-		sport := r.URL.Query().Get("sport")
+		sports := r.URL.Query().Get("sports")
 
-		if longitude == 0 || latitude == 0 || sport == "" {
-			http.Error(rw, "missing query param - long/lat/sport", http.StatusBadRequest)
+		if longitude == 0 || latitude == 0 || sports == "" {
+			http.Error(rw, "missing query param - long/lat/sports", http.StatusBadRequest)
 			return
 		}
+
+		splicedSports := strings.Split(sports, ",")
 
 		var events []Event
 		var fields []Field
@@ -220,10 +223,13 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		// loop through the fields and find the correspoding events
+		// filter by visibility, status and sports
 		for i := range fields {
 			filter := bson.M{
-				"fieldId":    fields[i].ID,
-				"sport":      sport,
+				"fieldId": fields[i].ID,
+				"sports": bson.M{
+					"$in": splicedSports,
+				},
 				"visibility": "public",
 				"$or": []interface{}{
 					bson.M{"status": "pending"},

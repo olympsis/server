@@ -24,16 +24,20 @@ import (
 func main() {
 	// logger
 	l := logrus.New()
+
 	// mux router
 	r := mux.NewRouter()
+
 	// database
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
+	// notifications service
 	notif := pushService.NewNotificationService(l, r)
 	notif.CreateNewClient()
 	notif.ConnectToDatabase()
 
+	// search service
 	lookupAPI := lookup.NewLookUpAPI(l, r, d)
 
 	authAPI := auth.NewAuthAPI(l, r, d)

@@ -9,6 +9,7 @@ import (
 	"olympsis-server/models"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
@@ -109,12 +110,14 @@ func (f *Service) GetFields() http.HandlerFunc {
 		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
 		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
 		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
+		sports := r.URL.Query().Get("sports")
 
 		if longitude == 0 || latitude == 0 {
 			http.Error(rw, "you need longitude/latitude", http.StatusBadRequest)
 			return
-
 		}
+
+		splicedSports := strings.Split(sports, ",")
 
 		var fields []models.Field
 		loc := models.GeoJSON{
@@ -122,14 +125,16 @@ func (f *Service) GetFields() http.HandlerFunc {
 			Coordinates: []float64{longitude, latitude},
 		}
 
-		filter := bson.D{
-			{Key: "location",
-				Value: bson.D{
-					{Key: "$near", Value: bson.D{
-						{Key: "$geometry", Value: loc},
-						{Key: "$maxDistance", Value: radius},
-					}},
-				}},
+		filter := bson.M{
+			"location": bson.M{
+				"$near": bson.M{
+					"$geometry":    loc,
+					"$maxDistance": radius,
+				},
+			},
+			"sports": bson.M{
+				"$in": splicedSports,
+			},
 		}
 
 		err := f.FindFields(context.Background(), filter, &fields)
