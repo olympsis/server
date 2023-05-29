@@ -24,20 +24,7 @@ func (s *Service) SearchUserByUUID(uuid string) (models.UserData, error) {
 	// context/filter
 	ctx := context.Background()
 	filter := bson.M{"uuid": uuid}
-
-	// return only uuid, first name and last name
 	opts := options.FindOneOptions{}
-	opts.SetProjection(bson.M{
-		"_id":          0,
-		"uuid":         1,
-		"fist_name":    1,
-		"last_name":    1,
-		"email":        0,
-		"token":        0,
-		"access_token": 0,
-		"provider":     0,
-		"created_at":   0,
-	})
 
 	// find and decode auth user data
 	var auth models.AuthUser
@@ -45,19 +32,6 @@ func (s *Service) SearchUserByUUID(uuid string) (models.UserData, error) {
 	if err != nil {
 		return models.UserData{}, err
 	}
-
-	// return onl username, bio, image_url, visibility, clubs and sports
-	opts.SetProjection(bson.M{
-		"_id":          0,
-		"uuid":         0,
-		"username":     1,
-		"bio":          1,
-		"image_url":    1,
-		"visibility":   1,
-		"clubs":        1,
-		"sports":       0,
-		"device_token": 0,
-	})
 
 	// find and decode user metadata
 	var user models.User
@@ -90,20 +64,7 @@ func (s *Service) SearchUserByUsername(name string) (models.UserData, error) {
 	// context/filter
 	ctx := context.Background()
 	filter := bson.M{"username": name}
-
-	// return onl username, bio, image_url, visibility, clubs and sports
 	opts := options.FindOneOptions{}
-	opts.SetProjection(bson.M{
-		"_id":          0,
-		"uuid":         1,
-		"username":     1,
-		"bio":          1,
-		"image_url":    1,
-		"visibility":   1,
-		"clubs":        1,
-		"sports":       0,
-		"device_token": 0,
-	})
 
 	// find and decode user metadata
 	var user models.User
@@ -115,17 +76,6 @@ func (s *Service) SearchUserByUsername(name string) (models.UserData, error) {
 	filter = bson.M{"uuid": user.UUID}
 
 	// return only uuid, first name and last name
-	opts.SetProjection(bson.M{
-		"_id":          0,
-		"uuid":         1,
-		"fist_name":    1,
-		"last_name":    1,
-		"email":        0,
-		"token":        0,
-		"access_token": 0,
-		"provider":     0,
-		"created_at":   0,
-	})
 
 	// find and decode auth user data
 	var auth models.AuthUser

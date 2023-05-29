@@ -25,27 +25,42 @@ func (s *FieldAPI) Ready() {
 	*/
 
 	// get fields
-	s.Router.Handle(
-		"/fields", middleware.Chain(s.Service.GetFields(), middleware.Logging()),
+	s.Router.Handle("/fields",
+		middleware.Chain(
+			s.Service.GetFields(),
+			middleware.Logging(),
+		),
 	).Methods("GET")
 
 	// get a field
-	s.Router.Handle(
-		"/fields/{id}", middleware.Chain(s.Service.GetAField(), middleware.Logging()),
+	s.Router.Handle("/fields/{id}",
+		middleware.Chain(
+			s.Service.GetAField(),
+			middleware.Logging(),
+		),
 	).Methods("GET")
 
 	// create field
-	s.Router.Handle(
-		"/fields", middleware.Chain(s.Service.InsertAField(), middleware.Logging()),
+	s.Router.Handle("/fields",
+		middleware.Chain(
+			s.Service.InsertAField(),
+			middleware.Logging(),
+		),
 	).Methods("POST")
 
 	// update a field
-	s.Router.Handle(
-		"/fields/{id}", middleware.Chain(s.Service.UpdateAField(), middleware.Logging()),
+	s.Router.Handle("/fields/{id}",
+		middleware.Chain(
+			s.Service.UpdateAField(),
+			middleware.Logging(),
+		),
 	).Methods("PUT")
 
 	// delete a field
-	s.Router.Handle(
-		"/fields/{id}", middleware.Chain(s.Service.DeleteAField(), middleware.Logging()),
+	s.Router.Handle("/fields/{id}",
+		middleware.Chain(
+			s.Service.DeleteAField(),
+			middleware.Logging(),
+		),
 	).Methods("DELETE")
 }

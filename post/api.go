@@ -2,6 +2,7 @@ package post
 
 import (
 	"olympsis-server/database"
+	"olympsis-server/middleware"
 	"olympsis-server/post/service"
 	notif "olympsis-server/pushnote/service"
 	search "olympsis-server/search"
@@ -21,15 +22,87 @@ func NewPostAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.
 }
 
 func (p *PostAPI) Ready() {
-	p.Router.Handle("/posts", p.Service.GetPosts()).Methods("GET")
-	p.Router.Handle("/posts/{id}", p.Service.GetPost()).Methods("GET")
-	p.Router.Handle("/posts", p.Service.CreatePost()).Methods("POST")
-	p.Router.Handle("/posts/{id}", p.Service.UpdatePost()).Methods("PUT")
-	p.Router.Handle("/posts/{id}", p.Service.DeletePost()).Methods("DELETE")
+	/*
+		POSTS
+	*/
 
-	p.Router.Handle("/posts/{id}/likes", p.Service.AddLike()).Methods("POST")
-	p.Router.Handle("/posts/{id}/likes/{likeId}", p.Service.RemoveLike()).Methods("DELETE")
+	// get posts
+	p.Router.Handle("/posts", middleware.Chain(
+		p.Service.GetPosts(),
+		middleware.Logging(),
+		middleware.UserMiddleware(),
+	)).Methods("GET")
 
-	p.Router.Handle("/posts/{id}/comments", p.Service.AddComment()).Methods("POST")
-	p.Router.Handle("/posts/{id}/comments/{commentId}", p.Service.RemoveComment()).Methods("DELETE")
+	// get a post
+	p.Router.Handle("/posts/{id}", middleware.Chain(
+		p.Service.GetPost(),
+		middleware.Logging(),
+		middleware.UserMiddleware(),
+	)).Methods("GET")
+
+	// create a post
+	p.Router.Handle("/posts", middleware.Chain(
+		p.Service.CreatePost(),
+		middleware.Logging(),
+		middleware.UserMiddleware(),
+	)).Methods("POST")
+
+	// udpdate a post
+	p.Router.Handle("/posts/{id}", middleware.Chain(
+		p.Service.UpdatePost(),
+		middleware.Logging(),
+		middleware.UserMiddleware(),
+	)).Methods("PUT")
+
+	// delete a post
+	p.Router.Handle("/posts/{id}", middleware.Chain(
+		p.Service.DeletePost(),
+		middleware.Logging(),
+		middleware.UserMiddleware(),
+	)).Methods("DELETE")
+
+	/*
+		POST LIKES
+	*/
+
+	// add a like
+	p.Router.Handle("/posts/{id}/likes",
+		middleware.Chain(
+			p.Service.AddLike(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// remove a like
+	p.Router.Handle("/posts/{id}/likes/{likeId}",
+		middleware.Chain(
+			p.Service.RemoveLike(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
+
+	/*
+		POST COMMENTS
+	*/
+
+	// add a comment
+	p.Router.Handle("/posts/{id}/comments",
+		middleware.Chain(
+			p.Service.AddComment(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// remove a comment
+	p.Router.Handle("/posts/{id}/comments/{commentId}",
+		middleware.Chain(
+			p.Service.RemoveComment(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
+
 }

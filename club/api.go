@@ -3,6 +3,7 @@ package club
 import (
 	"olympsis-server/club/service"
 	"olympsis-server/database"
+	"olympsis-server/middleware"
 	notif "olympsis-server/pushnote/service"
 	search "olympsis-server/search"
 
@@ -21,24 +22,136 @@ func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.
 }
 
 func (s *ClubAPI) Ready() {
-	s.Router.Handle("/clubs", s.Service.GetClubs()).Methods("GET")
-	s.Router.Handle("/clubs/{id}", s.Service.GetClub()).Methods("GET")
-	s.Router.Handle("/clubs/{id}", s.Service.UpdateClub()).Methods("PUT")
-	s.Router.Handle("/clubs", s.Service.CreateClub()).Methods("POST")
-	s.Router.Handle("/clubs/{id}", s.Service.DeleteClub()).Methods("DELETE")
-	s.Router.Handle("/clubs/{id}/leave", s.Service.LeaveClub()).Methods("PUT")
+	/*
+		BASIC
+	*/
 
-	// applications
-	s.Router.Handle("/clubs/{id}/applications", s.Service.GetApplications()).Methods("GET")
-	s.Router.Handle("/clubs/{id}/applications", s.Service.CreateApplication()).Methods("POST")
-	s.Router.Handle("/clubs/{id}/applications/{applicationId}", s.Service.UpdateApplication()).Methods("PUT")
-	s.Router.Handle("/clubs/{id}/applications/{applicationId}", s.Service.DeleteApplication()).Methods("DELETE")
+	// get clubs
+	s.Router.Handle("/clubs",
+		middleware.Chain(
+			s.Service.GetClubs(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
 
-	// members
-	s.Router.Handle("/clubs/{id}/members/{memberId}/rank", s.Service.ChangeMemberRank()).Methods("PUT")
-	s.Router.Handle("/clubs/{id}/members/{memberId}/kick", s.Service.KickMember()).Methods("PUT")
-	s.Router.Handle("/clubs/{id}/members", s.Service.LeaveClub()).Methods("PUT")
+	// get a club
+	s.Router.Handle("/clubs/{id}",
+		middleware.Chain(
+			s.Service.GetClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
 
-	// invites
-	s.Router.Handle("/clubs/invites", s.Service.CreateInvitation()).Methods("POST")
+	// update a club - requires admin token
+	s.Router.Handle("/clubs/{id}",
+		middleware.Chain(
+			s.Service.UpdateClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+			middleware.ClubAdminMiddleware(),
+		),
+	).Methods("PUT")
+
+	// create a club
+	s.Router.Handle("/clubs",
+		middleware.Chain(
+			s.Service.CreateClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// delete a club - requires admin token
+	s.Router.Handle("/clubs/{id}",
+		middleware.Chain(
+			s.Service.DeleteClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+			middleware.ClubAdminMiddleware(),
+		),
+	).Methods("DELETE")
+
+	// leave a club
+	s.Router.Handle("/clubs/{id}/leave",
+		middleware.Chain(
+			s.Service.LeaveClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	/*
+		Club Applications
+	*/
+
+	// get club application - requires admin token
+	s.Router.Handle("/clubs/{id}/applications",
+		middleware.Chain(
+			s.Service.GetApplications(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+			middleware.ClubAdminMiddleware(),
+		),
+	).Methods("GET")
+
+	// create club application
+	s.Router.Handle("/clubs/{id}/applications",
+		middleware.Chain(
+			s.Service.CreateApplication(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// update club application - requires admin token
+	s.Router.Handle("/clubs/{id}/applications/{applicationId}",
+		middleware.Chain(
+			s.Service.UpdateApplication(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+			middleware.ClubAdminMiddleware(),
+		),
+	).Methods("PUT")
+
+	// delete application
+	s.Router.Handle("/clubs/{id}/applications/{applicationId}",
+		middleware.Chain(
+			s.Service.DeleteApplication(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
+
+	/*
+		Club Members
+	*/
+
+	// change member rank
+	s.Router.Handle("/clubs/{id}/members/{memberId}/rank",
+		middleware.Chain(
+			s.Service.ChangeMemberRank(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// kick member from club
+	s.Router.Handle("/clubs/{id}/members/{memberId}/kick",
+		middleware.Chain(
+			s.Service.KickMember(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// leave club
+	s.Router.Handle("/clubs/{id}/members",
+		middleware.Chain(
+			s.Service.LeaveClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
 }

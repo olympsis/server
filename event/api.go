@@ -3,6 +3,7 @@ package event
 import (
 	"olympsis-server/database"
 	"olympsis-server/event/service"
+	"olympsis-server/middleware"
 	notif "olympsis-server/pushnote/service"
 	search "olympsis-server/search"
 
@@ -21,16 +22,97 @@ func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif
 }
 
 func (e *EventAPI) Ready() {
-	// handlers for http requests
-	e.Router.Handle("/events/{id}", e.Service.GetEvent()).Methods("GET")
-	e.Router.Handle("/events", e.Service.GetEventsByLocation()).Methods("GET")
-	e.Router.Handle("/events", e.Service.CreateEvent()).Methods("POST")
-	e.Router.Handle("/events/{id}", e.Service.UpdateAnEvent()).Methods("PUT")
-	e.Router.Handle("/events/{id}", e.Service.DeleteAnEvent()).Methods("DELETE")
 
-	e.Router.Handle("/events/{id}/participants", e.Service.AddParticipant()).Methods("POST")
-	e.Router.Handle("/events/{id}/participants/{participantId}", e.Service.RemoveParticipant()).Methods("DELETE")
+	/*
+		EVENTS
+	*/
 
-	e.Router.Handle("/events/{id}/subscribe", e.Service.SubscribeToEvent()).Methods("POST")
-	e.Router.Handle("/events/{id}/unsubscribe", e.Service.UpdateAnEvent()).Methods("POST")
+	// get events
+	e.Router.Handle("/events",
+		middleware.Chain(
+			e.Service.GetEventsByLocation(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// get an event
+	e.Router.Handle("/events/{id}",
+		middleware.Chain(
+			e.Service.GetEvent(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// create an event
+	e.Router.Handle("/events",
+		middleware.Chain(
+			e.Service.CreateEvent(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// update an event
+	e.Router.Handle("/events/{id}",
+		middleware.Chain(
+			e.Service.UpdateAnEvent(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// delete an event
+	e.Router.Handle("/events/{id}",
+		middleware.Chain(
+			e.Service.DeleteAnEvent(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
+
+	/*
+		EVENT PARTICIPANTS
+	*/
+
+	// add a participant
+	e.Router.Handle("/events/{id}/participants",
+		middleware.Chain(
+			e.Service.AddParticipant(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// remove a participant
+	e.Router.Handle("/events/{id}/participants/{participantId}",
+		middleware.Chain(
+			e.Service.RemoveParticipant(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
+
+	/*
+		EVENT NOTIFICATIONS
+	*/
+
+	// subscribe to event notifications
+	e.Router.Handle("/events/{id}/subscribe",
+		middleware.Chain(
+			e.Service.SubscribeToEvent(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// unsubscribe from event notifications
+	e.Router.Handle("/events/{id}/unsubscribe",
+		middleware.Chain(
+			e.Service.UpdateAnEvent(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
 }

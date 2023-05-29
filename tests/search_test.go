@@ -41,7 +41,7 @@ func TestSearchUserByUUID(t *testing.T) {
 
 	s := search.NewSearchService(l, d)
 
-	user, err := s.SearchUserByUUID("6abfe36c-5eea-4bb9-af6a-2aeee37af629")
+	user, err := s.SearchUserByUUID("1edbdae3-55ea-4934-a1fa-f6d73f0fe951")
 	if err != nil {
 		t.Error(err.Error())
 		return
