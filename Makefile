@@ -1,4 +1,4 @@
-VERSION 	 := v0.1.2
+VERSION 	 := v0.1.3
 SERVICE_NAME := olympsis/server
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
@@ -23,6 +23,10 @@ export COMMENTS_COL=comments
 export FREQUEST_COL=friendRequests
 export CAPPICATIONS_COL=clubApplications 
 export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
+
+export POSTGRES_USER=postgres
+export POSTGRES_PASSWORD=20031998
+export TOPIC_DB_NAME=olympsis_notif
 
 .PHONY: all dep build clean test coverage coverhtml lint
 

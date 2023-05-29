@@ -23,6 +23,11 @@ ENV FREQUEST_COL=friendRequests
 ENV CAPPICATIONS_COL=clubApplications
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
+
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=20031998
+ENV TOPIC_DB_NAME=olympsis_notif
+
 EXPOSE 8080
 
 CMD ["/docker"]

@@ -10,7 +10,7 @@ import (
 	"olympsis-server/field"
 	"olympsis-server/lookup"
 	"olympsis-server/post"
-	"olympsis-server/pushnote"
+	pushService "olympsis-server/pushnote/service"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -30,17 +30,18 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
-	pushNoteAPI := pushnote.NewPushNoteAPI(l, r)
+	notif := pushService.NewNotificationService(l, r)
+	notif.CreateNewClient()
+	notif.ConnectToDatabase()
+
 	lookupAPI := lookup.NewLookUpAPI(l, r, d)
 
 	authAPI := auth.NewAuthAPI(l, r, d)
 	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
-	clubAPI := club.NewClubAPI(l, r, d, pushNoteAPI.GetService(), lookupAPI.GetService())
+	clubAPI := club.NewClubAPI(l, r, d, notif, lookupAPI.GetService())
 	postAPI := post.NewPostAPI(l, r, d)
 	eventAPI := event.NewEventAPI(l, r, d)
-
-	pushNoteAPI.Ready()
 
 	authAPI.Ready()
 	userAPI.Ready()
