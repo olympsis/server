@@ -109,12 +109,12 @@ func ValidateClubToken(s string, u string) (string, string, error) {
 	} else {
 		id := claims["iss"].(string)
 		uuid := claims["sub"].(string)
-		rank := claims["role"].(string)
+		role := claims["role"].(string)
 
 		if uuid != u {
 			return "", "", errors.New("uuid does not match")
 		}
 
-		return id, rank, nil
+		return id, role, nil
 	}
 }

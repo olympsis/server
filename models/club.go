@@ -22,10 +22,11 @@ type Club struct {
 }
 
 type Member struct {
-	ID       primitive.ObjectID `json:"id" bson:"_id"`
+	ID       primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	UUID     string             `json:"uuid" bson:"uuid"`
 	Role     string             `json:"role" bson:"role"`
-	JoinedAt int64              `json:"joined_at" bson:"joined_at"`
+	Data     *UserData          `json:"data,omitempty" bson:"data,omitempty"`
+	JoinedAt int64              `json:"joined_at,omitempty" bson:"joined_at"`
 }
 
 type ClubInvite struct {
@@ -64,6 +65,7 @@ type ClubApplication struct {
 	UUID      string             `json:"uuid"`
 	ClubID    primitive.ObjectID `json:"club_id"`
 	Status    string             `json:"status"`
+	Data      *UserData          `json:"data,omitempty" bson:"data,omitempty"`
 	CreatedAt int64              `json:"created_at"`
 }
 
@@ -77,5 +79,6 @@ type ClubInvitation struct {
 	UUID      string             `json:"uuid"`
 	ClubID    primitive.ObjectID `json:"club_id"`
 	Status    string             `json:"status"`
+	Data      *Club              `json:"data,omitempty" bson:"data,omitempty"`
 	CreatedAt int64              `json:"created_at"`
 }
