@@ -49,8 +49,8 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.UpdateClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
 			middleware.ClubAdminMiddleware(),
+			middleware.UserMiddleware(),
 		),
 	).Methods("PUT")
 
@@ -68,8 +68,8 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.DeleteClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
 			middleware.ClubAdminMiddleware(),
+			middleware.UserMiddleware(),
 		),
 	).Methods("DELETE")
 
@@ -91,8 +91,8 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetApplications(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
 			middleware.ClubAdminMiddleware(),
+			middleware.UserMiddleware(),
 		),
 	).Methods("GET")
 
@@ -110,8 +110,8 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.UpdateApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
 			middleware.ClubAdminMiddleware(),
+			middleware.UserMiddleware(),
 		),
 	).Methods("PUT")
 

@@ -8,15 +8,15 @@ Club
 */
 type Club struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id"`
-	Name        string             `json:"name" bson:"name"`
+	Name        string             `json:"name,omitempty" bson:"name"`
 	Description string             `json:"description,omitempty" bson:"description,omitempty"`
-	Sport       string             `json:"sport" bson:"sport"`
-	City        string             `json:"city" bson:"city"`
-	State       string             `json:"state" bson:"state"`
-	Country     string             `json:"country" bson:"country"`
-	ImageURL    string             `json:"image_url" bson:"image_url"`
-	Visibility  string             `json:"visibility" bson:"visibility"`
-	Members     []Member           `json:"members" bson:"members"`
+	Sport       string             `json:"sport,omitempty" bson:"sport"`
+	City        string             `json:"city,omitempty" bson:"city"`
+	State       string             `json:"state,omitempty" bson:"state"`
+	Country     string             `json:"country,omitempty" bson:"country"`
+	ImageURL    string             `json:"image_url,omitempty" bson:"image_url"`
+	Visibility  string             `json:"visibility,omitempty" bson:"visibility"`
+	Members     []Member           `json:"members,omitempty" bson:"members"`
 	Rules       []string           `json:"rules,omitempty" bson:"rules,omitempty"`
 	CreatedAt   int64              `json:"created_at,omitempty" bson:"created_at,omitempty"`
 }

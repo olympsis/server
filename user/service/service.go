@@ -87,7 +87,7 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 			}
 		}
 
-		rw.WriteHeader(http.StatusFound)
+		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "is_available": false }`))
 	}
 }
@@ -172,7 +172,7 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 			changes["username"] = req.UserName
 		}
 		if req.ImageURL != "" {
-			changes["imageURL"] = req.ImageURL
+			changes["image_url"] = req.ImageURL
 		}
 		if req.Bio != "" {
 			changes["bio"] = req.Bio
@@ -181,7 +181,7 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 			changes["sports"] = req.Sports
 		}
 		if req.DeviceToken != "" {
-			changes["deviceToken"] = req.DeviceToken
+			changes["device_token"] = req.DeviceToken
 		}
 		if req.Visibility != "" {
 			changes["visibility"] = req.Visibility

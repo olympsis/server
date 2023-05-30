@@ -108,7 +108,7 @@ func (s *Service) CreateTopic(name string) error {
 	// 	return err
 	// }
 
-	createStmt := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+	createStmt := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS "%s" (
 		ID SERIAL PRIMARY KEY, 
 		uuid VARCHAR(50),
 		token VARCHAR(100)
@@ -160,7 +160,7 @@ Add tokens to a topic
 */
 func (s *Service) AddTokenToTopic(name string, uuid string, token string) error {
 
-	insertStmt := fmt.Sprintf(`INSERT INTO %s (uuid, token) VALUES ($1, $2)`, name)
+	insertStmt := fmt.Sprintf(`INSERT INTO "%s" (uuid, token) VALUES ($1, $2)`, name)
 
 	// add token to topic table
 	_, err := s.Database.Exec(context.TODO(), insertStmt, uuid, token)
@@ -175,7 +175,7 @@ func (s *Service) AddTokenToTopic(name string, uuid string, token string) error 
 Remove token from topic
 */
 func (s *Service) RemoveTokenFromTopic(name string, token string) error {
-	updateStmt := fmt.Sprintf("DELETE FROM %s WHERE token=$1", name)
+	updateStmt := fmt.Sprintf(`DELETE FROM "%s" WHERE token=$1`, name)
 
 	// remove entry from table
 	_, err := s.Database.Exec(context.TODO(), updateStmt, token)
@@ -190,7 +190,7 @@ func (s *Service) RemoveTokenFromTopic(name string, token string) error {
 Delete a topic
 */
 func (s *Service) DeleteTopic(name string) error {
-	deleteSmt := fmt.Sprintf("DROP TABLE IF EXISTS %s", name)
+	deleteSmt := fmt.Sprintf(`DROP TABLE IF EXISTS "%s"`, name)
 	_, err := s.Database.Exec(context.TODO(), deleteSmt)
 	if err != nil {
 		return err
