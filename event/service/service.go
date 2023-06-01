@@ -77,7 +77,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			ID:              primitive.NewObjectID(),
 			Poster:          uuid,
 			ClubID:          req.ClubID,
-			FieldId:         req.FieldId,
+			FieldID:         req.FieldID,
 			ImageURL:        req.ImageURL,
 			Title:           req.Title,
 			Body:            req.Body,
@@ -319,7 +319,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			changes["body"] = req.Body
 		}
 		if req.ImageURL != "" {
-			changes["imageURL"] = req.ImageURL
+			changes["image_url"] = req.ImageURL
 		}
 		if req.MaxParticipants != 0 {
 			changes["maxParticipants"] = req.MaxParticipants

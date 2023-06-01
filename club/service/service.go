@@ -28,8 +28,6 @@ type Service struct {
 
 /*
 Create new Club service struct
-
-  - Create and Returns a pointer to a new club service struct
 */
 func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
 	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
@@ -244,6 +242,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		if err != nil {
 			c.Logger.Error("failed to get user(" + uuid + "): " + err.Error())
 		}
+
 		if user.DeviceToken == "" {
 			// if we user is not subscribed for notifications then just create the topics
 			err = c.NotifService.CreateTopic(clubTopic)
@@ -354,7 +353,7 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 			change["country"] = req.Country
 		}
 		if req.ImageURL != "" {
-			change["imageURL"] = req.ImageURL
+			change["image_url"] = req.ImageURL
 		}
 		if len(req.Rules) > 0 {
 			change["rules"] = req.Rules
@@ -474,13 +473,13 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// if there is no member id
-		if len(vars["memberId"]) == 0 {
+		if len(vars["memberID"]) == 0 {
 			http.Error(rw, "bad member id found", http.StatusBadRequest)
 			return
 		}
 
 		// if we get an member id
-		if len(vars["memberId"]) < 24 {
+		if len(vars["memberID"]) < 24 {
 			http.Error(rw, "bad member id found", http.StatusBadRequest)
 			return
 		}
@@ -492,7 +491,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// convert club id to oid
-		memID := vars["memberId"]
+		memID := vars["memberID"]
 		memOID, err := primitive.ObjectIDFromHex(memID)
 		if err != nil {
 			c.Logger.Debug(err.Error())
@@ -613,13 +612,13 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// if there is no club id
-		if len(vars["memberId"]) == 0 {
+		if len(vars["memberID"]) == 0 {
 			http.Error(rw, "bad member id found", http.StatusBadRequest)
 			return
 		}
 
 		// if we get an invalid id
-		if len(vars["memberId"]) < 24 {
+		if len(vars["memberID"]) < 24 {
 			http.Error(rw, "bad member id found", http.StatusBadRequest)
 			return
 		}
@@ -631,7 +630,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// convert member id to objectid
-		mid := vars["memberId"]
+		mid := vars["memberID"]
 		memOID, err := primitive.ObjectIDFromHex(mid)
 		if err != nil {
 			c.Logger.Debug(err.Error())

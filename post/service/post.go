@@ -185,7 +185,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		post := models.Post{
 			ID:        primitive.NewObjectID(),
 			Poster:    uuid,
-			ClubId:    req.ClubId,
+			ClubID:    req.ClubID,
 			Body:      req.Body,
 			Images:    req.Images,
 			Likes:     []models.Like{},
@@ -207,7 +207,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 		// grab club info for notifications
 		var club models.Club
-		filter := bson.M{"_id": post.ClubId}
+		filter := bson.M{"_id": post.ClubID}
 		err = p.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 		if err != nil {
 			p.Logger.Error(err)

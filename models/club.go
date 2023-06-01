@@ -29,20 +29,25 @@ type Member struct {
 	JoinedAt int64              `json:"joined_at,omitempty" bson:"joined_at"`
 }
 
-type ClubInvite struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	UUID      string             `json:"uuid" bson:"uuid"`
-	ClubID    string             `json:"club_id" bson:"club_id"`
-	Status    string             `json:"status" bson:"status"`
-	CreatedAt int64              `json:"created_at" bson:"created_at"`
-}
-
 type ClubsResponse struct {
 	TotalClubs int    `json:"total_clubs"`
 	Clubs      []Club `json:"clubs"`
 }
+type ClubInvite struct {
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	UUID      string             `json:"uuid" bson:"uuid"`
+	ClubID    string             `json:"club_id" bson:"club_id"`
+	Data      *ClubInviteData    `json:"data,omitempty" bson:"data,omitempty"`
+	Status    string             `json:"status" bson:"status"`
+	CreatedAt int64              `json:"created_at" bson:"created_at"`
+}
 
-type ClubInvites struct {
+type ClubInviteData struct {
+	Club    *Club     `json:"club,omitempty"`
+	Inviter *UserData `json:"inviter,omitempty"`
+}
+
+type ClubInvitesResponse struct {
 	TotalInvites int          `json:"total_invites"`
 	Invites      []ClubInvite `json:"invites"`
 }
@@ -72,13 +77,4 @@ type ClubApplication struct {
 type ClubApplicationsResponse struct {
 	TotalApplications int               `json:"total_applications"`
 	Applications      []ClubApplication `json:"club_applications"`
-}
-
-type ClubInvitation struct {
-	ID        primitive.ObjectID `json:"id"`
-	UUID      string             `json:"uuid"`
-	ClubID    primitive.ObjectID `json:"club_id"`
-	Status    string             `json:"status"`
-	Data      *Club              `json:"data,omitempty" bson:"data,omitempty"`
-	CreatedAt int64              `json:"created_at"`
 }

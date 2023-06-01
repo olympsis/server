@@ -6,7 +6,7 @@ type Event struct {
 	ID              primitive.ObjectID `json:"id" bson:"_id"`
 	Poster          string             `json:"poster" bson:"poster"`
 	ClubID          primitive.ObjectID `json:"club_id" bson:"club_id"`
-	FieldId         primitive.ObjectID `json:"field_id" bson:"field_id"`
+	FieldID         primitive.ObjectID `json:"field_id" bson:"field_id"`
 	ImageURL        string             `json:"image_url" bson:"image_url"`
 	Title           string             `json:"title" bson:"title"`
 	Body            string             `json:"body" bson:"body"`
@@ -23,6 +23,12 @@ type Event struct {
 	CreatedAt       int64              `json:"created_at" bson:"created_at"`
 }
 
+type EventData struct {
+	Poster *UserData `json:"poster,omitempty"`
+	Club   *Club     `json:"club,omitempty"`
+	Field  *Field    `json:"field,omitempty"`
+}
+
 type EventsResponse struct {
 	TotalEvents int     `json:"total_events"`
 	Events      []Event `json:"events"`
@@ -31,6 +37,7 @@ type EventsResponse struct {
 type Participant struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`
+	Data      *UserData          `json:"data,omitempty" bson:"data,omitempty"`
 	Status    string             `json:"status" bson:"status"`
 	CreatedAt int64              `json:"created_at,omitempty" bson:"created_at"`
 }
