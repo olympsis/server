@@ -75,7 +75,7 @@ func (p *PostAPI) Ready() {
 	).Methods("POST")
 
 	// remove a like
-	p.Router.Handle("/posts/{id}/likes/{likeId}",
+	p.Router.Handle("/posts/{id}/likes/{likeID}",
 		middleware.Chain(
 			p.Service.RemoveLike(),
 			middleware.Logging(),
@@ -97,7 +97,7 @@ func (p *PostAPI) Ready() {
 	).Methods("POST")
 
 	// remove a comment
-	p.Router.Handle("/posts/{id}/comments/{commentId}",
+	p.Router.Handle("/posts/{id}/comments/{commentID}",
 		middleware.Chain(
 			p.Service.RemoveComment(),
 			middleware.Logging(),

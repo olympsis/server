@@ -13,6 +13,7 @@ type Post struct {
 	Title     string             `json:"title" bson:"title"`
 	Body      string             `json:"body" bson:"body"`
 	EventID   primitive.ObjectID `json:"event_id,omitempty" bson:"event_id,omitempty"`
+	Data      PostData           `json:"data,omitempty" bson:"data,omitempty"`
 	Images    []string           `json:"images" bson:"images"`
 	Likes     []Like             `json:"likes" bson:"likes"`
 	Comments  []Comment          `json:"comments" bson:"comments"`
@@ -22,6 +23,7 @@ type Post struct {
 type PostData struct {
 	Poster *UserData `json:"poster,omitempty"`
 	Event  *Event    `json:"event,omitempty"`
+	User   UserData  `json:"user,omitempty"`
 }
 
 /*
