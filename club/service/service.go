@@ -584,11 +584,6 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			text = "You've been demoted"
 		}
 
-		// add user to admin topic for club
-		if usr.DeviceToken != "" {
-			c.NotifService.AddTokenToTopic(club.ID.Hex(), uuid, usr.DeviceToken)
-		}
-
 		// if user was member then add them to the admin topic
 		if club.Members[index].Role == "member" {
 			c.NotifService.AddTokenToTopic(club.ID.Hex()+"_admin", uuid, usr.DeviceToken)
