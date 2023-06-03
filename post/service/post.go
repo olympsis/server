@@ -85,6 +85,15 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error(err)
 			}
+			user, err := p.SearchService.SearchUserByUUID(post.Poster)
+			if err != nil {
+				p.Logger.Error(err)
+			}
+
+			data := models.PostData{
+				User: user,
+			}
+			post.Data = data
 			posts = append(posts, post)
 		}
 
@@ -141,6 +150,16 @@ func (p *Service) GetPost() http.HandlerFunc {
 				return
 			}
 		}
+
+		user, err := p.SearchService.SearchUserByUUID(post.Poster)
+		if err != nil {
+			p.Logger.Error(err.Error())
+		}
+
+		data := models.PostData{
+			User: user,
+		}
+		post.Data = data
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
