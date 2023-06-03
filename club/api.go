@@ -106,7 +106,7 @@ func (s *ClubAPI) Ready() {
 	).Methods("POST")
 
 	// update club application - requires admin token
-	s.Router.Handle("/clubs/{id}/applications/{applicationId}",
+	s.Router.Handle("/clubs/{id}/applications/{applicationID}",
 		middleware.Chain(
 			s.Service.UpdateApplication(),
 			middleware.Logging(),
@@ -116,7 +116,7 @@ func (s *ClubAPI) Ready() {
 	).Methods("PUT")
 
 	// delete application
-	s.Router.Handle("/clubs/{id}/applications/{applicationId}",
+	s.Router.Handle("/clubs/{id}/applications/{applicationID}",
 		middleware.Chain(
 			s.Service.DeleteApplication(),
 			middleware.Logging(),
