@@ -50,7 +50,7 @@ Get Posts (GET)
 */
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		club := r.URL.Query().Get("clubId")
+		club := r.URL.Query().Get("clubID")
 
 		if club == "" {
 			rw.Header().Set("Content-Type", "application/json")
@@ -60,7 +60,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		}
 
 		coid, _ := primitive.ObjectIDFromHex(club)
-		filter := bson.M{"clubId": coid}
+		filter := bson.M{"club_id": coid}
 
 		var posts []models.Post
 		cur, err := p.Database.PostCol.Find(context.TODO(), filter)
