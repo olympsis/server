@@ -457,7 +457,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		// delete club from users data
 		for i := 0; i < len(club.Members); i++ {
 			filter := bson.M{"uuid": club.Members[i].UUID}
-			update := bson.M{"$pull": bson.M{"clubs": club.ID.Hex()}}
+			update := bson.M{"$pull": bson.M{"clubs": oid}}
 			c.Database.UserCol.UpdateOne(context.Background(), filter, update)
 		}
 
@@ -949,9 +949,12 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		note := notif.Notification{
 			Title: "New Club Application",
 			Body:  "You have a new club application",
-			Topic: id + "_admin",
+			Topic: app.ClubID.Hex() + "_admin",
 		}
-		c.NotifService.SendNotificationToTopic(&note)
+		err = c.NotifService.SendNotificationToTopic(&note)
+		if err != nil {
+			c.Logger.Error(err.Error())
+		}
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(app)
@@ -1101,6 +1104,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 					Title: "Club Application",
 					Body:  club.Name + " accepted your application.",
 				}
+				c.NotifService.AddTokenToTopic(club.ID.Hex(), usr.UUID, usr.DeviceToken)
 				c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
 
 				rw.Header().Set("Content-Type", "application/json")
