@@ -940,7 +940,13 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 			return
 		}
 
-		// Notify admins
+		// notify admins
+		note := notif.Notification{
+			Title: "New Club Application",
+			Body:  "You have a new club application",
+			Topic: oid.Hex() + "_admin",
+		}
+		c.NotifService.SendNotificationToTopic(&note)
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(app)

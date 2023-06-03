@@ -72,12 +72,12 @@ type ApplicationUpdateRequest struct {
 }
 
 type ClubApplication struct {
-	ID        primitive.ObjectID `json:"id"`
-	UUID      string             `json:"uuid"`
-	ClubID    primitive.ObjectID `json:"club_id"`
-	Status    string             `json:"status"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	UUID      string             `json:"uuid" bson:"uuid"`
+	ClubID    primitive.ObjectID `json:"club_id" bson:"club_id"`
+	Status    string             `json:"status" bson:"status"`
 	Data      *UserData          `json:"data,omitempty" bson:"data,omitempty"`
-	CreatedAt int64              `json:"created_at"`
+	CreatedAt int64              `json:"created_at" bson:"created_at"`
 }
 
 type ClubApplicationsResponse struct {
