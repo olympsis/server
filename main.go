@@ -33,7 +33,7 @@ func main() {
 	d.EstablishConnection()
 
 	// notifications service
-	n := notif.NewNotificationService(l, r)
+	n := notif.NewNotificationService(l)
 	n.CreateNewClient()
 	n.ConnectToDatabase()
 

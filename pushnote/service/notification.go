@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
@@ -17,8 +16,8 @@ import (
 /*
 Create new field service struct
 */
-func NewNotificationService(l *logrus.Logger, r *mux.Router) *Service {
-	return &Service{Logger: l, Router: r}
+func NewNotificationService(l *logrus.Logger) *Service {
+	return &Service{Logger: l}
 }
 
 /*
@@ -126,7 +125,7 @@ func (s *Service) CreateTopic(name string) error {
 Get a topic
 */
 func (s *Service) GetTopic(name string) (Topic, error) {
-	queryStmt := fmt.Sprintf(`SELECT uuid, token FROM %s`, name)
+	queryStmt := fmt.Sprintf(`SELECT uuid, token FROM "%s"`, name)
 	rows, err := s.Database.Query(context.TODO(), queryStmt)
 	if err != nil {
 		return Topic{}, err
