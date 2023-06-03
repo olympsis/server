@@ -278,9 +278,6 @@ func (p *Service) UpdatePost() http.HandlerFunc {
 		change := bson.M{}
 		update := bson.M{"$set": change}
 
-		if req.Title != "" {
-			change["title"] = req.Title
-		}
 		if req.Body != "" {
 			change["body"] = req.Body
 		}
