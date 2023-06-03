@@ -455,6 +455,11 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		c.NotifService.DeleteTopic(clubAdminTopic)
 
 		// delete club from users data
+		for i := 0; i < len(club.Members); i++ {
+			filter := bson.M{"uuid": club.Members[i].UUID}
+			update := bson.M{"$pull": bson.M{"clubs": club.ID.Hex()}}
+			c.Database.UserCol.UpdateOne(context.Background(), filter, update)
+		}
 
 		// delete club
 		filter := bson.M{"_id": oid}
@@ -944,7 +949,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		note := notif.Notification{
 			Title: "New Club Application",
 			Body:  "You have a new club application",
-			Topic: oid.Hex() + "_admin",
+			Topic: id + "_admin",
 		}
 		c.NotifService.SendNotificationToTopic(&note)
 
@@ -985,13 +990,13 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 		// grab club id from path
 		vars := mux.Vars(r)
 		// if there is no application id
-		if len(vars["applicationId"]) == 0 {
+		if len(vars["applicationID"]) == 0 {
 			http.Error(rw, "bad application id", http.StatusBadRequest)
 			return
 		}
 
 		// if we get an invalid application id
-		if len(vars["applicationId"]) < 24 {
+		if len(vars["applicationID"]) < 24 {
 			http.Error(rw, "bad application id", http.StatusBadRequest)
 			return
 		}
@@ -1012,7 +1017,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 		}
 
 		// convert application id to oid
-		aid := vars["applicationId"]
+		aid := vars["applicationID"]
 		aoid, err := primitive.ObjectIDFromHex(aid)
 		if err != nil {
 			c.Logger.Debug(err.Error())
@@ -1104,6 +1109,19 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			}
 
 			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusOK)
+			return
+		} else {
+			// update club application in database
+			filter := bson.M{"_id": aoid}
+			change := bson.M{"$set": bson.M{"status": req.Status}}
+			_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
+			if err != nil {
+				c.Logger.Error(err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+				return
+			}
 			rw.WriteHeader(http.StatusOK)
 			return
 		}
