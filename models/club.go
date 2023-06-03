@@ -29,10 +29,16 @@ type Member struct {
 	JoinedAt int64              `json:"joined_at,omitempty" bson:"joined_at"`
 }
 
+type ClubResponse struct {
+	Token string `json:"token,omitempty"`
+	Club  Club   `json:"club"`
+}
+
 type ClubsResponse struct {
 	TotalClubs int    `json:"total_clubs"`
 	Clubs      []Club `json:"clubs"`
 }
+
 type ClubInvite struct {
 	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	UUID      string             `json:"uuid" bson:"uuid"`

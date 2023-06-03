@@ -115,6 +115,9 @@ Get a Club (GET)
 */
 func (c *Service) GetClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		uuid := r.Header.Get("UUID")
+
 		vars := mux.Vars(r)
 		id := vars["id"]
 
@@ -143,8 +146,24 @@ func (c *Service) GetClub() http.HandlerFunc {
 			}
 		}
 
+		//
+		if club.ID.Hex() == "000000000000000000000000" {
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		var token string
+
 		// fetch member data
 		for i := 0; i < len(club.Members); i++ {
+			if club.Members[i].UUID == uuid {
+				if club.Members[i].Role != "member" {
+					token, err = utils.GenerateClubToken(club.ID.Hex(), club.Members[i].Role, uuid)
+					if err != nil {
+						c.Logger.Error(err)
+					}
+				}
+			}
 			usr, err := c.SearchService.SearchUserByUUID(club.Members[i].UUID)
 			if err != nil {
 				club.Members[i].Data = nil
@@ -153,9 +172,14 @@ func (c *Service) GetClub() http.HandlerFunc {
 			}
 		}
 
+		resp := models.ClubResponse{
+			Token: token,
+			Club:  club,
+		}
+
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(club)
+		json.NewEncoder(rw).Encode(resp)
 
 	}
 }
