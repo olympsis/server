@@ -129,19 +129,21 @@ func (s *ClubAPI) Ready() {
 	*/
 
 	// change member rank
-	s.Router.Handle("/clubs/{id}/members/{memberId}/rank",
+	s.Router.Handle("/clubs/{id}/members/{memberID}/rank",
 		middleware.Chain(
 			s.Service.ChangeMemberRank(),
 			middleware.Logging(),
+			middleware.ClubAdminMiddleware(),
 			middleware.UserMiddleware(),
 		),
 	).Methods("PUT")
 
 	// kick member from club
-	s.Router.Handle("/clubs/{id}/members/{memberId}/kick",
+	s.Router.Handle("/clubs/{id}/members/{memberID}/kick",
 		middleware.Chain(
 			s.Service.KickMember(),
 			middleware.Logging(),
+			middleware.ClubAdminMiddleware(),
 			middleware.UserMiddleware(),
 		),
 	).Methods("PUT")

@@ -502,13 +502,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// if there is no member id
-		if len(vars["memberID"]) == 0 {
-			http.Error(rw, "bad member id found", http.StatusBadRequest)
-			return
-		}
-
-		// if we get an member id
-		if len(vars["memberID"]) < 24 {
+		if len(vars["memberID"]) == 0 || len(vars["memberID"]) < 24 {
 			http.Error(rw, "bad member id found", http.StatusBadRequest)
 			return
 		}
@@ -580,7 +574,9 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		text := ""
-		if req.Role == "admin" {
+		if req.Role == "owner" {
+			text = "You've been promoted to Owner"
+		} else if req.Role == "admin" {
 			text = "You've been promoted to Admin"
 		} else if req.Role == "moderator" {
 			text = "You've been promoted to Moderator"
@@ -589,8 +585,13 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// add user to admin topic for club
-		if usr.DeviceToken != "" && req.Role == "owner" || req.Role == "moderator" {
+		if usr.DeviceToken != "" {
 			c.NotifService.AddTokenToTopic(club.ID.Hex(), uuid, usr.DeviceToken)
+		}
+
+		// if user was member then add them to the admin topic
+		if club.Members[index].Role == "member" {
+			c.NotifService.AddTokenToTopic(club.ID.Hex()+"_admin", uuid, usr.DeviceToken)
 		}
 
 		// notify user that they had their rank changed
