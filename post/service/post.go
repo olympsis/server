@@ -357,14 +357,14 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		// grab club id from path
 		vars := mux.Vars(r)
 
-		// if there is no club id
+		// if there is no post id
 		if len(vars["id"]) < 24 {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": "bad post ID" }`))
 			return
 		}
 
-		// convert club id to oid
+		// convert post id to oid
 		id := vars["id"]
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {

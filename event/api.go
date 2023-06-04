@@ -86,7 +86,7 @@ func (e *EventAPI) Ready() {
 	).Methods("POST")
 
 	// remove a participant
-	e.Router.Handle("/events/{id}/participants/{participantId}",
+	e.Router.Handle("/events/{id}/participants/{participantID}",
 		middleware.Chain(
 			e.Service.RemoveParticipant(),
 			middleware.Logging(),
@@ -110,7 +110,7 @@ func (e *EventAPI) Ready() {
 	// unsubscribe from event notifications
 	e.Router.Handle("/events/{id}/unsubscribe",
 		middleware.Chain(
-			e.Service.UpdateAnEvent(),
+			e.Service.UnsubscribeFromEvent(),
 			middleware.Logging(),
 			middleware.UserMiddleware(),
 		),

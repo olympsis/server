@@ -100,7 +100,27 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			return
 		}
 
+		user, err := e.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			e.Logger.Error(err.Error())
+		}
+
 		// TODO subscribe owner to events
+		e.NotifService.CreateTopic(event.ID.Hex())
+		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
+
+		var field models.Field
+		e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": event.FieldID}).Decode(&field)
+
+		var club models.Club
+		e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": event.ClubID}).Decode(&club)
+
+		data := models.EventData{
+			Poster: &user,
+			Field:  &field,
+			Club:   &club,
+		}
+		event.Data = &data
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(event)
@@ -119,6 +139,9 @@ Returns:
 */
 func (e *Service) GetEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		uuid := r.Header.Get("UUID")
+
 		// grab event id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
@@ -140,18 +163,33 @@ func (e *Service) GetEvent() http.HandlerFunc {
 			}
 		}
 
-		// TODO Fetch data about owner
-
 		// add user data to participants
-		// for ptp := range event.Participants {
-		// 	var participantData UserData
-		// 	err = e.FetchDataAboutUser(event.Participants[ptp].UUID, &participantData)
-		// 	if err != nil {
-		// 		e.Logger.Error(err.Error())
-		// 	} else {
-		// 		//event.Participants[ptp].Data = &participantData
-		// 	}
-		// }
+		for ptp := range event.Participants {
+			data, err := e.SearchService.SearchUserByUUID(event.Participants[ptp].UUID)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+			event.Participants[ptp].Data = &data
+		}
+
+		// event data
+		user, err := e.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			e.Logger.Error(err.Error())
+		}
+
+		var field models.Field
+		e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": event.FieldID}).Decode(&field)
+
+		var club models.Club
+		e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": event.ClubID}).Decode(&club)
+
+		data := models.EventData{
+			Poster: &user,
+			Field:  &field,
+			Club:   &club,
+		}
+		event.Data = &data
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -170,20 +208,6 @@ Returns:
 */
 func (e *Service) GetEventsByLocation() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		/*
-			token, err := utils.GetTokenFromHeader(r)
-			if err != nil {
-				e.Logger.Error(err.Error())
-				http.Error(rw, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			_, _, _, err := utils.ValidateAuthToken(token)
-			if err != nil {
-				e.Logger.Error("Failed to Decode Token: " + err.Error())
-				http.Error(rw, "forbidden", http.StatusForbidden)
-				return
-			}*/
 
 		// query params
 		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
@@ -245,8 +269,8 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 					bson.M{"status": "in-progress"},
 				},
 			}
-
-			err = e.FindEvents(context.Background(), filter, &events)
+			var _events []models.Event
+			err = e.FindEvents(context.Background(), filter, &_events)
 			if err != nil {
 				if err == mongo.ErrNoDocuments {
 					rw.WriteHeader(http.StatusNotFound)
@@ -254,7 +278,29 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 					return
 				}
 			}
-			//TODO fetch owner data for all events
+
+			// fetch owner data for all events
+			for index := range _events {
+				// event data
+				user, err := e.SearchService.SearchUserByUUID(_events[index].Poster)
+				if err != nil {
+					e.Logger.Error(err.Error())
+				}
+
+				var field models.Field
+				e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": _events[index].FieldID}).Decode(&field)
+
+				var club models.Club
+				e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": _events[index].ClubID}).Decode(&club)
+
+				data := models.EventData{
+					Poster: &user,
+					Field:  &field,
+					Club:   &club,
+				}
+				_events[index].Data = &data
+			}
+			events = append(events, _events...)
 		}
 
 		if len(events) == 0 {
@@ -322,16 +368,16 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			changes["image_url"] = req.ImageURL
 		}
 		if req.MaxParticipants != 0 {
-			changes["maxParticipants"] = req.MaxParticipants
+			changes["max_participants"] = req.MaxParticipants
 		}
 		if req.StartTime != 0 {
-			changes["startTime"] = req.StartTime
+			changes["start_time"] = req.StartTime
 		}
 		if req.ActualStartTime != 0 {
-			changes["actualStartTime"] = req.ActualStartTime
+			changes["actual_start_time"] = req.ActualStartTime
 		}
 		if req.StopTime != 0 {
-			changes["stopTime"] = req.StopTime
+			changes["stop_time"] = req.StopTime
 		}
 		if req.Status != "" {
 			changes["status"] = req.Status
@@ -354,15 +400,27 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		// notify participants
 		if req.ActualStartTime != 0 && req.Status == "in-progress" {
 			// notify participants that the event is starting
-			//e.SendNotificationToTopic(*r, event.Title, "Event is Starting", id)
+			note := notif.Notification{
+				Title: event.Title,
+				Body:  "Event is starting",
+				Topic: event.ClubID.Hex(),
+			}
+			e.NotifService.SendNotificationToTopic(&note)
+
 			rw.WriteHeader(http.StatusOK)
 			json.NewEncoder(rw).Encode(&event)
 		}
 
 		// notify participants
 		if req.StopTime != 0 && req.Status == "ended" {
-			// notify participants that the event is starting
-			//e.SendNotificationToTopic(*r, event.Title, "Event has Ended", id)
+			// notify participants that the event ended
+			note := notif.Notification{
+				Title: event.Title,
+				Body:  "Event ended",
+				Topic: event.ClubID.Hex(),
+			}
+			e.NotifService.SendNotificationToTopic(&note)
+			e.NotifService.DeleteTopic(event.ClubID.Hex())
 			rw.WriteHeader(http.StatusOK)
 			json.NewEncoder(rw).Encode(&event)
 		}
@@ -404,7 +462,7 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		}
 
 		// delete notification topic
-
+		e.NotifService.DeleteTopic(id)
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -467,25 +525,6 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 
 		// if event is full
 		if len(event.Participants) >= int(event.MaxParticipants) {
-
-			// add owner data to event
-			// var data UserData
-			// err = e.FetchDataAboutUser(event.Poster, &data)
-			// if err != nil {
-			// 	e.Logger.Error(err.Error())
-			// }
-
-			// fetch participants data
-			// for ptp := range event.Participants {
-			// 	var participantData UserData
-			// 	err = e.FetchDataAboutUser(event.Participants[ptp].UUID, &participantData)
-			// 	if err != nil {
-			// 		e.Logger.Error(err.Error())
-			// 	} else {
-			// 		//event.Participants[ptp].Data = &participantData
-			// 	}
-			// }
-
 			errResponse := models.FullEventError{
 				MSG:   "event capacity is full",
 				Event: event,
@@ -513,13 +552,11 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// subscribe user to notifications
-		// var userData UserData
-		// err = e.FetchDataAboutUser(uuid, &userData)
-		// if err != nil {
-		// 	e.Logger.Error(err.Error())
-		// } else {
-		// 	//e.SubscribeToEventTopic(event.ID.Hex(), []string{userData.DeviceToken})
-		// }
+		user, err := e.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			e.Logger.Error(err.Error())
+		}
+		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -544,7 +581,7 @@ Returns:
 func (e *Service) RemoveParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("UUID")
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -554,7 +591,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		partId := vars["participantId"]
+		partId := vars["participantID"]
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 		poid, _ := primitive.ObjectIDFromHex(partId)
@@ -571,6 +608,11 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// unsubscribe user from notifications
+		user, err := e.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			e.Logger.Error(err.Error())
+		}
+		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), user.DeviceToken)
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
@@ -590,7 +632,7 @@ Returns:
 func (e *Service) SubscribeToEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("UUID")
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -611,7 +653,46 @@ func (e *Service) SubscribeToEvent() http.HandlerFunc {
 			return
 		}
 
-		// subscribe to event
+		// subscribe user to notifications
+		user, err := e.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			e.Logger.Error(err.Error())
+		}
+		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
+	}
+}
 
+func (e *Service) UnsubscribeFromEvent() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		uuid := r.Header.Get("UUID")
+
+		// grab id from path
+		vars := mux.Vars(r)
+		if len(vars["id"]) < 24 {
+			http.Error(rw, "bad event id", http.StatusBadRequest)
+			return
+		}
+		id := vars["id"]
+
+		oid, _ := primitive.ObjectIDFromHex(id)
+
+		// fetch event
+		var event models.Event
+		filter := bson.M{"_id": oid}
+		err := e.FindEvent(context.Background(), filter, &event)
+		if err != nil {
+			http.Error(rw, "event not found", http.StatusNotFound)
+			return
+		}
+
+		// unsubscribe user from notifications
+		user, err := e.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			e.Logger.Error(err.Error())
+		}
+		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), user.DeviceToken)
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(event)
 	}
 }
