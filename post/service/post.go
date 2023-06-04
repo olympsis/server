@@ -94,6 +94,16 @@ func (p *Service) GetPosts() http.HandlerFunc {
 				User: &user,
 			}
 			post.Data = &data
+
+			// grab user data for comments
+			for i := 0; i < len(post.Comments); i++ {
+				usrData, err := p.SearchService.SearchUserByUUID(post.Comments[i].UUID)
+				if err != nil {
+					p.Logger.Error(err.Error())
+				}
+				post.Comments[i].Data = &usrData
+			}
+
 			posts = append(posts, post)
 		}
 
@@ -160,6 +170,15 @@ func (p *Service) GetPost() http.HandlerFunc {
 			User: &user,
 		}
 		post.Data = &data
+
+		// get comments data
+		for i := 0; i < len(post.Comments); i++ {
+			usrData, err := p.SearchService.SearchUserByUUID(post.Comments[i].UUID)
+			if err != nil {
+				p.Logger.Error(err.Error())
+			}
+			post.Comments[i].Data = &usrData
+		}
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
