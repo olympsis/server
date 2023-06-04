@@ -208,15 +208,12 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		splicedSports := strings.Split(sports, ",")
-
 		var events []models.Event
-		var fields []models.Field
 
 		loc := models.GeoJSON{
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
-
 		filter := bson.M{
 			"location": bson.M{
 				"$near": bson.M{
@@ -229,7 +226,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			},
 		}
 
-		err := e.FindEvents(context.Background(), filter, &events)
+		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, "no events found", http.StatusNotFound)
@@ -237,19 +234,19 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			}
 		}
 
-		// if there are no fields then there should be no events
-		if len(events) == 0 {
-			rw.Header().Set("Content-Type", "application/json")
-			http.Error(rw, "no events found", http.StatusNoContent)
-			return
-		}
-
 		// loop through the fields and find the correspoding events
-		// filter by visibility, status and sports
-		for i := range fields {
+		for cursor.Next(context.TODO()) {
+			// decode field
+			var field models.Field
+			err := cursor.Decode(&field)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+
+			// filter to find events
 			filter := bson.M{
-				"fieldId": fields[i].ID,
-				"sports": bson.M{
+				"field_id": field.ID,
+				"sport": bson.M{
 					"$in": splicedSports,
 				},
 				"visibility": "public",
@@ -258,6 +255,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 					bson.M{"status": "in-progress"},
 				},
 			}
+
 			var _events []models.Event
 			err = e.FindEvents(context.Background(), filter, &_events)
 			if err != nil {
@@ -289,6 +287,8 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 				}
 				_events[index].Data = &data
 			}
+
+			// add events to array
 			events = append(events, _events...)
 		}
 

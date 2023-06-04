@@ -20,7 +20,7 @@ type Event struct {
 	Participants    []Participant      `json:"participants" bson:"participants"`
 	Likes           []Like             `json:"likes" bson:"likes"`
 	Visibility      string             `json:"visibility" bson:"visibility"`
-	Data            *EventData         `json:"data" bson:"data"`
+	Data            *EventData         `json:"data" bson:"data,omitempty"`
 	CreatedAt       int64              `json:"created_at" bson:"created_at"`
 }
 
