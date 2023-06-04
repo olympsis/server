@@ -217,14 +217,16 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			Coordinates: []float64{longitude, latitude},
 		}
 
-		filter := bson.D{
-			{Key: "location",
-				Value: bson.D{
-					{Key: "$near", Value: bson.D{
-						{Key: "$geometry", Value: loc},
-						{Key: "$maxDistance", Value: radius},
-					}},
-				}},
+		filter := bson.M{
+			"location": bson.M{
+				"$near": bson.M{
+					"$geometry":    loc,
+					"$maxDistance": radius,
+				},
+			},
+			"sports": bson.M{
+				"$in": splicedSports,
+			},
 		}
 
 		err := e.FindEvents(context.Background(), filter, &events)
