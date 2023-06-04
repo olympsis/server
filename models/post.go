@@ -15,7 +15,7 @@ type Post struct {
 	Data      *PostData          `json:"data,omitempty" bson:"data,omitempty"`
 	Images    []string           `json:"images" bson:"images"`
 	Likes     []Like             `json:"likes,omitempty" bson:"likes,omitempty"`
-	Comments  []Comment          `json:"comment,omitempty" bson:"comments,omitempty"`
+	Comments  []Comment          `json:"comments,omitempty" bson:"comments,omitempty"`
 	CreatedAt int64              `json:"created_at" bson:"created_at"`
 }
 
