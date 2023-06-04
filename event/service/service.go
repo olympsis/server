@@ -105,22 +105,9 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			e.Logger.Error(err.Error())
 		}
 
-		// TODO subscribe owner to events
+		// subscribe owner to notifications
 		e.NotifService.CreateTopic(event.ID.Hex())
 		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
-
-		var field models.Field
-		e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": event.FieldID}).Decode(&field)
-
-		var club models.Club
-		e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": event.ClubID}).Decode(&club)
-
-		data := models.EventData{
-			Poster: &user,
-			Field:  &field,
-			Club:   &club,
-		}
-		event.Data = &data
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(event)
