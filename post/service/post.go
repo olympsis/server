@@ -91,9 +91,9 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			}
 
 			data := models.PostData{
-				User: user,
+				User: &user,
 			}
-			post.Data = data
+			post.Data = &data
 			posts = append(posts, post)
 		}
 
@@ -157,9 +157,9 @@ func (p *Service) GetPost() http.HandlerFunc {
 		}
 
 		data := models.PostData{
-			User: user,
+			User: &user,
 		}
-		post.Data = data
+		post.Data = &data
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -508,7 +508,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 		filter := bson.M{"_id": oid}
 		change := bson.M{"$push": bson.M{"comments": req}}
 
-		_, err = p.Database.CommentsCol.UpdateOne(context.TODO(), filter, change)
+		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
 		if err != nil {
 			p.Logger.Error(err.Error())
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -553,7 +553,7 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"comments": bson.M{"_id": coid}}}
 
-		_, err := p.Database.CommentsCol.UpdateOne(context.TODO(), match, change)
+		_, err := p.Database.PostCol.UpdateOne(context.TODO(), match, change)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
