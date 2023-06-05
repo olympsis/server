@@ -17,6 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 /*
@@ -226,7 +227,9 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			},
 		}
 
-		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
+		projection := bson.M{"_id": 1}
+
+		cursor, err := e.Database.FieldCol.Find(context.Background(), filter, options.Find().SetProjection(projection))
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, "no events found", http.StatusNotFound)
@@ -234,7 +237,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			}
 		}
 
-		// loop through the fields and find the correspoding events
+		var fieldsIDs []primitive.ObjectID
 		for cursor.Next(context.TODO()) {
 			// decode field
 			var field models.Field
@@ -242,55 +245,58 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			if err != nil {
 				e.Logger.Error(err.Error())
 			}
-
-			// filter to find events
-			filter := bson.M{
-				"field_id": field.ID,
-				"sport": bson.M{
-					"$in": splicedSports,
-				},
-				"visibility": "public",
-				"$or": []interface{}{
-					bson.M{"status": "pending"},
-					bson.M{"status": "in-progress"},
-				},
-			}
-
-			var _events []models.Event
-			err = e.FindEvents(context.Background(), filter, &_events)
-			if err != nil {
-				if err == mongo.ErrNoDocuments {
-					rw.WriteHeader(http.StatusNotFound)
-					rw.Write([]byte(`{ "msg": "field does not exist" }`))
-					return
-				}
-			}
-
-			// fetch owner data for all events
-			for index := range _events {
-				// event data
-				user, err := e.SearchService.SearchUserByUUID(_events[index].Poster)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				}
-
-				var field models.Field
-				e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": _events[index].FieldID}).Decode(&field)
-
-				var club models.Club
-				e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": _events[index].ClubID}).Decode(&club)
-
-				data := models.EventData{
-					Poster: &user,
-					Field:  &field,
-					Club:   &club,
-				}
-				_events[index].Data = &data
-			}
-
-			// add events to array
-			events = append(events, _events...)
+			fieldsIDs = append(fieldsIDs, field.ID)
 		}
+
+		// filter to find events
+		filter = bson.M{
+			"field_id": bson.M{
+				"$in": fieldsIDs,
+			},
+			"sport": bson.M{
+				"$in": splicedSports,
+			},
+			"visibility": "public",
+			"$or": []interface{}{
+				bson.M{"status": "pending"},
+				bson.M{"status": "in-progress"},
+			},
+		}
+
+		var _events []models.Event
+		err = e.FindEvents(context.Background(), filter, &_events)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				rw.WriteHeader(http.StatusNotFound)
+				rw.Write([]byte(`{ "msg": "field does not exist" }`))
+				return
+			}
+		}
+
+		// fetch owner data for all events
+		for index := range _events {
+			// event data
+			user, err := e.SearchService.SearchUserByUUID(_events[index].Poster)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+
+			var field models.Field
+			e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": _events[index].FieldID}).Decode(&field)
+
+			var club models.Club
+			e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": _events[index].ClubID}).Decode(&club)
+
+			data := models.EventData{
+				Poster: &user,
+				Field:  &field,
+				Club:   &club,
+			}
+			_events[index].Data = &data
+		}
+
+		// add events to array
+		events = append(events, _events...)
 
 		if len(events) == 0 {
 			http.Error(rw, "no events", http.StatusNoContent)
@@ -536,6 +542,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		change := bson.M{"$push": bson.M{"participants": part}}
 		err = e.UpdateEvent(context.Background(), filter, change, &event)
 		if err != nil {
+			e.Logger.Error(err.Error())
 			http.Error(rw, "failed to update event", http.StatusInternalServerError)
 			return
 		}

@@ -13,12 +13,12 @@ type Event struct {
 	Sport           string             `json:"sport" bson:"sport"`
 	Level           int8               `json:"level" bson:"level"`
 	Status          string             `json:"status" bson:"status"`
-	StartTime       int64              `json:"start_time" bson:"start_time"`
-	ActualStartTime int64              `json:"actual_start_time" bson:"actual_start_time"`
-	StopTime        int64              `json:"stop_time" bson:"stop_time"`
+	StartTime       int64              `json:"start_time,omitempty" bson:"start_time,omitempty"`
+	ActualStartTime int64              `json:"actual_start_time,omitempty" bson:"actual_start_time,omitempty"`
+	StopTime        int64              `json:"stop_time,omitempty" bson:"stop_time,omitempty"`
 	MaxParticipants int8               `json:"max_participants" bson:"max_participants"`
-	Participants    []Participant      `json:"participants" bson:"participants"`
-	Likes           []Like             `json:"likes" bson:"likes"`
+	Participants    []Participant      `json:"participants,omitempty" bson:"participants,omitempty"`
+	Likes           []Like             `json:"likes,omitempty" bson:"likes,omitempty"`
 	Visibility      string             `json:"visibility" bson:"visibility"`
 	Data            *EventData         `json:"data" bson:"data,omitempty"`
 	CreatedAt       int64              `json:"created_at" bson:"created_at"`
