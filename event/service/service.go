@@ -293,6 +293,15 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 				Club:   &club,
 			}
 			_events[index].Data = &data
+
+			// add user data to participants
+			for ptp := range _events[index].Participants {
+				data, err := e.SearchService.SearchUserByUUID(_events[index].Participants[ptp].UUID)
+				if err != nil {
+					e.Logger.Error(err.Error())
+				}
+				_events[index].Participants[ptp].Data = &data
+			}
 		}
 
 		// add events to array
