@@ -407,7 +407,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			note := notif.Notification{
 				Title: event.Title,
 				Body:  "Event is starting",
-				Topic: event.ClubID.Hex(),
+				Topic: event.ID.Hex(),
 			}
 			e.NotifService.SendNotificationToTopic(&note)
 
@@ -421,10 +421,10 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			note := notif.Notification{
 				Title: event.Title,
 				Body:  "Event ended",
-				Topic: event.ClubID.Hex(),
+				Topic: event.ID.Hex(),
 			}
 			e.NotifService.SendNotificationToTopic(&note)
-			e.NotifService.DeleteTopic(event.ClubID.Hex())
+			e.NotifService.DeleteTopic(event.ID.Hex())
 			rw.WriteHeader(http.StatusOK)
 			json.NewEncoder(rw).Encode(&event)
 		}
