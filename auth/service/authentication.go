@@ -140,7 +140,8 @@ func (a *Service) SignUp() http.HandlerFunc {
 			}
 
 			if resp.Error != "" {
-				a.Log.Error("apple returned an error: %s - %s\n", resp.Error, resp.ErrorDescription)
+				a.Log.Error(resp.Error)
+				a.Log.Error(resp.ErrorDescription)
 				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -243,7 +244,8 @@ func (a *Service) Login() http.HandlerFunc {
 			}
 
 			if resp.Error != "" {
-				a.Log.Error("apple returned an error: %s - %s\n", resp.Error, resp.ErrorDescription)
+				a.Log.Error(resp.Error)
+				a.Log.Error(resp.ErrorDescription)
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -399,7 +401,8 @@ func (a *Service) Delete() http.HandlerFunc {
 		}
 
 		if resp.Error != "" {
-			a.Log.Error("apple returned an error: %s - %s\n", resp.Error, resp.ErrorDescription)
+			a.Log.Error(resp.Error)
+			a.Log.Error(resp.ErrorDescription)
 			return
 		}
 
