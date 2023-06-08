@@ -98,15 +98,6 @@ func (s *Service) SendNotificationToTopic(note *Notification) error {
 Create a topic
 */
 func (s *Service) CreateTopic(name string) error {
-	// topic := Topic{
-	// 	Name:   name,
-	// 	Tokens: tokens,
-	// }
-	// topicJSON, err := json.Marshal(topic)
-	// if err != nil {
-	// 	return err
-	// }
-
 	createStmt := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS "%s" (
 		ID SERIAL PRIMARY KEY, 
 		uuid VARCHAR(50),
