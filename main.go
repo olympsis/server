@@ -37,7 +37,10 @@ func main() {
 	t := os.Getenv("TEAMID")
 	f := "./files/AuthKey_JN25FUC9X2.p8"
 	n := notif.NewNotificationService(l, d.Pool)
-	n.CreateNewClient(k, t, f)
+	err := n.CreateNewClient(k, t, f)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	// search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)

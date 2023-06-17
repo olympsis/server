@@ -5,13 +5,19 @@ PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
 export PORT=80
+
+export KEYID=JN25FUC9X2
+export TEAMID=5A6H49Q85D
+
 export DB_ADDR=192.168.1.205
 export DB_USR=service
 export DB_PASS=qN1PHHgo6L942AvpTgGQ
 export DB_NAME=olympsis
+
 export STORAGE_ADDR=192.168.1.205:9000
 export STORAGE_ACCESS_KEY=p4eHM3a4v3wGB2ro
 export STORAGE_SECRET_KEY=WbPjehYtD3wO4V4PNlYwJwWiPRy6qqqN
+
 export AUTH_COL=auth
 export USER_COL=users
 export CLUB_COL=clubs
@@ -22,6 +28,7 @@ export CINVITE_COL=clubInvites
 export COMMENTS_COL=comments
 export FREQUEST_COL=friendRequests
 export CAPPICATIONS_COL=clubApplications
+
 export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 export POSTGRES_USER=postgres
