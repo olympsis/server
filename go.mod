@@ -7,7 +7,10 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jackc/pgx/v5 v5.3.1
-	github.com/sirupsen/logrus v1.9.0
+	github.com/olympsis/models v0.0.0-20230607014904-5c2dae7a363f
+	github.com/olympsis/notif v0.0.0-20230616024033-db897c97a29b
+	github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201
+	github.com/sirupsen/logrus v1.9.3
 	github.com/tideland/gorest v2.15.5+incompatible
 )
 
@@ -34,7 +37,7 @@ require (
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
-	github.com/sideshow/apns2 v0.23.0
+	github.com/sideshow/apns2 v0.23.0 // indirect
 	github.com/tideland/golib v4.24.2+incompatible // indirect
-	go.mongodb.org/mongo-driver v1.11.3
+	go.mongodb.org/mongo-driver v1.11.7
 )

@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"olympsis-server/database"
-	"olympsis-server/models"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

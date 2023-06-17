@@ -9,8 +9,6 @@ import (
 	"olympsis-server/event"
 	"olympsis-server/field"
 	"olympsis-server/post"
-	notif "olympsis-server/pushnote/service"
-	search "olympsis-server/search"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -18,6 +16,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/olympsis/notif"
+	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,12 +33,14 @@ func main() {
 	d.EstablishConnection()
 
 	// notifications service
-	n := notif.NewNotificationService(l)
-	n.CreateNewClient()
-	n.ConnectToDatabase()
+	k := os.Getenv("KEYID")
+	t := os.Getenv("TEAMID")
+	f := "./files/AuthKey_JN25FUC9X2.p8"
+	n := notif.NewNotificationService(l, d.Pool)
+	n.CreateNewClient(k, t, f)
 
 	// search service
-	sh := search.NewSearchService(l, d)
+	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
 	authAPI := auth.NewAuthAPI(l, r, d)
 	userAPI := user.NewUserAPI(l, r, d)

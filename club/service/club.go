@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"olympsis-server/models"
+
+	"github.com/olympsis/models"
 )
 
 func (s *Service) InsertClub(ctx context.Context, club *models.Club) error {

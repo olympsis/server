@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -12,6 +13,7 @@ import (
 
 type Database struct {
 	Logger             *logrus.Logger
+	Pool               *pgxpool.Pool
 	Client             *mongo.Client
 	AuthCol            *mongo.Collection
 	UserCol            *mongo.Collection
@@ -33,6 +35,9 @@ func (d *Database) EstablishConnection() {
 
 	d.Logger.Info("Connecting to Database...")
 
+	/*
+		Connect to Mongo Database
+	*/
 	credential := options.Credential{
 		AuthSource: "admin",
 		Username:   os.Getenv("DB_USR"),
@@ -66,6 +71,22 @@ func (d *Database) EstablishConnection() {
 
 		d.Logger.Info("Database connection successful.")
 	}
+
+	/*
+		Connect to SQL Database
+	*/
+	user := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("POSTGRES_PASSWORD")
+	addr := os.Getenv("DB_ADDR")
+	dbName := os.Getenv("TOPIC_DB_NAME")
+
+	poolStr := "postgres://" + user + ":" + password + "@" + addr + "/" + dbName + "?sslmode=disable"
+	pool, err := pgxpool.New(context.Background(), poolStr)
+	if err != nil {
+		d.Logger.Fatal("failed to connect to database ", err)
+		return
+	}
+	d.Pool = pool
 }
 
 /*

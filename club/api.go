@@ -4,10 +4,10 @@ import (
 	"olympsis-server/club/service"
 	"olympsis-server/database"
 	"olympsis-server/middleware"
-	notif "olympsis-server/pushnote/service"
-	search "olympsis-server/search"
 
 	"github.com/gorilla/mux"
+	"github.com/olympsis/notif"
+	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 

@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"olympsis-server/models"
+
+	"github.com/olympsis/models"
 )
 
 // Insert new user into database
