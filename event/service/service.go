@@ -21,7 +21,7 @@ import (
 )
 
 /*
-Field Service Struct
+Event Service Struct
 */
 type Service struct {
 	Database *database.Database
@@ -399,6 +399,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		if err != nil {
 			e.Logger.Error(err)
 			http.Error(rw, "failed to update event", http.StatusInternalServerError)
+			return
 		}
 
 		// notify participants
@@ -413,6 +414,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 
 			rw.WriteHeader(http.StatusOK)
 			json.NewEncoder(rw).Encode(&event)
+			return
 		}
 
 		// notify participants
@@ -427,6 +429,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			e.NotifService.DeleteTopic(event.ID.Hex())
 			rw.WriteHeader(http.StatusOK)
 			json.NewEncoder(rw).Encode(&event)
+			return
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
@@ -667,6 +670,16 @@ func (e *Service) SubscribeToEvent() http.HandlerFunc {
 	}
 }
 
+/*
+Unsubscribe from event (POST)
+
+  - grab uuid from token
+
+Returns:
+
+	Http handler
+		- Writes back OK to client
+*/
 func (e *Service) UnsubscribeFromEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		uuid := r.Header.Get("UUID")
