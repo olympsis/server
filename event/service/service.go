@@ -101,14 +101,9 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			return
 		}
 
-		user, err := e.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		}
-
 		// subscribe owner to notifications
 		e.NotifService.CreateTopic(event.ID.Hex())
-		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
+		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(event)
@@ -560,11 +555,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// subscribe user to notifications
-		user, err := e.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		}
-		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
+		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -616,11 +607,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// unsubscribe user from notifications
-		user, err := e.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		}
-		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), user.DeviceToken)
+		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), uuid)
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
@@ -662,11 +649,7 @@ func (e *Service) SubscribeToEvent() http.HandlerFunc {
 		}
 
 		// subscribe user to notifications
-		user, err := e.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		}
-		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid, user.DeviceToken)
+		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
 	}
 }
 
@@ -704,11 +687,7 @@ func (e *Service) UnsubscribeFromEvent() http.HandlerFunc {
 		}
 
 		// unsubscribe user from notifications
-		user, err := e.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		}
-		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), user.DeviceToken)
+		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), uuid)
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)

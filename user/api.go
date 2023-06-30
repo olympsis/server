@@ -6,6 +6,7 @@ import (
 	"olympsis-server/user/service"
 
 	"github.com/gorilla/mux"
+	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,8 +16,8 @@ type UserAPI struct {
 	Service *service.Service
 }
 
-func NewUserAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *UserAPI {
-	return &UserAPI{Logger: l, Router: r, Service: service.NewUserService(l, r, d)}
+func NewUserAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *UserAPI {
+	return &UserAPI{Logger: l, Router: r, Service: service.NewUserService(l, r, d, n)}
 }
 
 func (u *UserAPI) Ready() {

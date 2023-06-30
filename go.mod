@@ -7,8 +7,8 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jackc/pgx/v5 v5.3.1
-	github.com/olympsis/models v0.0.0-20230607014904-5c2dae7a363f
-	github.com/olympsis/notif v0.0.0-20230616024033-db897c97a29b
+	github.com/olympsis/models v0.0.0-20230618005150-607948e18e48
+	github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd
 	github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201
 	github.com/sirupsen/logrus v1.9.3
 	github.com/tideland/gorest v2.15.5+incompatible
@@ -25,8 +25,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
-	github.com/xdg-go/scram v1.1.1 // indirect
-	github.com/xdg-go/stringprep v1.0.3 // indirect
+	github.com/xdg-go/scram v1.1.2 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
@@ -39,5 +39,5 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/sideshow/apns2 v0.23.0 // indirect
 	github.com/tideland/golib v4.24.2+incompatible // indirect
-	go.mongodb.org/mongo-driver v1.11.7
+	go.mongodb.org/mongo-driver v1.12.0
 )

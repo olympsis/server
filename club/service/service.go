@@ -288,11 +288,11 @@ func (c *Service) CreateClub() http.HandlerFunc {
 				c.Logger.Error("failed to create club admin topic: " + err.Error())
 			}
 
-			err = c.NotifService.AddTokenToTopic(clubTopic, uuid, user.DeviceToken)
+			err = c.NotifService.AddTokenToTopic(clubTopic, uuid)
 			if err != nil {
 				c.Logger.Error("failed to add token to club topic: " + err.Error())
 			}
-			err = c.NotifService.AddTokenToTopic(clubAdminTopic, uuid, user.DeviceToken)
+			err = c.NotifService.AddTokenToTopic(clubAdminTopic, uuid)
 			if err != nil {
 				c.Logger.Error("failed to add token club admin topic: " + err.Error())
 			}
@@ -488,8 +488,6 @@ Returns:
 func (c *Service) ChangeMemberRank() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
-
 		// grab club id from path
 		vars := mux.Vars(r)
 
@@ -586,7 +584,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 
 		// if user was member then add them to the admin topic
 		if club.Members[index].Role == "member" {
-			c.NotifService.AddTokenToTopic(club.ID.Hex()+"_admin", uuid, usr.DeviceToken)
+			c.NotifService.AddTokenToTopic(club.ID.Hex()+"_admin", usr.UUID)
 		}
 
 		// notify user that they had their rank changed
@@ -714,8 +712,8 @@ func (c *Service) KickMember() http.HandlerFunc {
 			Body:  "You've been kicked out of " + club.Name,
 		}
 		c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), usr.DeviceToken)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", usr.DeviceToken)
+		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), usr.UUID)
+		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", usr.UUID)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -783,15 +781,9 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 			return
 		}
 
-		// fetch user token
-		usr, err := c.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			c.Logger.Error(err.Error())
-		}
-
 		// remove from topics
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), usr.DeviceToken)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", usr.DeviceToken)
+		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), uuid)
+		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -1100,7 +1092,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 					Title: "Club Application",
 					Body:  club.Name + " accepted your application.",
 				}
-				c.NotifService.AddTokenToTopic(club.ID.Hex(), usr.UUID, usr.DeviceToken)
+				c.NotifService.AddTokenToTopic(club.ID.Hex(), usr.UUID)
 				c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
 
 				rw.Header().Set("Content-Type", "application/json")

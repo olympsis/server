@@ -245,7 +245,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 		// topic for post
 		p.NotifService.CreateTopic(post.ID.Hex())
-		p.NotifService.AddTokenToTopic(post.ID.Hex(), user.UUID, user.DeviceToken)
+		p.NotifService.AddTokenToTopic(post.ID.Hex(), user.UUID)
 
 		// grab club info for notifications
 		var club models.Club

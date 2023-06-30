@@ -36,7 +36,7 @@ func main() {
 	k := os.Getenv("KEYID")
 	t := os.Getenv("TEAMID")
 	f := "./files/AuthKey_JN25FUC9X2.p8"
-	n := notif.NewNotificationService(l, d.Pool)
+	n := notif.NewNotificationService(l, d.Pool, d.UserCol)
 	err := n.CreateNewClient(k, t, f)
 	if err != nil {
 		panic(err.Error())
@@ -46,7 +46,7 @@ func main() {
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
 	authAPI := auth.NewAuthAPI(l, r, d)
-	userAPI := user.NewUserAPI(l, r, d)
+	userAPI := user.NewUserAPI(l, r, d, n)
 	fieldAPI := field.NewFieldAPI(l, r, d)
 	clubAPI := club.NewClubAPI(l, r, d, n, sh)
 	postAPI := post.NewPostAPI(l, r, d, n, sh)
