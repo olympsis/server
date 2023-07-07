@@ -901,6 +901,8 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
 			c.Logger.Debug(err.Error())
+			http.Error(rw, "failed to convert club id", http.StatusBadRequest)
+			return
 		}
 
 		// check if an application already exists
@@ -908,12 +910,14 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		filter := bson.M{"uuid": uuid, "club_id": oid}
 		err = c.Database.ClubApplicationCol.FindOne(context.Background(), filter).Decode(&_app)
 		if err != nil {
-			if err != mongo.ErrNoDocuments {
-				// if found return the application
-				rw.WriteHeader(http.StatusCreated)
-				json.NewEncoder(rw).Encode(_app)
-				return
-			}
+			http.Error(rw, "failed to check application", http.StatusInternalServerError)
+			return
+		}
+
+		if _app.UUID == "" {
+			rw.WriteHeader(http.StatusCreated)
+			json.NewEncoder(rw).Encode(_app)
+			return
 		}
 
 		timeStamp := time.Now().Unix()

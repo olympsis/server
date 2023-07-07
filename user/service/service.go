@@ -129,7 +129,7 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 			UUID:       uuid,
 			UserName:   req.UserName,
 			Sports:     req.Sports,
-			Visibility: req.Visibility,
+			Visibility: "public",
 		}
 
 		// insert auth user in database

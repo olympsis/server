@@ -105,6 +105,15 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		e.NotifService.CreateTopic(event.ID.Hex())
 		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
 
+		// notify club members
+		note := notif.Notification{
+			Title: "New Event Created",
+			Body:  event.Title,
+			Topic: event.ClubID.Hex(),
+			Data:  event,
+		}
+		e.NotifService.SendNotificationToTopic(&note)
+
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(event)
 	}
