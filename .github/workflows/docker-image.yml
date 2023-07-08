@@ -9,15 +9,21 @@ on:
 jobs:
 
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: Build Image
+    - name: Docker Login
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and Push Image
       env:
         VERSION: 0.2.1
         SERVICE_NAME: olympsis/server
       run: | 
+        docker login -u josephlabs
         docker build . -t $SERVICE_NAME:$VERSION
         docker push $SERVICE_NAME:$VERSION
