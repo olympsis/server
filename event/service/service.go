@@ -328,6 +328,160 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 }
 
 /*
+Get Events (GET)
+- 	Grabs events by club ID
+
+Returns:
+
+	Http handler
+		- Writes an array of events back to client
+*/
+func (e *Service) GetEventsByClub() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		if len(vars["id"]) < 24 {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`{ "msg": "no club Id found in request." }`))
+			return
+		}
+		id := vars["id"]
+		oid, _ := primitive.ObjectIDFromHex(id)
+		filter := bson.M{"club_id": oid}
+
+		var events []models.Event
+		err := e.FindEvents(context.Background(), filter, &events)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				rw.WriteHeader(http.StatusNotFound)
+				rw.Write([]byte(`{ "msg": "club does not exist" }`))
+				return
+			}
+		}
+
+		var club models.Club
+		e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
+
+		for index := range events {
+			// event data
+			user, err := e.SearchService.SearchUserByUUID(events[index].Poster)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+
+			var field models.Field
+			e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": events[index].FieldID}).Decode(&field)
+
+			data := models.EventData{
+				Poster: &user,
+				Field:  &field,
+				Club:   &club,
+			}
+			events[index].Data = &data
+
+			// add user data to participants
+			for ptp := range events[index].Participants {
+				data, err := e.SearchService.SearchUserByUUID(events[index].Participants[ptp].UUID)
+				if err != nil {
+					e.Logger.Error(err.Error())
+				}
+				events[index].Participants[ptp].Data = &data
+			}
+		}
+
+		if len(events) == 0 {
+			http.Error(rw, "no events", http.StatusNoContent)
+			return
+		}
+
+		resp := models.EventsResponse{
+			TotalEvents: len(events),
+			Events:      events,
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
+	}
+}
+
+/*
+Get Events (GET)
+- 	Grabs events by club ID
+
+Returns:
+
+	Http handler
+		- Writes an array of events back to client
+*/
+func (e *Service) GetEventsByField() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		if len(vars["id"]) < 24 {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`{ "msg": "no field Id found in request." }`))
+			return
+		}
+		id := vars["id"]
+		oid, _ := primitive.ObjectIDFromHex(id)
+		filter := bson.M{"field_id": oid}
+
+		var events []models.Event
+		err := e.FindEvents(context.Background(), filter, &events)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				rw.WriteHeader(http.StatusNotFound)
+				rw.Write([]byte(`{ "msg": "field does not exist" }`))
+				return
+			}
+		}
+
+		var field models.Field
+		e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&field)
+
+		for index := range events {
+			// event data
+			user, err := e.SearchService.SearchUserByUUID(events[index].Poster)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+
+			var club models.Club
+			e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
+
+			data := models.EventData{
+				Poster: &user,
+				Field:  &field,
+				Club:   &club,
+			}
+			events[index].Data = &data
+
+			// add user data to participants
+			for ptp := range events[index].Participants {
+				data, err := e.SearchService.SearchUserByUUID(events[index].Participants[ptp].UUID)
+				if err != nil {
+					e.Logger.Error(err.Error())
+				}
+				events[index].Participants[ptp].Data = &data
+			}
+		}
+
+		if len(events) == 0 {
+			http.Error(rw, "no events", http.StatusNoContent)
+			return
+		}
+
+		resp := models.EventsResponse{
+			TotalEvents: len(events),
+			Events:      events,
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
+	}
+}
+
+/*
 Update Event (UPDATE)
 
   - grab event id from path

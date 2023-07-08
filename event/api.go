@@ -36,6 +36,24 @@ func (e *EventAPI) Ready() {
 		),
 	).Methods("GET")
 
+	// get events by club
+	e.Router.Handle("/events/club/{id}",
+		middleware.Chain(
+			e.Service.GetEventsByClub(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// get events by field
+	e.Router.Handle("/events/field/{id}",
+		middleware.Chain(
+			e.Service.GetEventsByField(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
 	// get an event
 	e.Router.Handle("/events/{id}",
 		middleware.Chain(
