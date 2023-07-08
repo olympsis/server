@@ -1,0 +1,23 @@
+name: Docker Image
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build Image
+      env:
+        VERSION: 0.2.1
+        SERVICE_NAME: olympsis/server
+      run: | 
+        docker build . -t $SERVICE_NAME:VERSION
+        docker push $SERVICE_NAME:$VERSION
