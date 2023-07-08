@@ -21,6 +21,5 @@ jobs:
         VERSION: 0.2.1
         SERVICE_NAME: olympsis/server
       run: | 
-        docker login -u josephlabs
         docker build . -t $SERVICE_NAME:$VERSION
         docker push $SERVICE_NAME:$VERSION
