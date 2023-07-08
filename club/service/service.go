@@ -207,7 +207,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		var req models.Club
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			c.Logger.Error("failed to decode request" + err.Error())
+			c.Logger.Error("failed to decode request " + err.Error())
 			http.Error(rw, "failed to decode request", http.StatusBadRequest)
 			return
 		}
