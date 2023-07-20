@@ -58,4 +58,12 @@ func (s *AuthAPI) Ready() {
 			middleware.Logging(),
 		),
 	).Methods("POST")
+
+	s.Router.Handle("/auth/token",
+		middleware.Chain(
+			s.Service.Token(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
 }
