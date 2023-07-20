@@ -424,6 +424,61 @@ func (a *Service) Delete() http.HandlerFunc {
 }
 
 /*
+Token (GET)
+  - Returns new auth token
+
+Returns:
+
+	Http handler
+		- Writes back token
+*/
+func (a *Service) Token() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		uuid := r.Header.Get("UUID")
+
+		// fetch user data
+		var user models.AuthUser
+		filter := bson.M{"uuid": uuid}
+		err := a.FindUser(context.Background(), filter, &user)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				a.Log.Error(err.Error())
+				http.Error(rw, "Failed to get user", http.StatusNotFound)
+				return
+			}
+			a.Log.Error(err.Error())
+			http.Error(rw, "Unexpected Error", http.StatusInternalServerError)
+			return
+		}
+
+		// generate new auth token
+		token, err := utils.GenerateAuthToken(uuid, user.Provider)
+		if err != nil {
+			a.Log.Error(err.Error())
+			http.Error(rw, "failed to create token", http.StatusInternalServerError)
+			return
+		}
+
+		// update tokens
+		update := bson.M{"$set": bson.M{"token": token}}
+		err = a.UpdateUser(context.Background(), filter, update, &user)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				a.Log.Error(err.Error())
+				http.Error(rw, "Failed to get user", http.StatusNotFound)
+				return
+			}
+			a.Log.Error(err.Error())
+			http.Error(rw, "Unexpected Error", http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"authToken": "` + token + `"}`))
+	}
+}
+
+/*
 Apple Notification(POST)
   - listens to apple server updates
 
