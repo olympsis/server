@@ -917,12 +917,6 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 			}
 		}
 
-		if _app.UUID == "" {
-			rw.WriteHeader(http.StatusCreated)
-			json.NewEncoder(rw).Encode(_app)
-			return
-		}
-
 		timeStamp := time.Now().Unix()
 		app := models.ClubApplication{
 			ID:        primitive.NewObjectID(),
