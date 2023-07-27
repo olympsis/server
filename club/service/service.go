@@ -900,7 +900,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			c.Logger.Debug(err.Error())
+			c.Logger.Error(err.Error())
 			http.Error(rw, "failed to convert club id", http.StatusBadRequest)
 			return
 		}
@@ -910,8 +910,11 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		filter := bson.M{"uuid": uuid, "club_id": oid}
 		err = c.Database.ClubApplicationCol.FindOne(context.Background(), filter).Decode(&_app)
 		if err != nil {
-			http.Error(rw, "failed to check application", http.StatusInternalServerError)
-			return
+			if err != mongo.ErrNoDocuments {
+				c.Logger.Error(err.Error())
+				http.Error(rw, "failed to check application", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		if _app.UUID == "" {
