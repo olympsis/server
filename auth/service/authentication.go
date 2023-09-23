@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"olympsis-server/auth/apple"
+	"olympsis-server/auth/google"
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"os"
@@ -17,46 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-/*
-Authentication Service
-  - reference object for auth service
-*/
-type Service struct {
-	// mongodb Client
-	Database *database.Database
-
-	// logrus logger to Log information about service and errors
-	Log *logrus.Logger
-
-	// mux Router to complete http requests
-	Router *mux.Router
-}
-
-type Notification struct {
-	Payload string `json:"payload"`
-}
-
-/*
-Apple Public Key
-- Public key from apple to confirm jwt token
-*/
-type ApplePublicKey struct {
-	KTY string `json:"kty"`
-	KID string `json:"kid"`
-	USE string `json:"use"`
-	ALG string `json:"alg"`
-	N   string `json:"n"`
-	E   string `json:"e"`
-}
-
-/*
-Apple Public Keys
-- list of public keys
-*/
-type ApplePublicKeys struct {
-	Keys []ApplePublicKey `json:"keys"`
-}
 
 /*
   - Creates new instace of auth service object
@@ -88,12 +49,17 @@ Returns:
 */
 func (a *Service) SignUp() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var request models.AuthRequest
 
+		/*
+			Grab http request body
+			If the process fails return bad request
+		*/
+		var request models.AuthRequest
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
 			a.Log.Error(err.Error())
-			http.Error(rw, "bad body", http.StatusBadRequest)
+			http.Error(rw, `{"error": "bad body in request"}`, http.StatusBadRequest)
+			return
 		}
 
 		if request.Provider == "https://appleid.apple.com" {
@@ -106,69 +72,111 @@ func (a *Service) SignUp() http.HandlerFunc {
 			// Find the 10-char Key ID value from the portal
 			keyID := "S3HDPU4ZC5"
 
+			/*
+				Read key file
+				Generate client secret for verification
+				If process fails return internal server error
+			*/
 			file, err := os.ReadFile("./auth/files/AuthKey_S3HDPU4ZC5.p8")
 			if err != nil {
-				a.Log.Error(err.Error())
-				rw.WriteHeader(http.StatusInternalServerError)
+				a.Log.Error("Failed to find auth key file: " + err.Error())
+				http.Error(rw, `{"error": "check logs"}`, http.StatusInternalServerError)
 				return
 			}
-
 			secret, err := apple.GenerateClientSecret(file, teamID, clientID, keyID)
 			if err != nil {
-				a.Log.Error("error generating secret: " + err.Error())
-				rw.WriteHeader(http.StatusInternalServerError)
+				a.Log.Error("Failed to generate secret: " + err.Error())
+				http.Error(rw, `{"error": "check logs"}`, http.StatusInternalServerError)
 				return
 			}
 
-			// Generate a new validation client
+			/*
+				Create new apple validator client
+				Create new token validation request
+			*/
 			client := apple.New()
-
 			vReq := apple.AppValidationTokenRequest{
 				ClientID:     clientID,
 				ClientSecret: secret,
 				Code:         request.Code,
 			}
 
+			/*
+				Perform validation request
+				Catch validation response and return error if process fails
+			*/
 			var resp apple.ValidationResponse
-
-			// Do the verification
 			err = client.VerifyAppToken(context.Background(), vReq, &resp)
 			if err != nil {
-				a.Log.Error("error verifying: " + err.Error())
-				rw.WriteHeader(http.StatusInternalServerError)
+				a.Log.Error("Failed to verify token: " + err.Error())
+				http.Error(rw, `{"error": "token verification failed"}`, http.StatusUnauthorized)
 				return
 			}
-
 			if resp.Error != "" {
-				a.Log.Error(resp.Error)
-				a.Log.Error(resp.ErrorDescription)
-				rw.WriteHeader(http.StatusInternalServerError)
+				a.Log.Error("Failed to verify token: " + resp.Error + " - " + resp.ErrorDescription)
+				http.Error(rw, `{"error": "token verification failed"}`, http.StatusInternalServerError)
 				return
 			}
 
-			uuid := uuid.New().String()
-			token, err := utils.GenerateAuthToken(uuid, request.Provider)
+			/*
+				Generate new user data
+				If process fails return internal server error
+			*/
+			user, err := a.CreateNewUserData(request.Provider, resp.AccessToken, request.FirstName, request.LastName, request.Email)
 			if err != nil {
-				a.Log.Error(err.Error())
-				rw.WriteHeader(http.StatusInternalServerError)
+				a.Log.Error("Failed to create user data: " + err.Error())
+				http.Error(rw, `{"error": "failed to create user data"}`, http.StatusInternalServerError)
 				return
 			}
 
-			user := models.AuthUser{
-				UUID:        uuid,
-				FirstName:   request.FirstName,
-				LastName:    request.LastName,
-				Email:       request.Email,
-				Token:       token,
-				AccessToken: resp.AccessToken,
-				Provider:    request.Provider,
-				CreatedAt:   time.Now().Unix(),
+			/*
+				Insert user into the database
+				Returns internal server error if process fails
+			*/
+			err = a.InsertUser(context.Background(), user)
+			if err != nil {
+				a.Log.Error("Failed to insert user into the database: " + err.Error())
+				http.Error(rw, `{"error": "failed to add user to the databse"}`, http.StatusInternalServerError)
+				return
 			}
 
-			err = a.InsertUser(context.Background(), &user)
+			rw.WriteHeader(http.StatusOK)
+			json.NewEncoder(rw).Encode(user)
+
+		} else if request.Provider == "https://accounts.google.com" {
+
+			/*
+				Create new google validator client
+				Validate token
+			*/
+			client := google.NewClient()
+			claims, err := client.ValidateJWT(request.Code)
 			if err != nil {
-				a.Log.Error(err.Error())
-				rw.WriteHeader(http.StatusInternalServerError)
+				a.Log.Error("Failed to validate google token " + err.Error())
+				http.Error(rw, `{"error": "failed to validate token"}`, http.StatusUnauthorized)
+				return
+			}
+
+			/*
+				Generate new user data
+				If process fails return internal server error
+			*/
+			user, err := a.CreateNewUserData(claims["iss"].(string), claims["jti"].(string), claims["given_name"].(string), claims["family_name"].(string), claims["email"].(string))
+			if err != nil {
+				a.Log.Error("Failed creating user data: " + err.Error())
+				http.Error(rw, `{"error": "failed to create user data"}`, http.StatusInternalServerError)
+				return
+			}
+
+			/*
+				Insert user into the database
+				Returns internal server error if process fails
+			*/
+			err = a.InsertUser(context.Background(), user)
+			if err != nil {
+				a.Log.Error("Failed inserting user into the database: " + err.Error())
+				http.Error(rw, `{"error": "failed to add user to the databse"}`, http.StatusInternalServerError)
+				return
 			}
 
 			rw.WriteHeader(http.StatusOK)
@@ -494,4 +502,23 @@ func (a *Service) AppleNotifications() http.HandlerFunc {
 
 		a.Log.Info(request.Payload)
 	}
+}
+
+func (a *Service) CreateNewUserData(provider string, accessToken string, firstName string, lastName string, email string) (*models.AuthUser, error) {
+	uuid := uuid.New().String()
+	token, err := utils.GenerateAuthToken(uuid, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.AuthUser{
+		UUID:        uuid,
+		FirstName:   firstName,
+		LastName:    lastName,
+		Email:       email,
+		Token:       token,
+		AccessToken: accessToken,
+		Provider:    provider,
+		CreatedAt:   time.Now().Unix(),
+	}, nil
 }

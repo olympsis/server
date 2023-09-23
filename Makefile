@@ -9,7 +9,7 @@ export PORT=80
 export KEYID=JN25FUC9X2
 export TEAMID=5A6H49Q85D
 
-export DB_ADDR=192.168.1.205
+export DB_ADDR=localhost#192.168.1.205
 export DB_USR=service
 export DB_PASS=qN1PHHgo6L942AvpTgGQ
 export DB_NAME=olympsis

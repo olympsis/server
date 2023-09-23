@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"google.golang.org/api/idtoken"
 )
 
 const (
@@ -53,41 +52,26 @@ func (c *Client) GetPublicKeys(ctx context.Context, keyID string) (string, error
 	return key, nil
 }
 
-func (c *Client) ValidateJWT(tokenString string) (GoogleClaims, error) {
-	claims := GoogleClaims{}
-
-	token, err := jwt.ParseWithClaims(
-		tokenString,
-		&claims,
-		func(token *jwt.Token) (interface{}, error) {
-			pem, err := c.GetPublicKeys(context.TODO(), fmt.Sprintf("%s", token.Header["kid"]))
-			if err != nil {
-				return nil, err
-			}
-			key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(pem))
-			if err != nil {
-				return nil, err
-			}
-			return key, nil
-		},
-	)
+func (c *Client) ValidateJWT(tokenString string) (map[string]interface{}, error) {
+	payload, err := idtoken.Validate(context.Background(), tokenString, "146182649446-mjkif5vnp0h91bhfl0dnqjrstuavft7e.apps.googleusercontent.com")
 	if err != nil {
-		return GoogleClaims{}, err
+		return nil, err
 	}
 
-	claims = token.Claims.(GoogleClaims)
+	claims := payload.Claims
 
-	if claims.Issuer != "accounts.google.com" && claims.Issuer != "https://accounts.google.com" {
-		return GoogleClaims{}, errors.New("iss is invalid")
+	if claims["iss"] != "accounts.google.com" && claims["iss"] != "https://accounts.google.com" {
+		return nil, errors.New("iss is invalid")
 	}
 
-	if claims.Audience != "YOUR_CLIENT_ID_HERE" {
-		return GoogleClaims{}, errors.New("aud is invalid")
+	if claims["aud"] != "146182649446-mjkif5vnp0h91bhfl0dnqjrstuavft7e.apps.googleusercontent.com" {
+		return nil, errors.New("aud is invalid")
 	}
 
-	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		return GoogleClaims{}, errors.New("JWT is expired")
-	}
+	// panic float64 to int64
+	// if claims["exp"].(int64) < time.Now().UTC().Unix() {
+	// 	return nil, errors.New("JWT is expired")
+	// }
 
 	return claims, nil
 }
