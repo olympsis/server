@@ -897,23 +897,68 @@ func (e *Service) UnsubscribeFromEvent() http.HandlerFunc {
 }
 
 /*
-Notify Club members
-
-  - Notifies all of club members about event and to RSVP
-*/
-func (e *Service) NotifyClubMembers() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-	}
-}
-
-/*
 Notify Event Participants
 
   - Notifies all of event's participants
 */
 func (e *Service) NotifyParticipants() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, r *http.Request) {
 
+		// grab id from path
+		vars := mux.Vars(r)
+		if len(vars["id"]) < 24 {
+			http.Error(rw, "bad event id", http.StatusBadRequest)
+			return
+		}
+
+		id := vars["id"]
+
+		// decode request
+		var req notif.Notification
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			return
+		}
+
+		req.Topic = id
+
+		e.NotifService.SendNotificationToTopic(&req)
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+	}
+}
+
+/*
+Notify Club members
+
+  - Notifies all of club members about event and to RSVP
+*/
+func (e *Service) NotifyClubMembers() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		// grab id from path
+		vars := mux.Vars(r)
+		if len(vars["id"]) < 24 {
+			http.Error(rw, "bad event id", http.StatusBadRequest)
+			return
+		}
+
+		id := vars["id"]
+
+		// decode request
+		var req notif.Notification
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			return
+		}
+
+		req.Topic = id
+
+		e.NotifService.SendNotificationToTopic(&req)
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
 	}
 }
