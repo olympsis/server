@@ -7,6 +7,7 @@ import (
 	"olympsis-server/database"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -84,11 +85,10 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			Body:            req.Body,
 			Sport:           req.Sport,
 			StartTime:       req.StartTime,
+			MinParticipants: req.MinParticipants,
 			MaxParticipants: req.MaxParticipants,
 			Participants:    req.Participants,
-			Likes:           []models.Like{},
 			Level:           req.Level,
-			Status:          "pending",
 			Visibility:      req.Visibility,
 			CreatedAt:       time.Now().Unix(),
 		}
@@ -170,11 +170,23 @@ func (e *Service) GetEvent() http.HandlerFunc {
 			e.Logger.Error(err.Error())
 		}
 
+		var wg sync.WaitGroup
 		var field models.Field
-		e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": event.FieldID}).Decode(&field)
-
 		var club models.Club
-		e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": event.ClubID}).Decode(&club)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": event.FieldID}).Decode(&field)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": event.ClubID}).Decode(&club)
+		}()
+
+		wg.Wait()
 
 		data := models.EventData{
 			Poster: &user,
@@ -206,9 +218,10 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
 		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
 		sports := r.URL.Query().Get("sports")
+		status := r.URL.Query().Get("status")
 
-		if longitude == 0 || latitude == 0 || sports == "" {
-			http.Error(rw, "missing query param - long/lat/sports", http.StatusBadRequest)
+		if longitude == 0 || latitude == 0 || radius == 0 || sports == "" || status == "" {
+			http.Error(rw, "missing query param - long/lat/sports/status", http.StatusBadRequest)
 			return
 		}
 
@@ -219,6 +232,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
+
 		filter := bson.M{
 			"location": bson.M{
 				"$near": bson.M{
@@ -232,7 +246,6 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		projection := bson.M{"_id": 1}
-
 		cursor, err := e.Database.FieldCol.Find(context.Background(), filter, options.Find().SetProjection(projection))
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -241,6 +254,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			}
 		}
 
+		// decode fields
 		var fieldsIDs []primitive.ObjectID
 		for cursor.Next(context.TODO()) {
 			// decode field
@@ -252,6 +266,15 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			fieldsIDs = append(fieldsIDs, field.ID)
 		}
 
+		var exists bool
+
+		// status filters
+		if status == "live" {
+			exists = false
+		} else if status == "ended" {
+			exists = true
+		}
+
 		// filter to find events
 		filter = bson.M{
 			"field_id": bson.M{
@@ -260,11 +283,10 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			"sport": bson.M{
 				"$in": splicedSports,
 			},
-			"visibility": "public",
-			"$or": []interface{}{
-				bson.M{"status": "pending"},
-				bson.M{"status": "in-progress"},
+			"stop_time": bson.M{
+				"$exists": exists,
 			},
+			"visibility": "public",
 		}
 
 		var _events []models.Event
@@ -279,17 +301,35 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 
 		// fetch owner data for all events
 		for index := range _events {
-			// event data
-			user, err := e.SearchService.SearchUserByUUID(_events[index].Poster)
-			if err != nil {
-				e.Logger.Error(err.Error())
-			}
 
+			var err error
+			var user models.UserData
+			var wg sync.WaitGroup
 			var field models.Field
-			e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": _events[index].FieldID}).Decode(&field)
-
 			var club models.Club
-			e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": _events[index].ClubID}).Decode(&club)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				user, err = e.SearchService.SearchUserByUUID(_events[index].Poster)
+				if err != nil {
+					e.Logger.Error(err.Error())
+				}
+			}()
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": _events[index].FieldID}).Decode(&field)
+			}()
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": _events[index].ClubID}).Decode(&club)
+			}()
+
+			wg.Wait()
 
 			data := models.EventData{
 				Poster: &user,
@@ -541,9 +581,6 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		if req.StopTime != 0 {
 			changes["stop_time"] = req.StopTime
 		}
-		if req.Status != "" {
-			changes["status"] = req.Status
-		}
 		if req.Level != 0 {
 			changes["level"] = req.Level
 		}
@@ -561,7 +598,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		}
 
 		// notify participants
-		if req.ActualStartTime != 0 && req.Status == "in-progress" {
+		if req.ActualStartTime != 0 {
 			// notify participants that the event is starting
 			note := notif.Notification{
 				Title: event.Title,
@@ -576,7 +613,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		}
 
 		// notify participants
-		if req.StopTime != 0 && req.Status == "ended" {
+		if req.StopTime != 0 {
 			// notify participants that the event ended
 			note := notif.Notification{
 				Title: event.Title,
@@ -689,16 +726,18 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// if event is full
-		if len(event.Participants) >= int(event.MaxParticipants) {
-			errResponse := models.FullEventError{
-				MSG:   "event capacity is full",
-				Event: event,
-			}
+		if event.MaxParticipants != 0 {
+			if len(event.Participants) >= int(event.MaxParticipants) {
+				errResponse := models.FullEventError{
+					MSG:   "event capacity is full",
+					Event: event,
+				}
 
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusConflict)
-			json.NewEncoder(rw).Encode(errResponse)
-			return
+				rw.Header().Set("Content-Type", "application/json")
+				rw.WriteHeader(http.StatusConflict)
+				json.NewEncoder(rw).Encode(errResponse)
+				return
+			}
 		}
 
 		// participant object
@@ -854,5 +893,27 @@ func (e *Service) UnsubscribeFromEvent() http.HandlerFunc {
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
+	}
+}
+
+/*
+Notify Club members
+
+  - Notifies all of club members about event and to RSVP
+*/
+func (e *Service) NotifyClubMembers() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+	}
+}
+
+/*
+Notify Event Participants
+
+  - Notifies all of event's participants
+*/
+func (e *Service) NotifyParticipants() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
 	}
 }
