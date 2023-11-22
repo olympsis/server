@@ -21,6 +21,7 @@ export STORAGE_SECRET_KEY=WbPjehYtD3wO4V4PNlYwJwWiPRy6qqqN
 export AUTH_COL=auth
 export USER_COL=users
 export CLUB_COL=clubs
+export ORG_COL=organizations
 export EVENT_COL=events
 export FIELD_COL=fields
 export POST_COL=posts
@@ -28,6 +29,7 @@ export CINVITE_COL=clubInvites
 export COMMENTS_COL=comments
 export FREQUEST_COL=friendRequests
 export CAPPICATIONS_COL=clubApplications
+export OAPPICATIONS_COL=organizationApplications
 
 export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 

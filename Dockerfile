@@ -20,6 +20,7 @@ ENV STORAGE_SECRET_KEY=WbPjehYtD3wO4V4PNlYwJwWiPRy6qqqN
 ENV AUTH_COL=auth
 ENV USER_COL=users
 ENV CLUB_COL=clubs
+ENV ORG_COL=organizations
 ENV EVENT_COL=events
 ENV FIELD_COL=fields
 ENV POST_COL=posts
@@ -27,6 +28,7 @@ ENV CINVITE_COL=clubInvites
 ENV COMMENTS_COL=comments
 ENV FREQUEST_COL=friendRequests
 ENV CAPPICATIONS_COL=clubApplications
+ENV OAPPICATIONS_COL=organizationApplications
 
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 

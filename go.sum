@@ -74,8 +74,8 @@ github.com/klauspost/compress v1.16.0 h1:iULayQNOReoYUe+1qtKOqw9CwJv3aNQu8ivo7lw
 github.com/klauspost/compress v1.16.0/go.mod h1:ntbaceVETuRiXiv4DpjP66DpAtAGkEQskQzEyD//IeE=
 github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe h1:iruDEfMl2E6fbMZ9s0scYfZQ84/6SPL6zC8ACM2oIL0=
 github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe/go.mod h1:wL8QJuTMNUDYhXwkmfOly8iTdp5TEcJFWZD2D7SIkUc=
-github.com/olympsis/models v0.0.0-20230618005150-607948e18e48 h1:zTK65LlbjFGedeY/tlOsO9yExLSiMBj6PZrN1iUvKeU=
-github.com/olympsis/models v0.0.0-20230618005150-607948e18e48/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
+github.com/olympsis/models v0.0.0-20231122042935-761ccc865584 h1:XDgZbhnf3jLH7qrfSpMOwdUaGQKh7bAr/QOcz2vpXKE=
+github.com/olympsis/models v0.0.0-20231122042935-761ccc865584/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
 github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd h1:Lo7WjM4+wtppkqozFZGQ1nqNgx/8zPbvyLBRu2Q1QNw=
 github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd/go.mod h1:rDFeCPBq0nfh51qFkfgrGVReMXgxdhkLvIMIKissZ7g=
 github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201 h1:oIWTWT38XH4OAx+rqPtMWgLpuVZEzMeW/ECwSB2mxo8=
