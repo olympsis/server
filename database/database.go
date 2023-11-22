@@ -12,21 +12,21 @@ import (
 )
 
 type Database struct {
-	Logger                     *logrus.Logger
-	Pool                       *pgxpool.Pool
-	Client                     *mongo.Client
-	AuthCol                    *mongo.Collection
-	UserCol                    *mongo.Collection
-	ClubCol                    *mongo.Collection
-	OrgCol                     *mongo.Collection
-	EventCol                   *mongo.Collection
-	FieldCol                   *mongo.Collection
-	PostCol                    *mongo.Collection
-	ClubInvCol                 *mongo.Collection
-	CommentsCol                *mongo.Collection
-	FriendReqCol               *mongo.Collection
-	ClubApplicationCol         *mongo.Collection
-	OrganizationApplicationCol *mongo.Collection
+	Logger             *logrus.Logger
+	Pool               *pgxpool.Pool
+	Client             *mongo.Client
+	AuthCol            *mongo.Collection
+	UserCol            *mongo.Collection
+	ClubCol            *mongo.Collection
+	OrgCol             *mongo.Collection
+	EventCol           *mongo.Collection
+	FieldCol           *mongo.Collection
+	PostCol            *mongo.Collection
+	ClubInvCol         *mongo.Collection
+	CommentsCol        *mongo.Collection
+	FriendReqCol       *mongo.Collection
+	ClubApplicationCol *mongo.Collection
+	OrgApplicationCol  *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {
@@ -71,7 +71,7 @@ func (d *Database) EstablishConnection() {
 		d.CommentsCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("COMMENTS_COL"))
 		d.FriendReqCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("FREQUEST_COL"))
 		d.ClubApplicationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CAPPICATIONS_COL"))
-		d.OrganizationApplicationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("OAPPICATIONS_COL"))
+		d.OrgApplicationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("OAPPICATIONS_COL"))
 
 		d.Logger.Info("Database connection successful.")
 	}
