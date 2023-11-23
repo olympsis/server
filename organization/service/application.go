@@ -51,7 +51,7 @@ func (s *Service) FindApplications(ctx context.Context, filter interface{}, orga
 }
 
 // Update an organization application in database
-func (s *Service) UpdateApplication(ctx context.Context, filter interface{}, update interface{}, organization *models.OrganizationApplication) error {
+func (s *Service) UpdateAnApplication(ctx context.Context, filter interface{}, update interface{}, organization *models.OrganizationApplication) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -95,7 +95,7 @@ func (s *Service) UpdateApplications(ctx context.Context, filter interface{}, up
 }
 
 // delete an organization application from the database
-func (s *Service) DeleteApplication(ctx context.Context, filter interface{}) error {
+func (s *Service) DeleteAnApplication(ctx context.Context, filter interface{}) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")

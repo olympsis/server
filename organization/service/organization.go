@@ -8,7 +8,7 @@ import (
 )
 
 // Insert a new organization into the database
-func (s *Service) InsertOrganization(ctx context.Context, event *models.Organization) error {
+func (s *Service) InsertAnOrganization(ctx context.Context, event *models.Organization) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -18,7 +18,7 @@ func (s *Service) InsertOrganization(ctx context.Context, event *models.Organiza
 }
 
 // Get an organization from database
-func (s *Service) FindOrganization(ctx context.Context, filter interface{}, organization *models.Organization) error {
+func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}, organization *models.Organization) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -51,7 +51,7 @@ func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, org
 }
 
 // Update an organization in database
-func (s *Service) UpdateOrganization(ctx context.Context, filter interface{}, update interface{}, organization *models.Organization) error {
+func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, update interface{}, organization *models.Organization) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -64,7 +64,7 @@ func (s *Service) UpdateOrganization(ctx context.Context, filter interface{}, up
 	}
 
 	// find and return updated user
-	err = s.FindOrganization(ctx, filter, organization)
+	err = s.FindAnOrganization(ctx, filter, organization)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (s *Service) UpdateOrganization(ctx context.Context, filter interface{}, up
 }
 
 // Update an organization in the database
-func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.Organization) error {
+func (s *Service) UpdateAnOrganizations(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.Organization) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
@@ -95,7 +95,7 @@ func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, u
 }
 
 // delete an organization from the database
-func (s *Service) DeleteOrganization(ctx context.Context, filter interface{}) error {
+func (s *Service) DeleteAnOrganization(ctx context.Context, filter interface{}) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")
