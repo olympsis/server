@@ -8,6 +8,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/event"
 	"olympsis-server/field"
+	"olympsis-server/organization"
 	"olympsis-server/post"
 	"olympsis-server/user"
 	"os"
@@ -51,6 +52,7 @@ func main() {
 	clubAPI := club.NewClubAPI(l, r, d, n, sh)
 	postAPI := post.NewPostAPI(l, r, d, n, sh)
 	eventAPI := event.NewEventAPI(l, r, d, n, sh)
+	organizationAPI := organization.NewOrganizationAPI(l, r, d, n, sh)
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -58,6 +60,7 @@ func main() {
 	clubAPI.Ready()
 	postAPI.Ready()
 	eventAPI.Ready()
+	organizationAPI.Ready()
 
 	port := os.Getenv("PORT")
 

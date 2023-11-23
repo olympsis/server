@@ -77,6 +77,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			Members:      req.Members,
 			CreatedAt:    req.CreatedAt,
 		}
+		organization.Members[0].ID = primitive.NewObjectID()
 
 		// insert organization into database
 		err = e.InsertAnOrganization(context.Background(), &organization)
@@ -110,7 +111,7 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		// find field data in database
+		// find organization data in database
 		var org models.Organization
 		OID, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.D{primitive.E{Key: "_id", Value: OID}}
@@ -141,8 +142,10 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		// fetch children clubs
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			cursor, err := e.Database.ClubCol.Find(context.Background(), bson.M{"parent_id": org.ID})
 			if err != nil {
+				e.Logger.Error(err.Error())
 				return
 			}
 
@@ -150,6 +153,7 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 				var club models.Club
 				err := cursor.Decode(&club)
 				if err != nil {
+					e.Logger.Error(err.Error())
 					return
 				}
 				clubs = append(clubs, club)
@@ -158,12 +162,14 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 
 		wg.Wait()
 
-		org.Data = &models.OrganizationData{
-			Children: &clubs,
+		if len(clubs) != 0 {
+			org.Data = &models.OrganizationData{
+				Children: &clubs,
+			}
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(org)
+		json.NewEncoder(rw).Encode(&org)
 	}
 }
 
@@ -179,6 +185,11 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		filter := bson.M{
 			"state":   state,
 			"country": country,
+		}
+
+		if state == "" || country == "" {
+			http.Error(rw, `{ "msg": "You need a state and a country to query organizations" }`, http.StatusBadRequest)
+			return
 		}
 
 		// fetch organizations
@@ -264,7 +275,7 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(&org)
+		json.NewEncoder(rw).Encode(org)
 	}
 }
 

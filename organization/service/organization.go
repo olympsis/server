@@ -23,7 +23,7 @@ func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}, or
 	if !pong {
 		return errors.New("failed to connect to database")
 	}
-	s.Database.EventCol.FindOne(ctx, filter).Decode(&organization)
+	s.Database.OrgCol.FindOne(ctx, filter).Decode(&organization)
 	return nil
 }
 
@@ -109,7 +109,7 @@ func (s *Service) DeleteAnOrganization(ctx context.Context, filter interface{}) 
 	return nil
 }
 
-// delete users in database
+// delete organizations in database
 func (s *Service) DeleteOrganizations(ctx context.Context, filter interface{}) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
