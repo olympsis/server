@@ -54,6 +54,8 @@ Create a new organization
 func (e *Service) CreateOrganization() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		uuid := r.Header.Get("UUID")
+
 		// decode request
 		var req models.Organization
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -61,6 +63,15 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
+		}
+
+		timeStamp := time.Now().Unix()
+
+		// creator of the organization
+		member := models.Member{
+			UUID:     uuid,
+			Role:     "manager",
+			JoinedAt: timeStamp,
 		}
 
 		// new organization model
@@ -74,8 +85,8 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			Country:      req.Country,
 			ImageURL:     req.ImageURL,
 			ImageGallery: req.ImageGallery,
-			Members:      req.Members,
-			CreatedAt:    req.CreatedAt,
+			Members:      []models.Member{member},
+			CreatedAt:    timeStamp,
 		}
 		organization.Members[0].ID = primitive.NewObjectID()
 
@@ -86,6 +97,14 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "Failed to create organization" }`, http.StatusInternalServerError)
 			return
 		}
+
+		// update user data
+		update := bson.M{
+			"$push": bson.M{
+				"organizations": organization.ID,
+			},
+		}
+		e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
 
 		// subscribe to notifications
 		e.NotifService.CreateTopic(organization.ID.Hex())
@@ -300,6 +319,16 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
+		var org models.Organization
+		e.FindAnOrganization(context.Background(), filter, &org)
+
+		// delete org from users data
+		for i := 0; i < len(org.Members); i++ {
+			filter := bson.M{"uuid": org.Members[i].UUID}
+			update := bson.M{"$pull": bson.M{"organizations": oid}}
+			e.Database.UserCol.UpdateOne(context.Background(), filter, update)
+		}
+
 		err := e.DeleteAnOrganization(context.Background(), filter)
 		if err != nil {
 			e.Logger.Debug(err.Error())
