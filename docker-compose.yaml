@@ -52,7 +52,7 @@ services:
 
   master:
     container_name: master
-    image: olympsis/server:0.2.1
+    image: olympsis/server:0.2.4
     restart: always
     ports:
       - "8080:8080/tcp"
@@ -61,7 +61,8 @@ services:
       - dashboard
       - etcd
     networks:
-      - olympsis
+      olympsis:
+        ipv4_address: 172.20.0.5
 
   chat:
     container_name: chat
@@ -74,7 +75,8 @@ services:
       - dashboard
       - etcd
     networks:
-      - olympsis
+      olympsis:
+        ipv4_address: 172.20.0.6
 
   storage:
     container_name: storage
@@ -87,9 +89,15 @@ services:
       - dashboard
       - etcd
     networks:
-      - olympsis
+      olympsis:
+        ipv4_address: 172.20.0.7
 
 networks:
   olympsis:
     name: olympsis
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.20.0.0/16"
+        - gateway: "172.20.0.1"
