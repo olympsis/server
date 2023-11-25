@@ -104,12 +104,12 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 
 		// grab organization id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
+		id := vars["id"]
+		if len(id) < 24 {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": "no organization id found in request" }`))
 			return
 		}
-		id := vars["id"]
 
 		// find organization data in database
 		var org models.Organization
@@ -121,6 +121,12 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
 				return
 			}
+		}
+
+		// check to see if object is empty
+		if org.Name == "" {
+			http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
+			return
 		}
 
 		var wg sync.WaitGroup
@@ -335,6 +341,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 		}
 
 		// insert application into database
+		req.ID = primitive.NewObjectID()
 		req.Status = "pending"
 		req.CreatedAt = time.Now().Unix()
 		err = e.InsertApplication(context.Background(), &req)
@@ -378,6 +385,12 @@ func (e *Service) GetApplication() http.HandlerFunc {
 			return
 		}
 
+		// if we don't get anything
+		if application.Status == "" {
+			http.Error(rw, `{ "msg": "failed to find organization application" }`, http.StatusNotFound)
+			return
+		}
+
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(application)
 	}
@@ -388,13 +401,16 @@ Get a list of organizations
 */
 func (e *Service) GetApplications() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
 		// grab id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, `{ "msg": "bad organization id" }`, http.StatusBadRequest)
+		id := vars["id"]
+		if len(id) < 24 {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`{ "msg": "bad id found in request" }`))
 			return
 		}
-		id := vars["id"]
+
 		oid, _ := primitive.ObjectIDFromHex(id)
 
 		var applications []models.OrganizationApplication
@@ -412,22 +428,16 @@ func (e *Service) GetApplications() http.HandlerFunc {
 		}
 
 		// fetch club data for each application
-		var wg sync.WaitGroup
 		for i := range applications {
-			i := i // loop closure fix
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				var club models.Club
-				err = e.Database.ClubCol.FindOne(context.Background(), applications[i].ClubID).Decode(&club)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				}
-				applications[i].Data.Club = club
-			}()
+			var club models.Club
+			err = e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": applications[i].ClubID}).Decode(&club)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+			applications[i].Data = &models.OrganizationApplicationData{
+				Club: &club,
+			}
 		}
-
-		wg.Wait()
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(applications)
@@ -442,14 +452,29 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 
 		// grab id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
+		id := vars["id"]
+		if len(id) < 24 {
 			http.Error(rw, `{ "msg": "bad application id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(vars["id"])
+		oid, _ := primitive.ObjectIDFromHex(id)
 
 		var req models.OrganizationApplication
 		json.NewDecoder(r.Body).Decode(&req)
+
+		// update the club's parent id
+		if req.Status == "accepted" {
+			filter := bson.M{
+				"_id": req.ClubID,
+			}
+			updates := bson.M{
+				"$set": bson.M{
+					"parent_id": req.OrganizationID,
+				},
+			}
+			e.Database.ClubCol.UpdateOne(context.Background(), filter, updates)
+			// maybe notify club admins that their application was approved.
+		}
 
 		err := e.UpdateAnApplication(context.Background(), bson.M{"_id": oid}, bson.M{"$set": bson.M{"status": req.Status}}, &req)
 		if err != nil {

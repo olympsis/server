@@ -85,7 +85,7 @@ func (e *OrganizationAPI) Ready() {
 	).Methods("POST")
 
 	// get applications
-	e.Router.Handle("/organizations/applications",
+	e.Router.Handle("/organizations/{id}/applications",
 		middleware.Chain(
 			e.Service.GetApplications(),
 			middleware.Logging(),
