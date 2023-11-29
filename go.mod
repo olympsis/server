@@ -7,12 +7,12 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.5.0
-	github.com/olympsis/models v0.0.0-20231125033959-b96d311f39ae
+	github.com/olympsis/models v0.0.0-20231128011259-530e19662249
 	github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd
 	github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201
 	github.com/sirupsen/logrus v1.9.3
 	github.com/tideland/gorest v2.15.5+incompatible
-	google.golang.org/api v0.151.0
+	google.golang.org/api v0.152.0
 )
 
 require (
@@ -33,14 +33,14 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.15.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
-	golang.org/x/oauth2 v0.14.0 // indirect
+	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
+	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )

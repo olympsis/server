@@ -53,7 +53,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		club := r.URL.Query().Get("clubID")
 
 		if club == "" {
-			rw.Header().Set("Content-Type", "application/json")
+
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": "for now posts are exclusive to clubs" }`))
 			return
@@ -67,15 +67,13 @@ func (p *Service) GetPosts() http.HandlerFunc {
 
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusNoContent)
+				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
 				return
 			}
 		}
 
 		if cur == nil {
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusNoContent)
+			http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
 			return
 		}
 
@@ -91,7 +89,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			}
 
 			data := models.PostData{
-				User: &user,
+				Poster: &user,
 			}
 			post.Data = &data
 
@@ -167,7 +165,7 @@ func (p *Service) GetPost() http.HandlerFunc {
 		}
 
 		data := models.PostData{
-			User: &user,
+			Poster: &user,
 		}
 		post.Data = &data
 
@@ -204,66 +202,123 @@ Http handler
 */
 func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// grab uuid
+
+		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
 
-		var req models.Post
-
 		// decode request
+		var req models.Post
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			p.Logger.Error(err.Error())
-			rw.WriteHeader(http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "bad request"}`, http.StatusBadRequest)
 			return
 		}
 
+		// add aditional data to post model
 		timeStamp := time.Now().Unix()
 		req.CreatedAt = timeStamp
 		post := models.Post{
-			ID:        primitive.NewObjectID(),
-			Poster:    uuid,
-			ClubID:    req.ClubID,
-			EventID:   req.EventID,
-			Body:      req.Body,
-			Images:    req.Images,
-			CreatedAt: timeStamp,
+			ID:           primitive.NewObjectID(),
+			Poster:       uuid,
+			GroupID:      req.GroupID,
+			EventID:      req.EventID,
+			Body:         req.Body,
+			Images:       req.Images,
+			CreatedAt:    timeStamp,
+			ExternalLink: req.ExternalLink,
 		}
 
 		// create post in database
 		_, err = p.Database.PostCol.InsertOne(context.TODO(), post)
 		if err != nil {
 			p.Logger.Error(err.Error())
-			rw.WriteHeader(http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "failed to create post"}`, http.StatusInternalServerError)
 			return
 		}
 
-		// grab user data
-		user, err := p.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			p.Logger.Error("failed to grab user data")
-		}
-
-		// topic for post
+		// create post notif topic
 		p.NotifService.CreateTopic(post.ID.Hex())
-		p.NotifService.AddTokenToTopic(post.ID.Hex(), user.UUID)
 
-		// grab club info for notifications
-		var club models.Club
-		filter := bson.M{"_id": post.ClubID}
-		err = p.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
-		if err != nil {
-			p.Logger.Error(err.Error())
-			rw.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		if req.Type == "announcement" {
 
-		// send notification to club members
-		note := notif.Notification{
-			Title: club.Name,
-			Body:  user.FirstName + " Created a post!",
-			Topic: club.ID.Hex(),
+			// grab org data
+			var org models.Organization
+			filter := bson.M{"_id": post.GroupID}
+			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
+			if err != nil {
+				p.Logger.Error(err.Error())
+				rw.WriteHeader(http.StatusCreated)
+				json.NewEncoder(rw).Encode(post)
+				return
+			}
+
+			post.Data = &models.PostData{
+				Organization: &org,
+			}
+
+			for i := 0; i < len(org.Members); i++ {
+				p.NotifService.AddTokenToTopic(post.ID.Hex(), org.Members[i].UUID)
+			}
+
+			// find child clubs
+			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": org.ID})
+			if err != nil {
+				p.Logger.Error("No children found")
+				rw.WriteHeader(http.StatusCreated)
+				json.NewEncoder(rw).Encode(post)
+			}
+
+			// send a notification to all of them
+			for cur.Next(context.TODO()) {
+				var club models.Club
+				err := cur.Decode(&club)
+				if err != nil {
+					p.Logger.Error(err)
+				}
+				// send notification to club members
+				note := notif.Notification{
+					Title: org.Name,
+					Body:  "New announcement!",
+					Topic: club.ID.Hex(),
+				}
+				p.NotifService.SendNotificationToTopic(&note)
+			}
+
+		} else if req.Type == "post" {
+
+			// grab club info
+			var club models.Club
+			filter := bson.M{"_id": post.GroupID}
+			err = p.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
+			if err != nil {
+				p.Logger.Error(err.Error())
+				rw.WriteHeader(http.StatusCreated)
+				json.NewEncoder(rw).Encode(post)
+				return
+			}
+
+			// grab user info
+			user, err := p.SearchService.SearchUserByUUID(uuid)
+			if err != nil {
+				p.Logger.Error(err.Error())
+				rw.WriteHeader(http.StatusCreated)
+				json.NewEncoder(rw).Encode(post)
+				return
+			}
+
+			post.Data = &models.PostData{
+				Poster: &user,
+			}
+
+			// send notification to club members
+			note := notif.Notification{
+				Title: club.Name,
+				Body:  user.Username + " created a post!",
+				Topic: club.ID.Hex(),
+			}
+			p.NotifService.SendNotificationToTopic(&note)
 		}
-		p.NotifService.SendNotificationToTopic(&note)
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(post)
@@ -300,9 +355,8 @@ func (p *Service) UpdatePost() http.HandlerFunc {
 			return
 		}
 
-		var req models.Post
-
 		// decode request
+		var req models.Post
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			p.Logger.Error(err.Error())
@@ -322,6 +376,9 @@ func (p *Service) UpdatePost() http.HandlerFunc {
 		if len(req.Images) > 0 {
 			change["images"] = req.Images
 		}
+		if req.ExternalLink != "" {
+			change["external_link"] = req.ExternalLink
+		}
 
 		// update post
 		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, update)
@@ -333,7 +390,6 @@ func (p *Service) UpdatePost() http.HandlerFunc {
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`OK`))
 	}
 }
 
@@ -356,22 +412,23 @@ func (p *Service) DeletePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
 		vars := mux.Vars(r)
+		id := vars["id"]
 
 		// if there is no post id
-		if len(vars["id"]) < 24 {
+		if len(id) < 24 {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "bad post ID" }`))
+			rw.Write([]byte(`{ "msg": "bad post id" }`))
 			return
 		}
 
 		// convert post id to oid
-		id := vars["id"]
+
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
 			p.Logger.Debug(err.Error())
 		}
 
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
+		filter := bson.M{"_id": oid}
 		_, err = p.Database.PostCol.DeleteOne(context.TODO(), filter)
 		if err != nil {
 			p.Logger.Debug(err.Error())
@@ -382,9 +439,7 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		// delete notif topic
 		p.NotifService.DeleteTopic(id)
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`OK`))
 	}
 }
 
