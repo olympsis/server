@@ -50,17 +50,29 @@ Get Posts (GET)
 */
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		club := r.URL.Query().Get("clubID")
+		group := r.URL.Query().Get("groupID")
+		parent := r.URL.Query().Get("parentID")
 
-		if club == "" {
-
+		if group == "" {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "for now posts are exclusive to clubs" }`))
+			rw.Write([]byte(`{ "msg": "please add a club id to your request" }`))
 			return
 		}
 
-		coid, _ := primitive.ObjectIDFromHex(club)
-		filter := bson.M{"club_id": coid}
+		groupID, _ := primitive.ObjectIDFromHex(group)
+		filter := bson.M{}
+
+		if parent != "" {
+			parentID, _ := primitive.ObjectIDFromHex(parent)
+			filter["$or"] = []interface{}{
+				bson.M{"group_id": groupID},
+				bson.M{"group_id": parentID},
+			}
+		} else {
+			filter["$or"] = []interface{}{
+				bson.M{"group_id": groupID},
+			}
+		}
 
 		var posts []models.Post
 		cur, err := p.Database.PostCol.Find(context.TODO(), filter)
@@ -82,27 +94,49 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			err := cur.Decode(&post)
 			if err != nil {
 				p.Logger.Error(err)
-			}
-			user, err := p.SearchService.SearchUserByUUID(post.Poster)
-			if err != nil {
-				p.Logger.Error(err)
-			}
+			} else {
 
-			data := models.PostData{
-				Poster: &user,
-			}
-			post.Data = &data
+				if post.Type == "announcement" {
 
-			// grab user data for comments
-			for i := 0; i < len(post.Comments); i++ {
-				usrData, err := p.SearchService.SearchUserByUUID(post.Comments[i].UUID)
-				if err != nil {
-					p.Logger.Error(err.Error())
+					user, err := p.SearchService.SearchUserByUUID(post.Poster)
+					if err != nil {
+						p.Logger.Error(err)
+					}
+
+					data := models.PostData{
+						Poster: &user,
+					}
+					post.Data = &data
+
+				} else if post.Type == "post" {
+
+					// grab org data
+					var org models.Organization
+					filter := bson.M{"_id": post.GroupID}
+					err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
+					if err != nil {
+						p.Logger.Error(err.Error())
+						return
+					}
+
+					post.Data = &models.PostData{
+						Organization: &org,
+					}
+
 				}
-				post.Comments[i].Data = &usrData
+
+				// grab user data for comments
+				for i := 0; i < len(post.Comments); i++ {
+					usrData, err := p.SearchService.SearchUserByUUID(post.Comments[i].UUID)
+					if err != nil {
+						p.Logger.Error(err.Error())
+					}
+					post.Comments[i].Data = &usrData
+				}
+
+				posts = append(posts, post)
 			}
 
-			posts = append(posts, post)
 		}
 
 		if len(posts) == 0 {
@@ -159,15 +193,34 @@ func (p *Service) GetPost() http.HandlerFunc {
 			}
 		}
 
-		user, err := p.SearchService.SearchUserByUUID(post.Poster)
-		if err != nil {
-			p.Logger.Error(err.Error())
-		}
+		if post.Type == "announcement" {
 
-		data := models.PostData{
-			Poster: &user,
+			// grab org data
+			var org models.Organization
+			filter := bson.M{"_id": post.GroupID}
+			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
+			if err != nil {
+				p.Logger.Error(err.Error())
+				return
+			}
+
+			post.Data = &models.PostData{
+				Organization: &org,
+			}
+
+		} else if post.Type == "post" {
+
+			user, err := p.SearchService.SearchUserByUUID(post.Poster)
+			if err != nil {
+				p.Logger.Error(err.Error())
+			}
+
+			data := models.PostData{
+				Poster: &user,
+			}
+			post.Data = &data
+
 		}
-		post.Data = &data
 
 		// get comments data
 		for i := 0; i < len(post.Comments); i++ {
