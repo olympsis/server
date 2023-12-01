@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"time"
@@ -55,23 +56,33 @@ func (p *Service) GetPosts() http.HandlerFunc {
 
 		if group == "" {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "please add a club id to your request" }`))
+			rw.Write([]byte(`{ "msg": "please add a group id to your request" }`))
 			return
 		}
 
-		groupID, _ := primitive.ObjectIDFromHex(group)
-		filter := bson.M{}
+		groupID, err := primitive.ObjectIDFromHex(group)
+		if err != nil {
+			p.Logger.Error(err.Error())
+			http.Error(rw, `{ "msg": "bad group id" }`, http.StatusBadRequest)
+			return
+		}
+		groupIDS := bson.A{
+			groupID,
+		}
 
 		if parent != "" {
 			parentID, _ := primitive.ObjectIDFromHex(parent)
-			filter["$or"] = []interface{}{
-				bson.M{"group_id": groupID},
-				bson.M{"group_id": parentID},
-			}
-		} else {
-			filter["$or"] = []interface{}{
-				bson.M{"group_id": groupID},
-			}
+			groupIDS = append(groupIDS, parentID)
+		}
+
+		filter := bson.M{
+			"group_id": bson.M{
+				"$in": groupIDS,
+			},
+		}
+
+		for key, value := range filter {
+			fmt.Printf("%s: %v\n", key, value)
 		}
 
 		var posts []models.Post
@@ -95,8 +106,21 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error(err)
 			} else {
-
 				if post.Type == "announcement" {
+
+					// grab org data
+					var org models.Organization
+					filter = bson.M{"_id": post.GroupID}
+					err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
+					if err != nil {
+						p.Logger.Error(err.Error())
+					}
+
+					post.Data = &models.PostData{
+						Organization: &org,
+					}
+
+				} else if post.Type == "post" {
 
 					user, err := p.SearchService.SearchUserByUUID(post.Poster)
 					if err != nil {
@@ -107,21 +131,6 @@ func (p *Service) GetPosts() http.HandlerFunc {
 						Poster: &user,
 					}
 					post.Data = &data
-
-				} else if post.Type == "post" {
-
-					// grab org data
-					var org models.Organization
-					filter := bson.M{"_id": post.GroupID}
-					err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
-					if err != nil {
-						p.Logger.Error(err.Error())
-						return
-					}
-
-					post.Data = &models.PostData{
-						Organization: &org,
-					}
 
 				}
 
@@ -273,6 +282,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		req.CreatedAt = timeStamp
 		post := models.Post{
 			ID:           primitive.NewObjectID(),
+			Type:         req.Type,
 			Poster:       uuid,
 			GroupID:      req.GroupID,
 			EventID:      req.EventID,
