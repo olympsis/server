@@ -115,9 +115,17 @@ func (p *Service) GetPosts() http.HandlerFunc {
 					if err != nil {
 						p.Logger.Error(err.Error())
 					}
-
 					post.Data = &models.PostData{
 						Organization: &org,
+					}
+
+					// in the org posts we would want to show the poster
+					if group == org.ID.Hex() {
+						user, err := p.SearchService.SearchUserByUUID(post.Poster)
+						if err != nil {
+							p.Logger.Error(err)
+						}
+						post.Data.Poster = &user
 					}
 
 				} else if post.Type == "post" {
@@ -126,7 +134,6 @@ func (p *Service) GetPosts() http.HandlerFunc {
 					if err != nil {
 						p.Logger.Error(err)
 					}
-
 					data := models.PostData{
 						Poster: &user,
 					}
