@@ -75,6 +75,8 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			return
 		}
 
+		req.Participants[0].ID = primitive.NewObjectID()
+
 		event := models.Event{
 			ID:              primitive.NewObjectID(),
 			Poster:          uuid,
