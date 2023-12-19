@@ -435,9 +435,6 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			}
 		}
 
-		// add events to array
-		events = append(events, events...)
-
 		if len(events) == 0 {
 			http.Error(rw, "no events", http.StatusNoContent)
 			return
