@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"time"
@@ -79,10 +78,6 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			"group_id": bson.M{
 				"$in": groupIDS,
 			},
-		}
-
-		for key, value := range filter {
-			fmt.Printf("%s: %v\n", key, value)
 		}
 
 		var posts []models.Post

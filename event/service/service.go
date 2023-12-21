@@ -68,8 +68,8 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		var req models.Event
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			http.Error(rw, `{ "msg": " `+err.Error()+`" }`, http.StatusBadRequest)
+			e.Logger.Error("Failed to decode request: " + err.Error())
 			return
 		}
 
