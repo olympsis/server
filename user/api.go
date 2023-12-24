@@ -61,10 +61,28 @@ func (u *UserAPI) Ready() {
 		),
 	).Methods("PUT")
 
-	// update user data
+	// find organizations invite
 	u.Router.Handle("/users/invitations/organizations",
 		middleware.Chain(
 			u.Service.GetOrganizationInvitations(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// search users by username
+	u.Router.Handle("/users/search/username",
+		middleware.Chain(
+			u.Service.SearchUsersByUserName(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// search user by uuid
+	u.Router.Handle("/users/search/uuid",
+		middleware.Chain(
+			u.Service.SearchUserByUUID(),
 			middleware.Logging(),
 			middleware.UserMiddleware(),
 		),
