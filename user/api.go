@@ -60,4 +60,13 @@ func (u *UserAPI) Ready() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("PUT")
+
+	// update user data
+	u.Router.Handle("/users/invitations/organizations",
+		middleware.Chain(
+			u.Service.GetOrganizationInvitations(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
 }

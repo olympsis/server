@@ -30,8 +30,11 @@ ENV FREQUEST_COL=friendRequests
 ENV CAPPICATIONS_COL=clubApplications
 ENV OAPPICATIONS_COL=organizationApplications
 
-ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
+ENV EVENT_INVITATIONS_COL=eventInvitations
+ENV CLUB_INVITATIONS_COL=clubInvitations
+ENV ORG_INVITATIONS_COL=organizationInvitations
 
+ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 ENV POSTGRES_USER=postgres
 ENV POSTGRES_PASSWORD=20031998

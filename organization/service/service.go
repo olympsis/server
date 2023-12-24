@@ -108,6 +108,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 
 		// subscribe to notifications
 		e.NotifService.CreateTopic(organization.ID.Hex())
+		e.NotifService.AddTokenToTopic(organization.ID.Hex(), uuid)
 
 		// return created organization
 		rw.WriteHeader(http.StatusCreated)
@@ -346,7 +347,7 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 */
 
 /*
-Create a new organization
+Create a new application
 */
 func (e *Service) CreateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -394,7 +395,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 }
 
 /*
-Get an organization
+Get an application
 */
 func (e *Service) GetApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -426,7 +427,7 @@ func (e *Service) GetApplication() http.HandlerFunc {
 }
 
 /*
-Get a list of organizations
+Get a list of applications
 */
 func (e *Service) GetApplications() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -474,7 +475,7 @@ func (e *Service) GetApplications() http.HandlerFunc {
 }
 
 /*
-Update an organization
+Update an application
 */
 func (e *Service) UpdateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -538,5 +539,285 @@ func (e *Service) DeleteApplication() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+	}
+}
+
+/*
+	INVITATION
+*/
+
+/*
+Creates an invitation object
+*/
+func (e *Service) CreateInvitation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		uuid := r.Header.Get("UUID")
+
+		// decode request
+		var req models.Invitation
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			return
+		}
+
+		filter := bson.M{
+			"recipient":  uuid,
+			"subject_id": req.SubjectID,
+		}
+
+		// check to see if invitation already exists
+		var invitation models.Invitation
+		err = e.FindAnInvitation(context.TODO(), filter, &invitation)
+		if err == nil {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(invitation)
+			return
+		}
+
+		// insert application into database
+		req.ID = primitive.NewObjectID()
+		req.CreatedAt = time.Now().Unix()
+		err = e.InsertAnInvitation(context.TODO(), &req)
+		if err != nil {
+			e.Logger.Error(err.Error())
+			http.Error(w, `{ "msg": "failed to create invitation" }`, http.StatusInternalServerError)
+			return
+		}
+
+		// fetch user data
+		user, err := e.SearchService.SearchUserByUUID(req.Recipient)
+		if err != nil {
+			e.Logger.Error("Failed to fetch user data: " + err.Error())
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(req)
+			return
+		}
+
+		// fetch organization data
+		var org models.Organization
+		err = e.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": req.SubjectID}).Decode(&org)
+		if err != nil {
+			e.Logger.Error("Failed to fetch organization data: " + err.Error())
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(req)
+			return
+		}
+
+		// notify user
+		note := notif.Notification{
+			Title: "New Invitation",
+			Body:  "You've been invited to join the " + org.Name + " organization",
+			Data:  org,
+		}
+		e.NotifService.SendNotificationToToken(&note, user.DeviceToken)
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(req)
+	}
+}
+
+/*
+Gets an invitation object
+*/
+func (e *Service) GetInvitation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// grab id from path
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(w, `{ "msg": "bad invitation id" }`, http.StatusBadRequest)
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(id)
+
+		// find invitation document
+		var invitation models.Invitation
+		err := e.FindAnInvitation(context.Background(), bson.M{"_id": oid}, &invitation)
+		if err != nil {
+			http.Error(w, `{ "msg": "invitation not found" }`, http.StatusNotFound)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(invitation)
+	}
+}
+
+/*
+Get invitations of an organization
+*/
+func (e *Service) GetInvitations() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// grab id from path
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(w, `{ "msg": "bad organization id" }`, http.StatusBadRequest)
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(id)
+
+		var invitations []models.Invitation
+		err := e.FindInvitations(context.TODO(), bson.M{"subject_id": oid}, &invitations)
+		if err != nil {
+			e.Logger.Error("Failed to find invitations: " + err.Error())
+			http.Error(w, `{"msg": "failed to find invitations"}`, http.StatusNoContent)
+		}
+
+		if len(invitations) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// fetch org data
+		var org models.Organization
+		err = e.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": oid}).Decode(&org)
+		if err != nil {
+			e.Logger.Error("Failed to find organization: " + err.Error())
+			http.Error(w, `{"msg": "failed to get organization data"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// fetch club data for each application
+		for i := range invitations {
+			invitations[i].Data = &models.InvitationData{
+				Organization: &org,
+			}
+		}
+
+		response := models.InvitationsResponse{
+			TotalInvitations: len(invitations),
+			Invitations:      invitations,
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+/*
+Update an invitation
+*/
+func (e *Service) UpdateInvitation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// grab id from path
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(w, `{ "msg": "bad invitation id" }`, http.StatusBadRequest)
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(id)
+
+		var req models.Invitation
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			http.Error(w, `{"msg": "Failed to decode request"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Status == "accepted" {
+			member := models.Member{
+				ID:       primitive.NewObjectID(),
+				UUID:     req.Recipient,
+				Role:     "manager",
+				JoinedAt: time.Now().Unix(),
+			}
+			changes := bson.M{
+				"$push": bson.M{"members": member},
+			}
+			_, err = e.Database.OrgCol.UpdateOne(context.TODO(), bson.M{"_id": req.SubjectID}, changes)
+			if err != nil {
+				e.Logger.Error("Failed to add user to organization: " + err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// We update the invitation only after we've added the user into the org
+		// If this fails we want the user to be able to try again
+		filter := bson.M{
+			"_id": oid,
+		}
+		updates := bson.M{
+			"$set": bson.M{
+				"status": req.Status,
+			},
+		}
+		err = e.UpdateAnInvitation(context.Background(), filter, updates, &req)
+		if err != nil {
+			e.Logger.Error("Failed to update invitation: " + err.Error())
+			http.Error(w, `{"msg": "failed to update invitation"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Update user data to have the organization
+		filter = bson.M{
+			"uuid": req.Recipient,
+		}
+		updates = bson.M{
+			"$push": bson.M{
+				"organizations": req.SubjectID,
+			},
+		}
+		_, err = e.Database.UserCol.UpdateOne(context.TODO(), filter, updates)
+		if err != nil {
+			e.Logger.Error("Failed to update user data: " + err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// fetch user data
+		usr, err := e.SearchService.SearchUserByUUID(req.Recipient)
+		if err != nil {
+			e.Logger.Error("Failed to find user data: " + err.Error())
+		}
+
+		// notify club admins
+		note := notif.Notification{
+			Title: "Invitation Status",
+			Body:  usr.Username + " " + req.Status + " their invite.",
+			Topic: req.SubjectID.Hex(),
+		}
+		err = e.NotifService.SendNotificationToTopic(&note)
+		if err != nil {
+			e.Logger.Error("Failed to send notification: " + err.Error())
+		}
+		err = e.NotifService.AddTokenToTopic(req.SubjectID.Hex(), req.Recipient)
+		if err != nil {
+			e.Logger.Error("Failed to add token to topic: " + err.Error())
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+/*
+Delete an invitation
+*/
+func (e *Service) DeleteInvitation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// grab id from path
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(w, `{ "msg": "bad invitation id" }`, http.StatusBadRequest)
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(id)
+
+		err := e.DeleteAnInvitation(context.Background(), bson.M{"_id": oid})
+		if err != nil {
+			e.Logger.Error("Failed to delete invitation: " + err.Error())
+			http.Error(w, `{"msg": "Failed to delete invitation"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
 	}
 }

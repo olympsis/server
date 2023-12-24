@@ -266,3 +266,51 @@ func (u *Service) DeleteUserData() http.HandlerFunc {
 		rw.WriteHeader(http.StatusOK)
 	}
 }
+
+func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		uuid := r.Header.Get("UUID")
+
+		filter := bson.M{
+			"recipient": uuid,
+			"status":    "pending",
+		}
+
+		var invitations []models.Invitation
+		cursor, err := u.Database.OrgInvitationCol.Find(context.TODO(), filter)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			u.Log.Error("Failed to fetch invitations: " + err.Error())
+			return
+		}
+		for cursor.Next(context.TODO()) {
+			var invite models.Invitation
+			err := cursor.Decode(&invite)
+			if err != nil {
+				u.Log.Error("Failed to decode invitation: " + err.Error())
+			}
+			var org models.Organization
+			err = u.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": invite.SubjectID}).Decode(&org)
+			if err != nil {
+				u.Log.Error("Failed to fetch org data: " + err.Error())
+			}
+			invite.Data = &models.InvitationData{
+				Organization: &org,
+			}
+			invitations = append(invitations, invite)
+		}
+
+		if len(invitations) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		response := models.InvitationsResponse{
+			TotalInvitations: len(invitations),
+			Invitations:      invitations,
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}

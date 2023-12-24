@@ -73,7 +73,7 @@ func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, 
 }
 
 // Update an organization in the database
-func (s *Service) UpdateAnOrganizations(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.Organization) error {
+func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.Organization) error {
 	pong := s.Database.PingDatabase()
 	if !pong {
 		return errors.New("failed to connect to database")

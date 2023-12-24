@@ -119,4 +119,52 @@ func (e *OrganizationAPI) Ready() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("DELETE")
+
+	/*
+		INVITATION
+	*/
+	// create an invitation
+	e.Router.Handle("/organizations/invitations",
+		middleware.Chain(
+			e.Service.CreateInvitation(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// get invitations
+	e.Router.Handle("/organizations/{id}/invitations",
+		middleware.Chain(
+			e.Service.GetInvitations(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// get an invitation
+	e.Router.Handle("/organizations/invitations/{id}",
+		middleware.Chain(
+			e.Service.GetInvitation(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// update an invitation
+	e.Router.Handle("/organizations/invitations/{id}",
+		middleware.Chain(
+			e.Service.UpdateInvitation(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// delete an invitation
+	e.Router.Handle("/organizations/invitations/{id}",
+		middleware.Chain(
+			e.Service.DeleteInvitation(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
 }

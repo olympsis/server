@@ -31,6 +31,10 @@ export FREQUEST_COL=friendRequests
 export CAPPICATIONS_COL=clubApplications
 export OAPPICATIONS_COL=organizationApplications
 
+export EVENT_INVITATIONS_COL=eventInvitations
+export CLUB_INVITATIONS_COL=clubInvitations
+export ORG_INVITATIONS_COL=organizationInvitations
+
 export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 export POSTGRES_USER=postgres
