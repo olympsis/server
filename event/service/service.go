@@ -735,6 +735,7 @@ Returns:
 */
 func (e *Service) UpdateAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
 		// grab event id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
@@ -784,7 +785,12 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		changes["max_participants"] = req.MaxParticipants
 		changes["level"] = req.Level
 		changes["external_link"] = req.ExternalLink
-		changes["stop_time"] = req.StopTime
+
+		if req.StopTime == 0 {
+			updates["$unset"] = bson.M{"stop_time": 1}
+		} else {
+			changes["stop_time"] = req.StopTime
+		}
 
 		var event models.Event
 
@@ -805,13 +811,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			}
 			e.NotifService.SendNotificationToTopic(&note)
 
-			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(&event)
-			return
-		}
-
-		// notify participants
-		if req.ActualStopTime != 0 {
+		} else if req.ActualStopTime != 0 {
 			// notify participants that the event ended
 			note := notif.Notification{
 				Title: event.Title,
@@ -820,9 +820,16 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			}
 			e.NotifService.SendNotificationToTopic(&note)
 			e.NotifService.DeleteTopic(event.ID.Hex())
-			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(&event)
-			return
+
+		} else {
+			// notify participants that the details changes
+			note := notif.Notification{
+				Title: event.Title,
+				Body:  "Event details has changed",
+				Topic: event.ID.Hex(),
+			}
+			e.NotifService.SendNotificationToTopic(&note)
+
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
