@@ -767,30 +767,24 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		if req.ImageURL != "" {
 			changes["image_url"] = req.ImageURL
 		}
-		if req.MaxParticipants != 0 {
-			changes["max_participants"] = req.MaxParticipants
-		}
 		if req.StartTime != 0 {
 			changes["start_time"] = req.StartTime
 		}
 		if req.ActualStartTime != 0 {
 			changes["actual_start_time"] = req.ActualStartTime
 		}
-		if req.StopTime != 0 {
-			changes["stop_time"] = req.StopTime
-		}
 		if req.ActualStopTime != 0 {
 			changes["actual_stop_time"] = req.ActualStopTime
-		}
-		if req.Level != 0 {
-			changes["level"] = req.Level
 		}
 		if req.Visibility != "" {
 			changes["visibility"] = req.Visibility
 		}
-		if req.ExternalLink != "" {
-			changes["external_link"] = req.ExternalLink
-		}
+
+		changes["min_participants"] = req.MinParticipants
+		changes["max_participants"] = req.MaxParticipants
+		changes["level"] = req.Level
+		changes["external_link"] = req.ExternalLink
+		changes["stop_time"] = req.StopTime
 
 		var event models.Event
 
