@@ -1192,3 +1192,58 @@ func (c *Service) DeleteApplication() http.HandlerFunc {
 		rw.Write([]byte(`OK`))
 	}
 }
+
+// CLUB POST ENDPOINTS
+
+func (s *Service) PinClubPost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Grab club id from path and validate it
+		id := mux.Vars(r)["id"]
+		valid := utils.ValidateClubID(id)
+		if !valid {
+			http.Error(w, "invalid club id", http.StatusBadRequest)
+			return
+		}
+
+		// grab post id from path
+		postID := mux.Vars(r)["postID"]
+		if len(postID) < 24 {
+			http.Error(w, "bad post id", http.StatusBadRequest)
+			return
+		}
+
+		// update club data to reflect new post
+		ok := s.PinPost(&id, &postID)
+		if ok {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (s *Service) UnpinClubPost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Grab club id from path and validate it
+		id := mux.Vars(r)["id"]
+		valid := utils.ValidateClubID(id)
+		if !valid {
+			http.Error(w, "invalid club id", http.StatusBadRequest)
+			return
+		}
+
+		// remove pinned post from club
+		ok := s.UnpinPost(&id)
+		if ok {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}

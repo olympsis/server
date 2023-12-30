@@ -167,4 +167,24 @@ func (e *OrganizationAPI) Ready() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("DELETE")
+
+	/*
+		Club Post
+	*/
+
+	e.Router.Handle("/organizations/{id}/post/{postID}",
+		middleware.Chain(
+			e.Service.PinOrgPost(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	e.Router.Handle("/organizations/{id}/post",
+		middleware.Chain(
+			e.Service.UnpinOrgPost(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/utils"
 	"sync"
 	"time"
 
@@ -819,5 +820,60 @@ func (e *Service) DeleteInvitation() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// CLUB POST ENDPOINTS
+
+func (s *Service) PinOrgPost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Grab club id from path and validate it
+		id := mux.Vars(r)["id"]
+		valid := utils.ValidateClubID(id)
+		if !valid {
+			http.Error(w, "invalid org id", http.StatusBadRequest)
+			return
+		}
+
+		// grab post id from path
+		postID := mux.Vars(r)["postID"]
+		if len(postID) < 24 {
+			http.Error(w, "bad post id", http.StatusBadRequest)
+			return
+		}
+
+		// update club data to reflect new post
+		ok := s.PinPost(&id, &postID)
+		if ok {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (s *Service) UnpinOrgPost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Grab club id from path and validate it
+		id := mux.Vars(r)["id"]
+		valid := utils.ValidateClubID(id)
+		if !valid {
+			http.Error(w, "invalid org id", http.StatusBadRequest)
+			return
+		}
+
+		// remove pinned post from club
+		ok := s.UnpinPost(&id)
+		if ok {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 }

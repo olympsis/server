@@ -156,4 +156,24 @@ func (s *ClubAPI) Ready() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("PUT")
+
+	/*
+		Club Post
+	*/
+
+	s.Router.Handle("/clubs/{id}/post/{postID}",
+		middleware.Chain(
+			s.Service.PinClubPost(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	s.Router.Handle("/clubs/{id}/post",
+		middleware.Chain(
+			s.Service.UnpinClubPost(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
 }
