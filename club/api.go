@@ -29,7 +29,16 @@ func (s *ClubAPI) Ready() {
 	// get clubs
 	s.Router.Handle("/clubs",
 		middleware.Chain(
-			s.Service.GetClubs(),
+			s.Service.GetClubsByLocation(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// get all of the clubs given
+	s.Router.Handle("/clubs/user",
+		middleware.Chain(
+			s.Service.GetUserClubs(),
 			middleware.Logging(),
 			middleware.UserMiddleware(),
 		),
@@ -47,7 +56,7 @@ func (s *ClubAPI) Ready() {
 	// update a club - requires admin token
 	s.Router.Handle("/clubs/{id}",
 		middleware.Chain(
-			s.Service.UpdateClub(),
+			s.Service.ModifyClub(),
 			middleware.Logging(),
 			middleware.ClubAdminMiddleware(),
 			middleware.UserMiddleware(),

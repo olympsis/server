@@ -399,7 +399,7 @@ Returns:
 
 		- Writes object back to client
 */
-func (p *Service) UpdatePost() http.HandlerFunc {
+func (p *Service) ModifyPost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// grab post id from path

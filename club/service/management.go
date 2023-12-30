@@ -46,7 +46,7 @@ func (s *Service) PinPost(clubID *string, postID *string) bool {
 	// update club's pinned post
 	filter := bson.M{"_id": cid}
 	update := bson.M{"$set": bson.M{"pinned_post_id": pid}}
-	err = s.UpdateAClub(context.TODO(), filter, update)
+	err = s.UpdateClub(context.TODO(), filter, update)
 	if err != nil {
 		s.Logger.Error("Failed to update club: " + err.Error())
 		return false
@@ -67,7 +67,7 @@ func (s *Service) UnpinPost(clubID *string) bool {
 	// remove club's pinned post
 	filter := bson.M{"_id": cid}
 	update := bson.M{"$unset": bson.M{"pinned_post_id": 1}}
-	err = s.UpdateAClub(context.TODO(), filter, update)
+	err = s.UpdateClub(context.TODO(), filter, update)
 	if err != nil {
 		s.Logger.Error("Failed to update club: " + err.Error())
 		return false

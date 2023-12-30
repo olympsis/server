@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/utils"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -33,21 +34,8 @@ func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *no
 	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
 }
 
-/*
-Get Clubs (GET)
-
-  - Fetches and returns a list of clubs
-
-  - Grab query params
-
-  - Filter and Search Clubs
-
-    Returns:
-    Http handler
-
-  - Writes list of club objects back to client
-*/
-func (c *Service) GetClubs() http.HandlerFunc {
+// Fetches all of the clubs in a given location
+func (c *Service) GetClubsByLocation() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		city := r.URL.Query().Get("city")
 		state := r.URL.Query().Get("state")
@@ -101,18 +89,69 @@ func (c *Service) GetClubs() http.HandlerFunc {
 	}
 }
 
-/*
-Get a Club (GET)
+// Fetches all of the clubs data for the given ids
+func (s *Service) GetUserClubs() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-  - Fetches and returns a club object
+		// grab user clubs
+		ids := r.URL.Query().Get("clubs")
+		splicedIDs := strings.Split(ids, ",")
+		var objectIDs []primitive.ObjectID
+		for i := range splicedIDs {
+			oid, err := primitive.ObjectIDFromHex(splicedIDs[i])
+			if err == nil {
+				objectIDs = append(objectIDs, oid)
+			}
+		}
 
-  - Grab path values
+		filter := bson.M{
+			"_id": bson.M{
+				"$in": objectIDs,
+			},
+		}
 
-    Returns:
-    Http handler
+		// get clubs
+		var clubs []models.Club
+		err := s.FindClubs(context.TODO(), filter, &clubs)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				s.Logger.Error(err.Error())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			} else {
+				s.Logger.Error(err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
 
-  - Writes a club object back to client
-*/
+		// get clubs organization data if they have any
+		for i := range clubs {
+			var org models.Organization
+			err := s.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": clubs[i].ParentID}).Decode(&org)
+			if err == nil {
+				clubs[i].Data = &models.ClubData{
+					Parent: &org,
+				}
+			}
+		}
+
+		if len(clubs) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		resp := models.ClubsResponse{
+			TotalClubs: len(clubs),
+			Clubs:      clubs,
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// Get the data of a club
 func (c *Service) GetClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -184,20 +223,7 @@ func (c *Service) GetClub() http.HandlerFunc {
 	}
 }
 
-/*
-Create Club Data (POST)
-
-  - Creates new club for olympsis
-
-  - Grab request body
-
-  - Create club data in user databse
-
-    Returns:
-    Http handler
-
-  - Writes object back to client
-*/
+// Creates a new club
 func (c *Service) CreateClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -308,25 +334,8 @@ func (c *Service) CreateClub() http.HandlerFunc {
 	}
 }
 
-/*
-Update Club Data (POST)
-
-  - Grab Club Id from path
-
-  - Update club data
-
-  - Grab request body
-
-  - updated club data in databse
-
-  - Must be club Admin
-
-    Returns:
-    Http handler
-
-  - Writes object back to client
-*/
-func (c *Service) UpdateClub() http.HandlerFunc {
+// Updates club data
+func (c *Service) ModifyClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// id := r.Header.Get("clubID") // idk if i should take the id this way
@@ -385,7 +394,7 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 
 		// update club data in database
 		var club models.Club
-		err = c.UpdateAClub(context.Background(), filter, update)
+		err = c.UpdateClub(context.Background(), filter, update)
 		if err != nil {
 			c.Logger.Error(err.Error())
 			http.Error(rw, "internal server error", http.StatusInternalServerError)
@@ -405,18 +414,7 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 	}
 }
 
-/*
-Delete Club Data (DELETE)
-
-  - Deletes club data object
-
-  - Grab parameters and update
-
-Returns:
-
-	Http handler
-		- Writes OK back to client if successful
-*/
+// Deletes a club
 func (c *Service) DeleteClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 

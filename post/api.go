@@ -49,7 +49,7 @@ func (p *PostAPI) Ready() {
 
 	// udpdate a post
 	p.Router.Handle("/posts/{id}", middleware.Chain(
-		p.Service.UpdatePost(),
+		p.Service.ModifyPost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(),
 	)).Methods("PUT")
