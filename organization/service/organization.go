@@ -2,37 +2,25 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/olympsis/models"
 )
 
 // Insert a new organization into the database
 func (s *Service) InsertAnOrganization(ctx context.Context, event *models.Organization) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	s.Database.OrgCol.InsertOne(ctx, event)
 	return nil
 }
 
 // Get an organization from database
 func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}, organization *models.Organization) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
+
 	s.Database.OrgCol.FindOne(ctx, filter).Decode(&organization)
 	return nil
 }
 
 // Get organizations from database
 func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, organizations *[]models.Organization) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	cursor, err := s.Database.OrgCol.Find(ctx, filter)
 	if err != nil {
@@ -52,11 +40,6 @@ func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, org
 
 // Update an organization in database
 func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, update interface{}, organization *models.Organization) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
-
 	// update user
 	_, err := s.Database.OrgCol.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -74,10 +57,6 @@ func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, 
 
 // Update an organization in the database
 func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.Organization) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// update event
 	_, err := s.Database.OrgCol.UpdateMany(ctx, filter, update)
@@ -96,10 +75,6 @@ func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, u
 
 // delete an organization from the database
 func (s *Service) DeleteAnOrganization(ctx context.Context, filter interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete user
 	_, err := s.Database.OrgCol.DeleteOne(ctx, filter)
@@ -111,10 +86,6 @@ func (s *Service) DeleteAnOrganization(ctx context.Context, filter interface{}) 
 
 // delete organizations in database
 func (s *Service) DeleteOrganizations(ctx context.Context, filter interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete users
 	_, err := s.Database.OrgCol.DeleteMany(ctx, filter)

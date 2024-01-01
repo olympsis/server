@@ -37,7 +37,7 @@ func main() {
 	k := os.Getenv("KEYID")
 	t := os.Getenv("TEAMID")
 	f := "./files/AuthKey_JN25FUC9X2.p8"
-	n := notif.NewNotificationService(l, d.Pool, d.UserCol)
+	n := notif.NewNotificationService(l, d.NotifCol, d.UserCol)
 	err := n.CreateNewClient(k, t, f)
 	if err != nil {
 		panic(err.Error())

@@ -1,3 +1,46 @@
-runtime: go121
+runtime: go120
 instance_class: F1
 max_concurrent_requests: 500
+service: server
+
+handlers:
+- url: /storage
+  script: auto
+  secure: always
+
+- url: /.*
+  script: auto
+
+env_variables:
+  PORT: 80
+
+  KEYID: "JN25FUC9X2"
+  TEAMID: "5A6H49Q85D"
+
+  DB_USR: "admin"
+  DB_PASS: "vM9pPgfHeZDxgBDv"
+
+  DB_NAME: "olympsis"
+  DB_ADDR: "database-0.i4q7nvi.mongodb.net"
+  NOTIF_DB_ADDR: "database-2.pdjjqal.mongodb.net"
+  NOTIF_DB_NAME: "notifications"
+  NOTIF_COL: "topics"
+
+  AUTH_COL: "auth"
+  USER_COL: "users"
+  CLUB_COL: "clubs"
+  ORG_COL: "organizations"
+  EVENT_COL: "events"
+  FIELD_COL: "fields"
+  POST_COL: "posts"
+  CINVITE_COL: "clubInvites"
+  COMMENTS_COL: "comments"
+  FREQUEST_COL: "friendRequests"
+  CAPPICATIONS_COL: "clubApplications"
+  OAPPICATIONS_COL: "organizationApplications"
+
+  EVENT_INVITATIONS_COL: "eventInvitations"
+  CLUB_INVITATIONS_COL: "clubInvitations"
+  ORG_INVITATIONS_COL: "organizationInvitations"
+
+  KEY: "SZkp78avQkxGyjRakxb5Ob08zqjguNRA"

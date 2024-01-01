@@ -2,27 +2,18 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/olympsis/models"
 )
 
 // adds invitation document to database
 func (s *Service) InsertAnInvitation(ctx context.Context, invitation *models.Invitation) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	s.Database.OrgInvitationCol.InsertOne(ctx, invitation)
 	return nil
 }
 
 // finds and returns an invitation from database
 func (s *Service) FindAnInvitation(ctx context.Context, filter interface{}, invitation *models.Invitation) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	err := s.Database.OrgInvitationCol.FindOne(ctx, filter).Decode(&invitation)
 	if err != nil {
 		return err
@@ -32,10 +23,6 @@ func (s *Service) FindAnInvitation(ctx context.Context, filter interface{}, invi
 
 // finds multiple invitations from database
 func (s *Service) FindInvitations(ctx context.Context, filter interface{}, invitations *[]models.Invitation) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	cursor, err := s.Database.OrgInvitationCol.Find(ctx, filter)
 	if err != nil {
@@ -55,11 +42,6 @@ func (s *Service) FindInvitations(ctx context.Context, filter interface{}, invit
 
 // updates in invitation in the database
 func (s *Service) UpdateAnInvitation(ctx context.Context, filter interface{}, update interface{}, invitation *models.Invitation) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
-
 	// update user
 	_, err := s.Database.OrgInvitationCol.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -77,10 +59,6 @@ func (s *Service) UpdateAnInvitation(ctx context.Context, filter interface{}, up
 
 // updates multiple invitations in the database
 func (s *Service) UpdateInvitations(ctx context.Context, filter interface{}, update interface{}, invitations *[]models.Invitation) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// update event
 	_, err := s.Database.OrgInvitationCol.UpdateMany(ctx, filter, update)
@@ -99,10 +77,6 @@ func (s *Service) UpdateInvitations(ctx context.Context, filter interface{}, upd
 
 // deletes an invitation from the database
 func (s *Service) DeleteAnInvitation(ctx context.Context, filter interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete user
 	_, err := s.Database.OrgInvitationCol.DeleteOne(ctx, filter)
@@ -114,10 +88,6 @@ func (s *Service) DeleteAnInvitation(ctx context.Context, filter interface{}) er
 
 // delete invitations in database
 func (s *Service) DeleteInvitations(ctx context.Context, filter interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete users
 	_, err := s.Database.OrgInvitationCol.DeleteMany(ctx, filter)

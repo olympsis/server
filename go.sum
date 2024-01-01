@@ -120,6 +120,8 @@ github.com/olympsis/models v0.0.0-20231224201359-e7a1e94e932d h1:DnvvycDDTf1Q1mL
 github.com/olympsis/models v0.0.0-20231224201359-e7a1e94e932d/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
 github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd h1:Lo7WjM4+wtppkqozFZGQ1nqNgx/8zPbvyLBRu2Q1QNw=
 github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd/go.mod h1:rDFeCPBq0nfh51qFkfgrGVReMXgxdhkLvIMIKissZ7g=
+github.com/olympsis/notif v0.0.0-20231231195317-3af63c75d7b7 h1:qNP9ftxrdh6e03gGobK+oKZ5xUx+fJdYhkvA3LOz+BE=
+github.com/olympsis/notif v0.0.0-20231231195317-3af63c75d7b7/go.mod h1:qTQFtHqF5Eusg6/gPrN3IyU+9L6z+qAWSzpWIPE8I5A=
 github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201 h1:oIWTWT38XH4OAx+rqPtMWgLpuVZEzMeW/ECwSB2mxo8=
 github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201/go.mod h1:GeVVL/TnH5d905qWzhtY9bHl1hpsJcqeJiYKiWmuW84=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

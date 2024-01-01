@@ -2,38 +2,24 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/olympsis/models"
 )
 
 // Insert new event into database
 func (s *Service) InsertEvent(ctx context.Context, event *models.Event) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	s.Database.EventCol.InsertOne(ctx, event)
 	return nil
 }
 
 // Get event from database
 func (s *Service) FindEvent(ctx context.Context, filter interface{}, event *models.Event) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	s.Database.EventCol.FindOne(ctx, filter).Decode(&event)
 	return nil
 }
 
 // get events from database
 func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]models.Event) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
-
 	cursor, err := s.Database.EventCol.Find(ctx, filter)
 	if err != nil {
 		return err
@@ -52,10 +38,6 @@ func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]
 
 // update user in database
 func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}, event *models.Event) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// update user
 	_, err := s.Database.EventCol.UpdateOne(ctx, filter, update)
@@ -74,10 +56,6 @@ func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update in
 
 // update event in database
 func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}, events *[]models.Event) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// update event
 	_, err := s.Database.EventCol.UpdateMany(ctx, filter, update)
@@ -96,10 +74,6 @@ func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update i
 
 // delete event in database
 func (s *Service) DeleteEvent(ctx context.Context, filter interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete user
 	_, err := s.Database.EventCol.DeleteOne(ctx, filter)
@@ -111,10 +85,6 @@ func (s *Service) DeleteEvent(ctx context.Context, filter interface{}) error {
 
 // delete users in database
 func (s *Service) DeleteEvents(ctx context.Context, filter interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete users
 	_, err := s.Database.EventCol.DeleteMany(ctx, filter)

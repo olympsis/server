@@ -8,7 +8,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/olympsis/models v0.0.0-20231224201359-e7a1e94e932d
-	github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd
+	github.com/olympsis/notif v0.0.0-20231231195317-3af63c75d7b7
 	github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201
 	github.com/sirupsen/logrus v1.9.3
 	github.com/tideland/gorest v2.15.5+incompatible
