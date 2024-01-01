@@ -3,7 +3,8 @@ WORKDIR /app
 COPY ./ ./
 RUN go build -o /docker
 RUN go mod download
-ENV PORT=8080
+
+ENV PORT=80
 
 ENV KEYID=JN25FUC9X2
 ENV TEAMID=5A6H49Q85D
@@ -36,7 +37,6 @@ ENV ORG_INVITATIONS_COL=organizationInvitations
 
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
-
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["/docker"]

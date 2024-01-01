@@ -63,6 +63,9 @@ func main() {
 	organizationAPI.Ready()
 
 	port := os.Getenv("PORT")
+	if port == "" {
+		port = "80"
+	}
 
 	// server config
 	s := &http.Server{

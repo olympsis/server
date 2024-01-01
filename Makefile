@@ -1,4 +1,4 @@
-VERSION := v0.2.8
+VERSION := v0.3.0
 SERVICE_NAME := olympsis/server
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)

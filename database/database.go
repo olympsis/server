@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type Database struct {
@@ -54,14 +55,24 @@ func (d *Database) EstablishConnection() {
 	opts := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
 	client, err := mongo.Connect(context.Background(), opts)
 	if err != nil {
-		panic("Failed to connect to Database: " + err.Error())
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	}
+
+	err = client.Ping(context.Background(), readpref.Primary())
+	if err != nil {
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 	}
 
 	noteLoc := os.Getenv("NOTIF_DB_ADDR")
 	opts2 := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + noteLoc + `/?retryWrites=true&w=majority`)
 	client2, err := mongo.Connect(context.Background(), opts2)
 	if err != nil {
-		panic("Failed to connect to Database: " + err.Error())
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	}
+
+	err = client2.Ping(context.Background(), readpref.Primary())
+	if err != nil {
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 	}
 
 	d.Client = client
