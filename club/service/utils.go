@@ -20,6 +20,12 @@ func (o *SafeOrganizations) AddOrganization(org *models.Organization) {
 	o.mu.Unlock()
 }
 
+func (o *SafeOrganizations) FindOrganization(id primitive.ObjectID) *models.Organization {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.organizations[id]
+}
+
 type SafeMembers struct {
 	mu      sync.Mutex
 	members map[string]*models.UserData
@@ -29,6 +35,12 @@ func (m *SafeMembers) AddMember(usr *models.UserData) {
 	m.mu.Lock()
 	m.members[usr.UUID] = usr
 	m.mu.Unlock()
+}
+
+func (m *SafeMembers) FindMember(uuid string) *models.UserData {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.members[uuid]
 }
 
 /*
@@ -74,11 +86,12 @@ func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
 	for i := range club.Members {
 		wg.Add(1)
 		go func(index int) {
+			uuid := club.Members[index].UUID
 			defer wg.Done()
 			// lookup member in dictionary
-			u, ok := members.members[club.Members[index].UUID]
-			if !ok { // if not found search for it
-				usr, err := s.SearchService.SearchUserByUUID(club.Members[index].UUID)
+			u := members.FindMember(uuid)
+			if u == nil { // if not found search for it
+				usr, err := s.SearchService.SearchUserByUUID(uuid)
 				if err == nil {
 					club.Members[index].Data = &usr
 					members.AddMember(&usr)
@@ -137,8 +150,8 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 			// if the club has a parent
 			if clubs[index].ParentID != nil {
 				// lookup org in the dictionary
-				o, ok := organizations.organizations[*clubs[index].ParentID]
-				if !ok { // if org is not in found fetch it
+				o := organizations.FindOrganization(*clubs[index].ParentID)
+				if o == nil { // if org is not in found fetch it
 					var org models.Organization
 					err := s.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": clubs[index].ParentID}).Decode(&org)
 					if err == nil {
@@ -161,9 +174,10 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 			defer wg.Done()
 			// get club members data
 			for j := range clubs[index].Members {
+				uuid := clubs[index].Members[j].UUID
 				// lookup member in dictionary
-				u, ok := members.members[clubs[index].Members[j].UUID]
-				if !ok { // if not found search for it
+				u := members.FindMember(uuid)
+				if u == nil { // if not found search for it
 					usr, err := s.SearchService.SearchUserByUUID(clubs[index].Members[j].UUID)
 					if err == nil {
 						clubs[index].Members[j].Data = &usr
