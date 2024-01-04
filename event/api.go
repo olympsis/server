@@ -133,4 +133,22 @@ func (e *EventAPI) Ready() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("POST")
+
+	// notify participants
+	e.Router.Handle("/events/{id}/notify/participants",
+		middleware.Chain(
+			e.Service.NotifyParticipants(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// notify club members
+	e.Router.Handle("/events/{id}/notify/clbu",
+		middleware.Chain(
+			e.Service.NotifyClubMembers(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
 }

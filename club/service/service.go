@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/utils"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -33,29 +34,15 @@ func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *no
 	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
 }
 
-/*
-Get Clubs (GET)
-
-  - Fetches and returns a list of clubs
-
-  - Grab query params
-
-  - Filter and Search Clubs
-
-    Returns:
-    Http handler
-
-  - Writes list of club objects back to client
-*/
-func (c *Service) GetClubs() http.HandlerFunc {
+// Fetches all of the clubs in a given location
+func (s *Service) GetClubsByLocation() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
 		city := r.URL.Query().Get("city")
 		state := r.URL.Query().Get("state")
 		country := r.URL.Query().Get("country")
 		if country == "" {
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "you need at least a country to query with." }`))
+			http.Error(rw, `{ "msg": "you need at least a country to query with" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -71,23 +58,17 @@ func (c *Service) GetClubs() http.HandlerFunc {
 			filter["state"] = state
 		}
 
-		var clubs []models.Club
-		err := c.FindClubs(context.TODO(), filter, &clubs)
+		// get all of the clubs data
+		clubs, err := s.GetClubsAndMetadata(filter)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				c.Logger.Error(err.Error())
-				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusNoContent)
-				return
-			} else {
-				c.Logger.Error(err.Error())
-				rw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
+			s.Logger.Error("failed to find clubs: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to find clubs" }`, http.StatusInternalServerError)
 		}
 
+		// no content
 		if len(clubs) == 0 {
 			rw.WriteHeader(http.StatusNoContent)
+			http.Error(rw, `{ "msg": "no clubs found" }`, http.StatusNoContent)
 			return
 		}
 
@@ -95,24 +76,57 @@ func (c *Service) GetClubs() http.HandlerFunc {
 			TotalClubs: len(clubs),
 			Clubs:      clubs,
 		}
-
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
 }
 
-/*
-Get a Club (GET)
+// Fetches all of the clubs data for the given ids
+func (s *Service) GetClubsList() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-  - Fetches and returns a club object
+		// grab user club id's
+		ids := r.URL.Query().Get("clubs")
+		splicedIDs := strings.Split(ids, ",")
+		var objectIDs []primitive.ObjectID
+		for i := range splicedIDs {
+			oid, err := primitive.ObjectIDFromHex(splicedIDs[i])
+			if err == nil {
+				objectIDs = append(objectIDs, oid)
+			}
+		}
 
-  - Grab path values
+		// filter for database
+		filter := bson.M{
+			"_id": bson.M{
+				"$in": objectIDs,
+			},
+		}
 
-    Returns:
-    Http handler
+		// get all of the clubs and their metadata {members info, parent info etc...}
+		clubs, err := s.GetClubsAndMetadata(filter)
+		if err != nil {
+			s.Logger.Error("failed to get clubs: ", err.Error())
+			http.Error(w, `{ "msg": "failed to get clubs" }`, http.StatusInternalServerError)
+			return
+		}
 
-  - Writes a club object back to client
-*/
+		// no content
+		if len(clubs) == 0 {
+			http.Error(w, `{ "msg": "no clubs found" }`, http.StatusNoContent)
+			return
+		}
+
+		resp := models.ClubsResponse{
+			TotalClubs: len(clubs),
+			Clubs:      clubs,
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// Get the data of a club
 func (c *Service) GetClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -135,26 +149,27 @@ func (c *Service) GetClub() http.HandlerFunc {
 		defer ctx()
 
 		// find club data in database
-		var club models.Club
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		err := c.FindClub(context.Background(), filter, &club)
+		club, err := c.GetClubAndMetadata(filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "club does not exist" }`))
+				http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
+				return
+			} else {
+				c.Logger.Error("failed to find club", err.Error())
+				http.Error(rw, `{ "msg": "failed to find club" }`, http.StatusNotFound)
 				return
 			}
 		}
 
-		//
-		if club.ID.Hex() == "000000000000000000000000" {
-			rw.WriteHeader(http.StatusNotFound)
+		// if no error is returned and no club is returned
+		if club.ID.IsZero() {
+			http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
 			return
 		}
 
+		// check if user is an admin
 		var token string
-
-		// fetch member data
 		for i := 0; i < len(club.Members); i++ {
 			if club.Members[i].UUID == uuid {
 				if club.Members[i].Role != "member" {
@@ -164,40 +179,19 @@ func (c *Service) GetClub() http.HandlerFunc {
 					}
 				}
 			}
-			usr, err := c.SearchService.SearchUserByUUID(club.Members[i].UUID)
-			if err != nil {
-				club.Members[i].Data = nil
-			} else {
-				club.Members[i].Data = &usr
-			}
 		}
 
 		resp := models.ClubResponse{
 			Token: token,
 			Club:  club,
 		}
-
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 
 	}
 }
 
-/*
-Create Club Data (POST)
-
-  - Creates new club for olympsis
-
-  - Grab request body
-
-  - Create club data in user databse
-
-    Returns:
-    Http handler
-
-  - Writes object back to client
-*/
+// Creates a new club
 func (c *Service) CreateClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -207,7 +201,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		var req models.Club
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			c.Logger.Error("failed to decode request " + err.Error())
+			c.Logger.Error("failed to decode request ", err.Error())
 			http.Error(rw, "failed to decode request", http.StatusBadRequest)
 			return
 		}
@@ -238,7 +232,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		// create club in database
 		err = c.InsertClub(context.TODO(), &club)
 		if err != nil {
-			c.Logger.Error("failed to create club: " + err.Error())
+			c.Logger.Error("failed to create club: ", err.Error())
 			http.Error(rw, "failed to create club", http.StatusInternalServerError)
 			return
 		}
@@ -248,13 +242,13 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		update := bson.M{"$push": bson.M{"clubs": club.ID}}
 		_, err = c.Database.UserCol.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
-			c.Logger.Error("failed to update user: " + err.Error())
+			c.Logger.Error("failed to update user: ", err.Error())
 		}
 
 		// generate admin token
 		token, err := utils.GenerateClubToken(club.ID.Hex(), "owner", uuid)
 		if err != nil {
-			c.Logger.Error("failed to create club" + err.Error())
+			c.Logger.Error("failed to create club", err.Error())
 			http.Error(rw, "failed to create club", http.StatusInternalServerError)
 			return
 		}
@@ -262,71 +256,37 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		// create notification topics
 		clubTopic := club.ID.Hex()
 		clubAdminTopic := club.ID.Hex() + "_admin"
-		user, err := c.SearchService.SearchUserByUUID(uuid)
+
+		// create topics and subscribe owner to it
+		err = c.NotifService.CreateTopic(clubTopic)
 		if err != nil {
-			c.Logger.Error("failed to get user(" + uuid + "): " + err.Error())
+			c.Logger.Error("failed to create club topic: ", err.Error())
+		}
+		err = c.NotifService.CreateTopic(clubAdminTopic)
+		if err != nil {
+			c.Logger.Error("failed to create club admin topic: ", err.Error())
 		}
 
-		if user.DeviceToken == "" {
-			// if we user is not subscribed for notifications then just create the topics
-			err = c.NotifService.CreateTopic(clubTopic)
-			if err != nil {
-				c.Logger.Error("failed to create club topic: " + err.Error())
-			}
-			err = c.NotifService.CreateTopic(clubAdminTopic)
-			if err != nil {
-				c.Logger.Error("failed to create club admin topic: " + err.Error())
-			}
-		} else {
-			// create topics and subscribe owner to it
-			err = c.NotifService.CreateTopic(clubTopic)
-			if err != nil {
-				c.Logger.Error("failed to create club topic: " + err.Error())
-			}
-			err = c.NotifService.CreateTopic(clubAdminTopic)
-			if err != nil {
-				c.Logger.Error("failed to create club admin topic: " + err.Error())
-			}
-
-			err = c.NotifService.AddTokenToTopic(clubTopic, uuid)
-			if err != nil {
-				c.Logger.Error("failed to add token to club topic: " + err.Error())
-			}
-			err = c.NotifService.AddTokenToTopic(clubAdminTopic, uuid)
-			if err != nil {
-				c.Logger.Error("failed to add token club admin topic: " + err.Error())
-			}
+		err = c.NotifService.AddTokenToTopic(clubTopic, uuid)
+		if err != nil {
+			c.Logger.Error("failed to add token to club topic: ", err.Error())
+		}
+		err = c.NotifService.AddTokenToTopic(clubAdminTopic, uuid)
+		if err != nil {
+			c.Logger.Error("failed to add token club admin topic: ", err.Error())
 		}
 
 		resp := models.CreateClubResponse{
 			Token: token,
 			Club:  club,
 		}
-
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(resp)
 	}
 }
 
-/*
-Update Club Data (POST)
-
-  - Grab Club Id from path
-
-  - Update club data
-
-  - Grab request body
-
-  - updated club data in databse
-
-  - Must be club Admin
-
-    Returns:
-    Http handler
-
-  - Writes object back to client
-*/
-func (c *Service) UpdateClub() http.HandlerFunc {
+// Updates club data
+func (c *Service) ModifyClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// id := r.Header.Get("clubID") // idk if i should take the id this way
@@ -337,7 +297,7 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 		id := mux.Vars(r)["id"]
 		valid := utils.ValidateClubID(id)
 		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "invalid club id" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -346,8 +306,8 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "failed to decode body", http.StatusBadRequest)
+			c.Logger.Error("failed to decode body: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to decode body" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -384,39 +344,26 @@ func (c *Service) UpdateClub() http.HandlerFunc {
 		}
 
 		// update club data in database
-		var club models.Club
-		err = c.UpdateAClub(context.Background(), filter, update)
+		err = c.UpdateClub(context.Background(), filter, update)
 		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "internal server error", http.StatusInternalServerError)
+			c.Logger.Error("Failed to update club: ", err.Error())
+			http.Error(rw, `{ "msg": "internal server error" }`, http.StatusInternalServerError)
 			return
 		}
 
-		err = c.FindClub(context.TODO(), filter, &club)
+		club, err := c.GetClubAndMetadata(filter)
 		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "internal server error", http.StatusInternalServerError)
+			c.Logger.Error("Failed to get club: ", err.Error())
+			http.Error(rw, `{ "msg": "internal server error" }`, http.StatusInternalServerError)
 			return
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(club)
 	}
 }
 
-/*
-Delete Club Data (DELETE)
-
-  - Deletes club data object
-
-  - Grab parameters and update
-
-Returns:
-
-	Http handler
-		- Writes OK back to client if successful
-*/
+// Deletes a club
 func (c *Service) DeleteClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -427,23 +374,25 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		id := mux.Vars(r)["id"]
 		valid := utils.ValidateClubID(id)
 		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "invalid club id" }`, http.StatusBadRequest)
 			return
 		}
 
 		// convert club id to oid
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			c.Logger.Debug(err.Error())
+			c.Logger.Debug("Failed to convert club id: ", err.Error())
+			http.Error(rw, `{ "msg": "bad club id" }`, http.StatusBadRequest)
+			return
 		}
 
 		// check if club exists
 		var club models.Club
-		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
+		err = c.FindClub(context.TODO(), bson.M{"_id": oid}, &club)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				c.Logger.Error(err.Error())
-				http.Error(rw, "club not found", http.StatusNotFound)
+				c.Logger.Error("club not found: ", err.Error())
+				http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
 				return
 			}
 		}
@@ -455,7 +404,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		c.NotifService.DeleteTopic(clubAdminTopic)
 
 		// delete club from users data
-		for i := 0; i < len(club.Members); i++ {
+		for i := range club.Members {
 			filter := bson.M{"uuid": club.Members[i].UUID}
 			update := bson.M{"$pull": bson.M{"clubs": oid}}
 			c.Database.UserCol.UpdateOne(context.Background(), filter, update)
@@ -463,12 +412,13 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 
 		// delete club
 		filter := bson.M{"_id": oid}
-		_, err = c.Database.ClubCol.DeleteOne(context.TODO(), filter)
+		err = c.RemoveClub(context.TODO(), filter)
 		if err != nil {
-			c.Logger.Debug(err.Error())
+			c.Logger.Debug("failed to delete club: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to delete club"}`, http.StatusInternalServerError)
+			return
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -1190,5 +1140,60 @@ func (c *Service) DeleteApplication() http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`OK`))
+	}
+}
+
+// CLUB POST ENDPOINTS
+
+func (s *Service) PinClubPost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Grab club id from path and validate it
+		id := mux.Vars(r)["id"]
+		valid := utils.ValidateClubID(id)
+		if !valid {
+			http.Error(w, "invalid club id", http.StatusBadRequest)
+			return
+		}
+
+		// grab post id from path
+		postID := mux.Vars(r)["postID"]
+		if len(postID) < 24 {
+			http.Error(w, "bad post id", http.StatusBadRequest)
+			return
+		}
+
+		// update club data to reflect new post
+		ok := s.PinPost(&id, &postID)
+		if ok {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (s *Service) UnpinClubPost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Grab club id from path and validate it
+		id := mux.Vars(r)["id"]
+		valid := utils.ValidateClubID(id)
+		if !valid {
+			http.Error(w, "invalid club id", http.StatusBadRequest)
+			return
+		}
+
+		// remove pinned post from club
+		ok := s.UnpinPost(&id)
+		if ok {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 }

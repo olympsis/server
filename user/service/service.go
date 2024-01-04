@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 /*
@@ -264,5 +265,175 @@ func (u *Service) DeleteUserData() http.HandlerFunc {
 		}
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
+	}
+}
+
+func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		uuid := r.Header.Get("UUID")
+
+		filter := bson.M{
+			"recipient": uuid,
+			"status":    "pending",
+		}
+
+		var invitations []models.Invitation
+		cursor, err := u.Database.OrgInvitationCol.Find(context.TODO(), filter)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			u.Log.Error("Failed to fetch invitations: " + err.Error())
+			return
+		}
+		for cursor.Next(context.TODO()) {
+			var invite models.Invitation
+			err := cursor.Decode(&invite)
+			if err != nil {
+				u.Log.Error("Failed to decode invitation: " + err.Error())
+			}
+			var org models.Organization
+			err = u.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": invite.SubjectID}).Decode(&org)
+			if err != nil {
+				u.Log.Error("Failed to fetch org data: " + err.Error())
+			}
+			invite.Data = &models.InvitationData{
+				Organization: &org,
+			}
+			invitations = append(invitations, invite)
+		}
+
+		if len(invitations) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		response := models.InvitationsResponse{
+			TotalInvitations: len(invitations),
+			Invitations:      invitations,
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func (u *Service) SearchUsersByUserName() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// grab username from query
+		keys, ok := r.URL.Query()["username"]
+		if !ok || len(keys[0]) < 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{ "msg": "no userName found in request" }`))
+			return
+		}
+		userName := keys[0]
+
+		// fetch users that might be related data
+		var users []models.UserData
+		regex := primitive.Regex{Pattern: userName, Options: "i"}
+		filter := bson.M{"username": regex}
+		cur, err := u.Database.UserCol.Find(context.TODO(), filter)
+		if err != nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		for cur.Next(context.TODO()) {
+			var meta models.User
+			var data models.UserData
+			err := cur.Decode(&meta)
+			if err != nil {
+				u.Log.Error("Failed to decode user data: " + err.Error())
+			}
+
+			data.Bio = meta.Bio
+			data.UUID = meta.UUID
+			data.Username = meta.UserName
+			data.ImageURL = meta.ImageURL
+			data.Visibility = meta.Visibility
+			data.DeviceToken = meta.DeviceToken
+
+			if data.Visibility == "public" {
+				data.Clubs = meta.Clubs
+				data.Sports = meta.Sports
+				data.Organizations = meta.Organizations
+			}
+			users = append(users, data)
+		}
+
+		// fetch first and last name
+		for i := range users {
+			var auth models.AuthUser
+			err := u.Database.AuthCol.FindOne(context.TODO(), bson.M{"uuid": users[i].UUID}).Decode(&auth)
+			if err != nil {
+				u.Log.Error("Failed to decode user auth data: " + err.Error())
+			} else {
+				users[i].FirstName = auth.FirstName
+				users[i].LastName = auth.LastName
+			}
+		}
+
+		response := models.UsersDataResponse{
+			TotalUsers: len(users),
+			Users:      users,
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func (u *Service) SearchUserByUUID() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// grab username from query
+		keys, ok := r.URL.Query()["uuid"]
+		if !ok || len(keys[0]) < 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{ "msg": "no uuid found in request" }`))
+			return
+		}
+		uuid := keys[0]
+
+		// context/filter
+		ctx := context.Background()
+		filter := bson.M{"uuid": uuid}
+		opts := options.FindOneOptions{}
+
+		// find and decode auth user data
+		var auth models.AuthUser
+		err := u.Database.AuthCol.FindOne(ctx, filter).Decode(&auth)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+		}
+
+		// find and decode user metadata
+		var user models.User
+		err = u.Database.UserCol.FindOne(ctx, filter, &opts).Decode(&user)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+		}
+
+		// create user data object
+		userData := models.UserData{
+			UUID:        user.UUID,
+			Bio:         user.Bio,
+			Username:    user.UserName,
+			FirstName:   auth.FirstName,
+			LastName:    auth.LastName,
+			ImageURL:    user.ImageURL,
+			Visibility:  user.Visibility,
+			DeviceToken: user.DeviceToken,
+		}
+
+		// if user visibility is public display this data if not then dont
+		if user.Visibility == "public" {
+			userData.Clubs = user.Clubs
+			userData.Sports = user.Sports
+			userData.Organizations = user.Organizations
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(userData)
 	}
 }

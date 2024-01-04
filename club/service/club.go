@@ -2,34 +2,21 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/olympsis/models"
 )
 
 func (s *Service) InsertClub(ctx context.Context, club *models.Club) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	s.Database.ClubCol.InsertOne(ctx, club)
 	return nil
 }
 
 func (s *Service) FindClub(ctx context.Context, filter interface{}, club *models.Club) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	s.Database.ClubCol.FindOne(ctx, filter).Decode(&club)
 	return nil
 }
 
 func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]models.Club) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	cursor, err := s.Database.ClubCol.Find(ctx, filter)
 	if err != nil {
 		return err
@@ -46,12 +33,7 @@ func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]mo
 	return nil
 }
 
-func (s *Service) UpdateAClub(ctx context.Context, filter interface{}, update interface{}) error {
-	pong := s.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
-
+func (s *Service) UpdateClub(ctx context.Context, filter interface{}, update interface{}) error {
 	// update user
 	_, err := s.Database.ClubCol.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -65,10 +47,14 @@ func (s *Service) UpdateClubs(ctx context.Context, filter interface{}, update in
 	return nil
 }
 
-func (s *Service) DeleteAClub(ctx context.Context, filter interface{}) error {
+func (s *Service) RemoveClub(ctx context.Context, filter interface{}) error {
+	_, err := s.Database.ClubCol.DeleteOne(ctx, filter)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (s *Service) DeleteClubs(ctx context.Context, filter interface{}) error {
+func (s *Service) RemoveClubs(ctx context.Context, filter interface{}) error {
 	return nil
 }

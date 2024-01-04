@@ -2,37 +2,24 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/olympsis/models"
 )
 
 // Insert new user into database
 func (f *Service) InsertField(ctx context.Context, field *models.Field) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	f.Database.FieldCol.InsertOne(ctx, field)
 	return nil
 }
 
 // Get user from database
 func (f *Service) FindField(ctx context.Context, filter interface{}, field *models.Field) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 	f.Database.FieldCol.FindOne(ctx, filter).Decode(&field)
 	return nil
 }
 
 // get users from database
 func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]models.Field) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	cursor, err := f.Database.FieldCol.Find(ctx, filter)
 	if err != nil {
@@ -52,11 +39,6 @@ func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]
 
 // update user in database
 func (f *Service) UpdateField(ctx context.Context, filter interface{}, update interface{}, field *models.Field) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
-
 	// update user
 	_, err := f.Database.FieldCol.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -74,11 +56,6 @@ func (f *Service) UpdateField(ctx context.Context, filter interface{}, update in
 
 // update users in database
 func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update interface{}, fields *[]models.Field) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
-
 	// update users
 	_, err := f.Database.FieldCol.UpdateMany(ctx, filter, update)
 	if err != nil {
@@ -105,10 +82,6 @@ func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update i
 
 // delete user in database
 func (f *Service) DeleteField(ctx context.Context, filter interface{}) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete user
 	_, err := f.Database.FieldCol.DeleteOne(ctx, filter)
@@ -120,10 +93,6 @@ func (f *Service) DeleteField(ctx context.Context, filter interface{}) error {
 
 // delete users in database
 func (f *Service) DeleteFields(ctx context.Context, filter interface{}) error {
-	pong := f.Database.PingDatabase()
-	if !pong {
-		return errors.New("failed to connect to database")
-	}
 
 	// delete users
 	_, err := f.Database.FieldCol.DeleteMany(ctx, filter)

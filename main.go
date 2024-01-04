@@ -8,7 +8,9 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/event"
 	"olympsis-server/field"
+	"olympsis-server/organization"
 	"olympsis-server/post"
+	"olympsis-server/storage"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
@@ -36,7 +38,7 @@ func main() {
 	k := os.Getenv("KEYID")
 	t := os.Getenv("TEAMID")
 	f := "./files/AuthKey_JN25FUC9X2.p8"
-	n := notif.NewNotificationService(l, d.Pool, d.UserCol)
+	n := notif.NewNotificationService(l, d.NotifCol, d.UserCol)
 	err := n.CreateNewClient(k, t, f)
 	if err != nil {
 		panic(err.Error())
@@ -51,6 +53,8 @@ func main() {
 	clubAPI := club.NewClubAPI(l, r, d, n, sh)
 	postAPI := post.NewPostAPI(l, r, d, n, sh)
 	eventAPI := event.NewEventAPI(l, r, d, n, sh)
+	storageAPI := storage.NewStorageAPI(l, r, d)
+	organizationAPI := organization.NewOrganizationAPI(l, r, d, n, sh)
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -58,8 +62,13 @@ func main() {
 	clubAPI.Ready()
 	postAPI.Ready()
 	eventAPI.Ready()
+	storageAPI.Ready()
+	organizationAPI.Ready()
 
 	port := os.Getenv("PORT")
+	if port == "" {
+		port = "80"
+	}
 
 	// server config
 	s := &http.Server{

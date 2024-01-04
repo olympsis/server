@@ -1,4 +1,4 @@
-VERSION := v0.2.1
+VERSION := v0.3.1
 SERVICE_NAME := olympsis/server
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
@@ -9,18 +9,19 @@ export PORT=80
 export KEYID=JN25FUC9X2
 export TEAMID=5A6H49Q85D
 
-export DB_ADDR=192.168.1.205
-export DB_USR=service
-export DB_PASS=qN1PHHgo6L942AvpTgGQ
-export DB_NAME=olympsis
+export DB_USR=admin
+export DB_PASS=vM9pPgfHeZDxgBDv
 
-export STORAGE_ADDR=192.168.1.205:9000
-export STORAGE_ACCESS_KEY=p4eHM3a4v3wGB2ro
-export STORAGE_SECRET_KEY=WbPjehYtD3wO4V4PNlYwJwWiPRy6qqqN
+export DB_NAME=olympsis
+export DB_ADDR=database-0.i4q7nvi.mongodb.net
+export NOTIF_DB_ADDR=database-2.pdjjqal.mongodb.net
+export NOTIF_DB_NAME=notifications
+export NOTIF_COL=topics
 
 export AUTH_COL=auth
 export USER_COL=users
 export CLUB_COL=clubs
+export ORG_COL=organizations
 export EVENT_COL=events
 export FIELD_COL=fields
 export POST_COL=posts
@@ -28,12 +29,14 @@ export CINVITE_COL=clubInvites
 export COMMENTS_COL=comments
 export FREQUEST_COL=friendRequests
 export CAPPICATIONS_COL=clubApplications
+export OAPPICATIONS_COL=organizationApplications
+
+export EVENT_INVITATIONS_COL=eventInvitations
+export CLUB_INVITATIONS_COL=clubInvitations
+export ORG_INVITATIONS_COL=organizationInvitations
 
 export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
-export POSTGRES_USER=postgres
-export POSTGRES_PASSWORD=20031998
-export TOPIC_DB_NAME=olympsis_notif
 
 .PHONY: all dep build clean test coverage coverhtml lint
 
