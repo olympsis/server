@@ -4,9 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt"
+	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -117,4 +119,51 @@ func ValidateClubToken(s string, u string) (string, string, error) {
 
 		return id, role, nil
 	}
+}
+
+type SafeOrganizations struct {
+	mu            sync.Mutex
+	organizations map[primitive.ObjectID]*models.Organization
+}
+
+func NewSafeOrganization() *SafeOrganizations {
+	return &SafeOrganizations{
+		mu:            sync.Mutex{},
+		organizations: make(map[primitive.ObjectID]*models.Organization),
+	}
+}
+
+func (o *SafeOrganizations) AddOrganization(org *models.Organization) {
+	o.mu.Lock()
+	o.organizations[org.ID] = org
+	o.mu.Unlock()
+}
+
+func (o *SafeOrganizations) FindOrganization(id primitive.ObjectID) *models.Organization {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.organizations[id]
+}
+
+type SafeMembers struct {
+	mu      sync.Mutex
+	members map[string]*models.UserData
+}
+
+func NewSafeMembers() *SafeMembers {
+	return &SafeMembers{
+		mu:      sync.Mutex{},
+		members: make(map[string]*models.UserData),
+	}
+}
+func (m *SafeMembers) AddMember(usr *models.UserData) {
+	m.mu.Lock()
+	m.members[usr.UUID] = usr
+	m.mu.Unlock()
+}
+
+func (m *SafeMembers) FindMember(uuid string) *models.UserData {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.members[uuid]
 }

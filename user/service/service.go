@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"olympsis-server/batch"
 	"olympsis-server/database"
+	"sync"
 	"time"
-
-	"github.com/olympsis/notif"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
+	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -435,5 +436,123 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(userData)
+	}
+}
+
+func (s *Service) CheckIn() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		var wg sync.WaitGroup
+		var auth models.AuthUser
+		var meta models.User
+		var clubs []models.Club
+		var orgs []models.Organization
+
+		uuid := r.Header.Get("UUID")
+		ctx := context.Background()
+		filter := bson.M{"uuid": uuid}
+
+		// fetch auth data
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := s.Database.AuthCol.FindOne(ctx, filter).Decode(&auth)
+			if err != nil {
+				s.Log.Error("failed to fetch user auth data: ", err.Error())
+			}
+		}()
+
+		// fetch user meta data
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := s.FindUser(ctx, filter, &meta)
+			if err != nil {
+				s.Log.Error("failed to fetch user metad data: ", err.Error())
+			}
+		}()
+
+		wg.Wait()
+
+		// get clubs if they exist
+		if len(meta.Clubs) > 0 {
+			var clubIds []primitive.ObjectID
+			for i := range meta.Clubs {
+				id, _ := primitive.ObjectIDFromHex(meta.Clubs[i])
+				clubIds = append(clubIds, id)
+			}
+			filter := bson.M{
+				"_id": bson.M{
+					"$in": clubIds,
+				},
+			}
+			clubs, _ = batch.ProcessBatchedClubData(filter, s.Database)
+		}
+
+		// get organizations if they exist
+		if len(meta.Organizations) > 0 {
+			for i := range meta.Organizations {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					var org models.Organization
+					oid, err := primitive.ObjectIDFromHex(meta.Organizations[i])
+					if err != nil {
+						s.Log.Error("failed to convert hex id to object id: ", err.Error())
+					} else {
+						err = s.Database.OrgCol.FindOne(ctx, bson.M{"_id": oid}).Decode(&org)
+						if err != nil {
+							s.Log.Error("failed to find organization: ", err.Error())
+						} else {
+							orgs = append(orgs, org)
+						}
+					}
+				}(i)
+			}
+		}
+
+		wg.Wait()
+
+		var invitations []models.Invitation
+		cursor, err := s.Database.OrgInvitationCol.Find(ctx, bson.M{"recipient": uuid})
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				s.Log.Error("no invitations found")
+			}
+			s.Log.Error("failed to find invitations: ", err.Error())
+		} else {
+			for cursor.Next(ctx) {
+				var invite models.Invitation
+				err := cursor.Decode(&invite)
+				if err != nil {
+					s.Log.Error("failed to decode invite: ", err.Error())
+				} else {
+					invitations = append(invitations, invite)
+				}
+			}
+		}
+
+		user := models.UserData{
+			UUID:          uuid,
+			Username:      meta.UserName,
+			FirstName:     auth.FirstName,
+			LastName:      auth.LastName,
+			ImageURL:      meta.ImageURL,
+			Visibility:    meta.Visibility,
+			Bio:           meta.Bio,
+			Clubs:         meta.Clubs,
+			Organizations: meta.Organizations,
+			Sports:        meta.Sports,
+		}
+
+		check := models.CheckIn{
+			User:          user,
+			Clubs:         &clubs,
+			Organizations: &orgs,
+			Invitations:   &invitations,
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(check)
 	}
 }

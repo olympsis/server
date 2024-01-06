@@ -2,46 +2,12 @@ package service
 
 import (
 	"context"
+	"olympsis-server/utils"
 	"sync"
 
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
-type SafeOrganizations struct {
-	mu            sync.Mutex
-	organizations map[primitive.ObjectID]*models.Organization
-}
-
-func (o *SafeOrganizations) AddOrganization(org *models.Organization) {
-	o.mu.Lock()
-	o.organizations[org.ID] = org
-	o.mu.Unlock()
-}
-
-func (o *SafeOrganizations) FindOrganization(id primitive.ObjectID) *models.Organization {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.organizations[id]
-}
-
-type SafeMembers struct {
-	mu      sync.Mutex
-	members map[string]*models.UserData
-}
-
-func (m *SafeMembers) AddMember(usr *models.UserData) {
-	m.mu.Lock()
-	m.members[usr.UUID] = usr
-	m.mu.Unlock()
-}
-
-func (m *SafeMembers) FindMember(uuid string) *models.UserData {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.members[uuid]
-}
 
 /*
 Provided a filter, return a club and their metadata.
@@ -64,10 +30,7 @@ func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
 	}
 
 	var wg sync.WaitGroup
-	members := SafeMembers{
-		mu:      sync.Mutex{},
-		members: make(map[string]*models.UserData),
-	}
+	members := utils.NewSafeMembers()
 
 	// get parent data if it exists
 	if club.ParentID != nil {
@@ -133,14 +96,8 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 	// dictionary for org/user data
 	var wg sync.WaitGroup
 
-	members := SafeMembers{
-		mu:      sync.Mutex{},
-		members: make(map[string]*models.UserData),
-	}
-	organizations := SafeOrganizations{
-		mu:            sync.Mutex{},
-		organizations: make(map[primitive.ObjectID]*models.Organization),
-	}
+	members := utils.NewSafeMembers()
+	organizations := utils.NewSafeOrganization()
 
 	// get clubs organization data if they have any
 	for i := range clubs {

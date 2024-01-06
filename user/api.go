@@ -27,6 +27,15 @@ func (u *UserAPI) Ready() {
 	*/
 
 	// search username availability
+	u.Router.Handle("/users/check-in",
+		middleware.Chain(
+			u.Service.CheckIn(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// search username availability
 	u.Router.Handle("/users/username",
 		middleware.Chain(
 			u.Service.CheckUsername(),
