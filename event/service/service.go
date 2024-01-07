@@ -1199,10 +1199,11 @@ func (e *Service) Location() http.HandlerFunc {
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
+
 		// fields filter
 		filter := bson.M{
 			"location": bson.M{
-				"$near": bson.M{
+				"$nearSphere": bson.M{
 					"$geometry":    loc,
 					"$maxDistance": radius,
 				},
@@ -1223,8 +1224,11 @@ func (e *Service) Location() http.HandlerFunc {
 		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
+				e.Logger.Error(err.Error())
 				http.Error(rw, "no events found", http.StatusNotFound)
 				return
+			} else {
+				e.Logger.Error(err.Error())
 			}
 		}
 
@@ -1368,11 +1372,6 @@ func (e *Service) Location() http.HandlerFunc {
 		}
 
 		wg.Wait()
-
-		if len(events) == 0 {
-			http.Error(rw, "no events", http.StatusNoContent)
-			return
-		}
 
 		resp := models.LocationResponse{
 			Fields: &fieldsArr,

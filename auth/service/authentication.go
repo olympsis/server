@@ -140,8 +140,24 @@ func (a *Service) SignUp() http.HandlerFunc {
 				return
 			}
 
+			// generate token for api
+			token, err := utils.GenerateAuthToken(user.UUID, user.Provider)
+			if err != nil {
+				a.Log.Error(err.Error())
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			response := models.AuthResponse{
+				UUID:      user.UUID,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+				Email:     user.Email,
+				Token:     token,
+			}
+
 			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(user)
+			json.NewEncoder(rw).Encode(response)
 
 		} else if request.Provider == "https://accounts.google.com" {
 
@@ -299,8 +315,16 @@ func (a *Service) Login() http.HandlerFunc {
 				return
 			}
 
+			response := models.AuthResponse{
+				UUID:      user.UUID,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+				Email:     user.Email,
+				Token:     token,
+			}
+
 			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(user)
+			json.NewEncoder(rw).Encode(response)
 		}
 
 	}

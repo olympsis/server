@@ -454,7 +454,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 		provider := r.Header.Get("Token-Provider")
 		ctx := context.Background()
 		filter := bson.M{"uuid": uuid}
-		tokenExpiry, _ := strconv.ParseInt(r.Header.Get("Token-Expiry"), 2, 64)
+		tokenExpiry, _ := strconv.ParseInt(r.Header.Get("Token-Expiry"), 10, 64)
 
 		// check to see if their token is close to expiry
 		var newToken *string
@@ -471,7 +471,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 				return
 			}
 		} else {
-			if tokenExpiry > time.Now().Add(15*24*time.Hour).Unix() {
+			if tokenExpiry < time.Now().Add(15*24*time.Hour).Unix() {
 				t, _ := utils.GenerateAuthToken(uuid, provider)
 				newToken = &t
 

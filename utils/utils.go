@@ -47,7 +47,7 @@ func GenerateAuthToken(u string, p string) (string, error) {
 	claims["sub"] = u
 	claims["pod"] = p
 	claims["iat"] = time.Now().Unix()
-	claims["exp"] = time.Now().Add(30 * 24 * time.Hour) // 30 days
+	claims["exp"] = time.Now().Add(30 * 24 * time.Hour).Unix() // 30 days
 
 	ts, err := token.SignedString(key)
 
