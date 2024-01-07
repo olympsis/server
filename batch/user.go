@@ -82,7 +82,7 @@ func ProcessBatchedClubData(filter interface{}, d *database.Database) ([]models.
 	// dictionary for org/user data
 	var wg sync.WaitGroup
 
-	members := utils.NewSafeMembers()
+	members := utils.NewSafeUsers()
 	organizations := utils.NewSafeOrganization()
 
 	// get clubs organization data if they have any
@@ -120,7 +120,7 @@ func ProcessBatchedClubData(filter interface{}, d *database.Database) ([]models.
 			for j := range clubs[index].Members {
 				uuid := clubs[index].Members[j].UUID
 				// lookup member in dictionary
-				u := members.FindMember(uuid)
+				u := members.FindUser(uuid)
 				if u == nil { // if not found search for it
 
 					var auth models.AuthUser
@@ -144,7 +144,7 @@ func ProcessBatchedClubData(filter interface{}, d *database.Database) ([]models.
 
 					if err == nil {
 						clubs[index].Members[j].Data = &user
-						members.AddMember(&user)
+						members.AddUser(&user)
 					} else {
 						d.Logger.Error("failed to get user data: ", err.Error())
 					}

@@ -30,7 +30,7 @@ func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
 	}
 
 	var wg sync.WaitGroup
-	members := utils.NewSafeMembers()
+	members := utils.NewSafeUsers()
 
 	// get parent data if it exists
 	if club.ParentID != nil {
@@ -52,12 +52,12 @@ func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
 			uuid := club.Members[index].UUID
 			defer wg.Done()
 			// lookup member in dictionary
-			u := members.FindMember(uuid)
+			u := members.FindUser(uuid)
 			if u == nil { // if not found search for it
 				usr, err := s.SearchService.SearchUserByUUID(uuid)
 				if err == nil {
 					club.Members[index].Data = &usr
-					members.AddMember(&usr)
+					members.AddUser(&usr)
 				} else {
 					s.Logger.Error("failed to get user data: ", err.Error())
 				}
@@ -96,7 +96,7 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 	// dictionary for org/user data
 	var wg sync.WaitGroup
 
-	members := utils.NewSafeMembers()
+	members := utils.NewSafeUsers()
 	organizations := utils.NewSafeOrganization()
 
 	// get clubs organization data if they have any
@@ -133,12 +133,12 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 			for j := range clubs[index].Members {
 				uuid := clubs[index].Members[j].UUID
 				// lookup member in dictionary
-				u := members.FindMember(uuid)
+				u := members.FindUser(uuid)
 				if u == nil { // if not found search for it
 					usr, err := s.SearchService.SearchUserByUUID(clubs[index].Members[j].UUID)
 					if err == nil {
 						clubs[index].Members[j].Data = &usr
-						members.AddMember(&usr)
+						members.AddUser(&usr)
 					} else {
 						s.Logger.Error("Failed to get user data: ", err.Error())
 					}

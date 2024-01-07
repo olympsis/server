@@ -121,6 +121,30 @@ func ValidateClubToken(s string, u string) (string, string, error) {
 	}
 }
 
+type SafeClubs struct {
+	mu    sync.Mutex
+	clubs map[primitive.ObjectID]*models.Club
+}
+
+func NewSafeClub() *SafeClubs {
+	return &SafeClubs{
+		mu:    sync.Mutex{},
+		clubs: make(map[primitive.ObjectID]*models.Club),
+	}
+}
+
+func (c *SafeClubs) AddClub(club *models.Club) {
+	c.mu.Lock()
+	c.clubs[club.ID] = club
+	c.mu.Unlock()
+}
+
+func (c *SafeClubs) FindClub(id primitive.ObjectID) *models.Club {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.clubs[id]
+}
+
 type SafeOrganizations struct {
 	mu            sync.Mutex
 	organizations map[primitive.ObjectID]*models.Organization
@@ -145,25 +169,48 @@ func (o *SafeOrganizations) FindOrganization(id primitive.ObjectID) *models.Orga
 	return o.organizations[id]
 }
 
-type SafeMembers struct {
+type SafeUsers struct {
 	mu      sync.Mutex
 	members map[string]*models.UserData
 }
 
-func NewSafeMembers() *SafeMembers {
-	return &SafeMembers{
+func NewSafeUsers() *SafeUsers {
+	return &SafeUsers{
 		mu:      sync.Mutex{},
 		members: make(map[string]*models.UserData),
 	}
 }
-func (m *SafeMembers) AddMember(usr *models.UserData) {
+func (m *SafeUsers) AddUser(usr *models.UserData) {
 	m.mu.Lock()
 	m.members[usr.UUID] = usr
 	m.mu.Unlock()
 }
 
-func (m *SafeMembers) FindMember(uuid string) *models.UserData {
+func (m *SafeUsers) FindUser(uuid string) *models.UserData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.members[uuid]
+}
+
+type SafeFields struct {
+	mu     sync.Mutex
+	fields map[primitive.ObjectID]*models.Field
+}
+
+func NewSafeFields() *SafeFields {
+	return &SafeFields{
+		mu:     sync.Mutex{},
+		fields: make(map[primitive.ObjectID]*models.Field),
+	}
+}
+func (m *SafeFields) AddField(field *models.Field) {
+	m.mu.Lock()
+	m.fields[field.ID] = field
+	m.mu.Unlock()
+}
+
+func (m *SafeFields) FindField(id primitive.ObjectID) *models.Field {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.fields[id]
 }
