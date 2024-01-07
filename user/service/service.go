@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"olympsis-server/batch"
 	"olympsis-server/database"
+	"olympsis-server/utils"
+	"strconv"
 	"sync"
 	"time"
 
@@ -449,8 +451,40 @@ func (s *Service) CheckIn() http.HandlerFunc {
 		var orgs []models.Organization
 
 		uuid := r.Header.Get("UUID")
+		provider := r.Header.Get("Token-Provider")
 		ctx := context.Background()
 		filter := bson.M{"uuid": uuid}
+		tokenExpiry, _ := strconv.ParseInt(r.Header.Get("Token-Expiry"), 2, 64)
+
+		// check to see if their token is close to expiry
+		var newToken *string
+		if tokenExpiry == 0 {
+			t, _ := utils.GenerateAuthToken(uuid, provider)
+			newToken = &t
+
+			// update tokens
+			update := bson.M{"$set": bson.M{"token": newToken}}
+			_, err := s.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
+			if err != nil {
+				s.Log.Error(err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			if tokenExpiry > time.Now().Add(15*24*time.Hour).Unix() {
+				t, _ := utils.GenerateAuthToken(uuid, provider)
+				newToken = &t
+
+				// update tokens
+				update := bson.M{"$set": bson.M{"token": newToken}}
+				_, err := s.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
+				if err != nil {
+					s.Log.Error(err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+		}
 
 		// fetch auth data
 		wg.Add(1)
@@ -550,6 +584,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 			Clubs:         &clubs,
 			Organizations: &orgs,
 			Invitations:   &invitations,
+			Token:         newToken,
 		}
 
 		w.WriteHeader(http.StatusOK)

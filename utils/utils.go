@@ -47,6 +47,7 @@ func GenerateAuthToken(u string, p string) (string, error) {
 	claims["sub"] = u
 	claims["pod"] = p
 	claims["iat"] = time.Now().Unix()
+	claims["exp"] = time.Now().Add(30 * 24 * time.Hour) // 30 days
 
 	ts, err := token.SignedString(key)
 
@@ -55,6 +56,36 @@ func GenerateAuthToken(u string, p string) (string, error) {
 	}
 
 	return ts, nil
+}
+
+func ValidateAuthToken(s string) (string, string, float64, float64, error) {
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(s, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("KEY")), nil
+	})
+
+	if err != nil {
+		return "", "", 0, 0, err
+	} else {
+		uuid, ok := claims["sub"].(string)
+		if !ok {
+			return "", "", 0, 0, errors.New("sub claim not found")
+		}
+		provider, ok := claims["pod"].(string)
+		if !ok {
+			return "", "", 0, 0, errors.New("pod claim not found")
+		}
+		createdAt, ok := claims["iat"].(float64)
+		if !ok {
+			return "", "", 0, 0, errors.New("iat claim not found")
+		}
+		expiresAt, ok := claims["exp"].(float64)
+		if !ok {
+			return "", "", 0, 0, errors.New("exp claim not found")
+		}
+
+		return uuid, provider, createdAt, expiresAt, nil
+	}
 }
 
 func GenerateClubToken(i string, r string, u string) (string, error) {
@@ -73,31 +104,6 @@ func GenerateClubToken(i string, r string, u string) (string, error) {
 	}
 
 	return ts, nil
-}
-
-func ValidateAuthToken(s string) (string, string, float64, error) {
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(s, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
-	})
-
-	if err != nil {
-		return "", "", 0, err
-	} else {
-		uuid, ok := claims["sub"].(string)
-		if !ok {
-			return "", "", 0, errors.New("sub claim not found")
-		}
-		provider, ok := claims["pod"].(string)
-		if !ok {
-			return "", "", 0, errors.New("pod claim not found")
-		}
-		createdAt, ok := claims["iat"].(float64)
-		if !ok {
-			return "", "", 0, errors.New("iat claim not found")
-		}
-		return uuid, provider, createdAt, nil
-	}
 }
 
 func ValidateClubToken(s string, u string) (string, string, error) {
@@ -132,13 +138,11 @@ func NewSafeClub() *SafeClubs {
 		clubs: make(map[primitive.ObjectID]*models.Club),
 	}
 }
-
 func (c *SafeClubs) AddClub(club *models.Club) {
 	c.mu.Lock()
 	c.clubs[club.ID] = club
 	c.mu.Unlock()
 }
-
 func (c *SafeClubs) FindClub(id primitive.ObjectID) *models.Club {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -156,13 +160,11 @@ func NewSafeOrganization() *SafeOrganizations {
 		organizations: make(map[primitive.ObjectID]*models.Organization),
 	}
 }
-
 func (o *SafeOrganizations) AddOrganization(org *models.Organization) {
 	o.mu.Lock()
 	o.organizations[org.ID] = org
 	o.mu.Unlock()
 }
-
 func (o *SafeOrganizations) FindOrganization(id primitive.ObjectID) *models.Organization {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -185,7 +187,6 @@ func (m *SafeUsers) AddUser(usr *models.UserData) {
 	m.members[usr.UUID] = usr
 	m.mu.Unlock()
 }
-
 func (m *SafeUsers) FindUser(uuid string) *models.UserData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -208,7 +209,6 @@ func (m *SafeFields) AddField(field *models.Field) {
 	m.fields[field.ID] = field
 	m.mu.Unlock()
 }
-
 func (m *SafeFields) FindField(id primitive.ObjectID) *models.Field {
 	m.mu.Lock()
 	defer m.mu.Unlock()

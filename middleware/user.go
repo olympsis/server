@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"olympsis-server/utils"
+	"strconv"
 )
 
 /*
@@ -26,14 +27,15 @@ func UserMiddleware() Middleware {
 				Validating Auth Token
 				- if claims are missing throw an error
 			*/
-			sub, _, _, err := utils.ValidateAuthToken(token)
+			sub, pod, _, exp, err := utils.ValidateAuthToken(token)
 			if err != nil {
 				http.Error(w, "invalid auth token", http.StatusUnauthorized)
 				return
 			} else {
 				// add uuid to header
 				r.Header.Add("UUID", sub)
-
+				r.Header.Add("Token-Expiry", strconv.Itoa(int(exp)))
+				r.Header.Add("Token-Provider", pod)
 				// call next middleware/handler in chain
 				f(w, r)
 			}

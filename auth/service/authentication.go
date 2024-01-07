@@ -335,24 +335,12 @@ Returns:
 func (a *Service) Delete() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			a.Log.Error(err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid, _, _, err := utils.ValidateAuthToken(token)
-		if err != nil {
-			a.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
 		// find user
 		var user models.AuthUser
 		filter := bson.M{"uuid": uuid}
-		err = a.FindUser(context.Background(), filter, &user)
+		err := a.FindUser(context.Background(), filter, &user)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(err.Error())
