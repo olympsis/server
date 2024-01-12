@@ -9,6 +9,7 @@ import (
 	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Service struct {
@@ -20,33 +21,9 @@ type Service struct {
 }
 
 // Insert one post into database
-func (s *Service) InsertPost(ctx context.Context, event *models.Post) error {
-	s.Database.PostCol.InsertOne(ctx, event)
-	return nil
-}
-
-// Find one post from database
-func (s *Service) FindPost(ctx context.Context, filter interface{}, event *models.Post) error {
-	s.Database.PostCol.FindOne(ctx, filter).Decode(&event)
-	return nil
-}
-
-// Find many posts from database
-func (s *Service) FindPosts(ctx context.Context, filter interface{}, posts *[]models.Post) error {
-	cursor, err := s.Database.PostCol.Find(ctx, filter)
-	if err != nil {
-		return err
-	}
-
-	for cursor.Next(context.TODO()) {
-		var event models.Post
-		err := cursor.Decode(&event)
-		if err != nil {
-			return err
-		}
-		*posts = append(*posts, event)
-	}
-	return nil
+func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *options.InsertOneOptions) error {
+	_, err := s.Database.PostCol.InsertOne(ctx, post, opts)
+	return err
 }
 
 // Update one post in the database

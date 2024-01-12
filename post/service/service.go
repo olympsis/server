@@ -42,118 +42,51 @@ Get Posts (GET)
 */
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// grab query parameters
 		group := r.URL.Query().Get("groupID")
 		parent := r.URL.Query().Get("parentID")
-
 		if group == "" {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": "please add a group id to your request" }`))
 			return
 		}
 
+		// convert ids found to objectIDs
+		var ids []primitive.ObjectID
 		groupID, err := primitive.ObjectIDFromHex(group)
 		if err != nil {
 			p.Logger.Error(err.Error())
 			http.Error(rw, `{ "msg": "bad group id" }`, http.StatusBadRequest)
 			return
+		} else {
+			ids = append(ids, groupID)
 		}
-		groupIDS := bson.A{
-			groupID,
-		}
-
 		if parent != "" {
 			parentID, _ := primitive.ObjectIDFromHex(parent)
-			groupIDS = append(groupIDS, parentID)
+			ids = append(ids, parentID)
 		}
 
-		filter := bson.M{
-			"group_id": bson.M{
-				"$in": groupIDS,
-			},
-		}
-
-		var posts []models.Post
-		cur, err := p.Database.PostCol.Find(context.TODO(), filter)
-
+		// run aggregation pipeline
+		posts, err := FindPosts(ids, p.Database, 100)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
 				return
-			}
-		}
-
-		if cur == nil {
-			http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
-			return
-		}
-
-		for cur.Next(context.TODO()) {
-			var post models.Post
-			err := cur.Decode(&post)
-			if err != nil {
-				p.Logger.Error(err)
 			} else {
-				if post.Type == "announcement" {
-
-					// grab org data
-					var org models.Organization
-					filter = bson.M{"_id": post.GroupID}
-					err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
-					if err != nil {
-						p.Logger.Error(err.Error())
-					}
-					post.Data = &models.PostData{
-						Organization: &org,
-					}
-
-					// in the org posts we would want to show the poster
-					if group == org.ID.Hex() {
-						user, err := p.SearchService.SearchUserByUUID(post.Poster)
-						if err != nil {
-							p.Logger.Error(err)
-						}
-						post.Data.Poster = &user
-					}
-
-				} else if post.Type == "post" {
-
-					user, err := p.SearchService.SearchUserByUUID(post.Poster)
-					if err != nil {
-						p.Logger.Error(err)
-					}
-					data := models.PostData{
-						Poster: &user,
-					}
-					post.Data = &data
-
-				}
-
-				// grab user data for comments
-				for i := 0; i < len(post.Comments); i++ {
-					usrData, err := p.SearchService.SearchUserByUUID(post.Comments[i].UUID)
-					if err != nil {
-						p.Logger.Error(err.Error())
-					}
-					post.Comments[i].Data = &usrData
-				}
-
-				posts = append(posts, post)
+				p.Logger.Error("failed to get posts: ", err.Error())
+				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
 			}
-
 		}
-
-		if len(posts) == 0 {
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusNoContent)
+		if posts == nil || len(*posts) == 0 {
+			http.Error(rw, `{ "msg": "no posts content not found" }`, http.StatusNoContent)
 			return
 		}
 
 		resp := models.PostsResponse{
-			TotalPosts: len(posts),
-			Posts:      posts,
+			TotalPosts: len(*posts),
+			Posts:      *posts,
 		}
-
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
@@ -174,70 +107,31 @@ Returns:
 */
 func (p *Service) GetPost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no post id found in request." }`))
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{ "msg": "no post id found in request." }`, http.StatusBadRequest)
 			return
 		}
-		id := vars["id"]
-		oid, _ := primitive.ObjectIDFromHex(id)
-		_, ctx := context.WithTimeout(context.Background(), 30*time.Second)
-		defer ctx()
 
-		// find post  in database
-		var post models.Post
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		err := p.Database.PostCol.FindOne(context.TODO(), filter).Decode(&post)
+		// convert id to objectID
+		oid, _ := primitive.ObjectIDFromHex(id)
+
+		// run aggregation pipeline to fetch post
+		post, err := FindPost(oid, p.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
+				http.Error(rw, `{"msg": "post not found"}`, http.StatusNotFound)
 				return
 			}
+			p.Logger.Error("failed to get post: ", err.Error())
+			http.Error(rw, `{"msg":"failed to get post"}`, http.StatusInternalServerError)
+			return
 		}
 
-		if post.Type == "announcement" {
-
-			// grab org data
-			var org models.Organization
-			filter := bson.M{"_id": post.GroupID}
-			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
-			if err != nil {
-				p.Logger.Error(err.Error())
-				return
-			}
-
-			post.Data = &models.PostData{
-				Organization: &org,
-			}
-
-		} else if post.Type == "post" {
-
-			user, err := p.SearchService.SearchUserByUUID(post.Poster)
-			if err != nil {
-				p.Logger.Error(err.Error())
-			}
-
-			data := models.PostData{
-				Poster: &user,
-			}
-			post.Data = &data
-
-		}
-
-		// get comments data
-		for i := 0; i < len(post.Comments); i++ {
-			usrData, err := p.SearchService.SearchUserByUUID(post.Comments[i].UUID)
-			if err != nil {
-				p.Logger.Error(err.Error())
-			}
-			post.Comments[i].Data = &usrData
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(post)
-
 	}
 }
 
@@ -263,7 +157,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req models.Post
+		var req models.PostDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			p.Logger.Error(err.Error())
@@ -273,8 +167,8 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 		// add aditional data to post model
 		timeStamp := time.Now().Unix()
-		req.CreatedAt = timeStamp
-		post := models.Post{
+		req.CreatedAt = &timeStamp
+		post := models.PostDao{
 			ID:           primitive.NewObjectID(),
 			Type:         req.Type,
 			Poster:       uuid,
@@ -282,7 +176,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			EventID:      req.EventID,
 			Body:         req.Body,
 			Images:       req.Images,
-			CreatedAt:    timeStamp,
+			CreatedAt:    &timeStamp,
 			ExternalLink: req.ExternalLink,
 		}
 
@@ -310,10 +204,6 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				return
 			}
 
-			post.Data = &models.PostData{
-				Organization: &org,
-			}
-
 			for i := 0; i < len(org.Members); i++ {
 				p.NotifService.AddTokenToTopic(post.ID.Hex(), org.Members[i].UUID)
 			}
@@ -323,7 +213,6 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error("No children found")
 				rw.WriteHeader(http.StatusCreated)
-				json.NewEncoder(rw).Encode(post)
 			}
 
 			// send a notification to all of them
@@ -351,7 +240,6 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error(err.Error())
 				rw.WriteHeader(http.StatusCreated)
-				json.NewEncoder(rw).Encode(post)
 				return
 			}
 
@@ -360,12 +248,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error(err.Error())
 				rw.WriteHeader(http.StatusCreated)
-				json.NewEncoder(rw).Encode(post)
 				return
-			}
-
-			post.Data = &models.PostData{
-				Poster: &user,
 			}
 
 			// send notification to club members
@@ -378,7 +261,6 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(post)
 	}
 }
 
@@ -413,7 +295,7 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		}
 
 		// decode request
-		var req models.Post
+		var req models.PostUpdate
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			p.Logger.Error(err.Error())
@@ -427,13 +309,13 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		change := bson.M{}
 		update := bson.M{"$set": change}
 
-		if req.Body != "" {
+		if *req.Body != "" {
 			change["body"] = req.Body
 		}
-		if len(req.Images) > 0 {
+		if len(*req.Images) > 0 {
 			change["images"] = req.Images
 		}
-		if req.ExternalLink != "" {
+		if *req.ExternalLink != "" {
 			change["external_link"] = req.ExternalLink
 		}
 
