@@ -28,6 +28,15 @@ func (e *EventAPI) Ready() {
 	*/
 
 	// get events
+	e.Router.Handle("/events/location",
+		middleware.Chain(
+			e.Service.Location(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// get events
 	e.Router.Handle("/events",
 		middleware.Chain(
 			e.Service.GetEventsByLocation(),

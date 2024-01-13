@@ -140,8 +140,24 @@ func (a *Service) SignUp() http.HandlerFunc {
 				return
 			}
 
+			// generate token for api
+			token, err := utils.GenerateAuthToken(user.UUID, user.Provider)
+			if err != nil {
+				a.Log.Error(err.Error())
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			response := models.AuthResponse{
+				UUID:      user.UUID,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+				Email:     user.Email,
+				Token:     token,
+			}
+
 			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(user)
+			json.NewEncoder(rw).Encode(response)
 
 		} else if request.Provider == "https://accounts.google.com" {
 
@@ -299,8 +315,16 @@ func (a *Service) Login() http.HandlerFunc {
 				return
 			}
 
+			response := models.AuthResponse{
+				UUID:      user.UUID,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+				Email:     user.Email,
+				Token:     token,
+			}
+
 			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(user)
+			json.NewEncoder(rw).Encode(response)
 		}
 
 	}
@@ -335,24 +359,12 @@ Returns:
 func (a *Service) Delete() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			a.Log.Error(err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		uuid, _, _, err := utils.ValidateAuthToken(token)
-		if err != nil {
-			a.Log.Error("Failed to Decode Token: " + err.Error())
-			http.Error(rw, "Forbidden", http.StatusForbidden)
-			return
-		}
+		uuid := r.Header.Get("UUID")
 
 		// find user
 		var user models.AuthUser
 		filter := bson.M{"uuid": uuid}
-		err = a.FindUser(context.Background(), filter, &user)
+		err := a.FindUser(context.Background(), filter, &user)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(err.Error())

@@ -2,34 +2,12 @@ package service
 
 import (
 	"context"
+	"olympsis-server/utils"
 	"sync"
 
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
-type SafeOrganizations struct {
-	mu            sync.Mutex
-	organizations map[primitive.ObjectID]*models.Organization
-}
-
-func (o *SafeOrganizations) AddOrganization(org *models.Organization) {
-	o.mu.Lock()
-	o.organizations[org.ID] = org
-	o.mu.Unlock()
-}
-
-type SafeMembers struct {
-	mu      sync.Mutex
-	members map[string]*models.UserData
-}
-
-func (m *SafeMembers) AddMember(usr *models.UserData) {
-	m.mu.Lock()
-	m.members[usr.UUID] = usr
-	m.mu.Unlock()
-}
 
 /*
 Provided a filter, return a club and their metadata.
@@ -52,10 +30,7 @@ func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
 	}
 
 	var wg sync.WaitGroup
-	members := SafeMembers{
-		mu:      sync.Mutex{},
-		members: make(map[string]*models.UserData),
-	}
+	members := utils.NewSafeUsers()
 
 	// get parent data if it exists
 	if club.ParentID != nil {
@@ -74,14 +49,15 @@ func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
 	for i := range club.Members {
 		wg.Add(1)
 		go func(index int) {
+			uuid := club.Members[index].UUID
 			defer wg.Done()
 			// lookup member in dictionary
-			u, ok := members.members[club.Members[index].UUID]
-			if !ok { // if not found search for it
-				usr, err := s.SearchService.SearchUserByUUID(club.Members[index].UUID)
+			u := members.FindUser(uuid)
+			if u == nil { // if not found search for it
+				usr, err := s.SearchService.SearchUserByUUID(uuid)
 				if err == nil {
 					club.Members[index].Data = &usr
-					members.AddMember(&usr)
+					members.AddUser(&usr)
 				} else {
 					s.Logger.Error("failed to get user data: ", err.Error())
 				}
@@ -120,14 +96,8 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 	// dictionary for org/user data
 	var wg sync.WaitGroup
 
-	members := SafeMembers{
-		mu:      sync.Mutex{},
-		members: make(map[string]*models.UserData),
-	}
-	organizations := SafeOrganizations{
-		mu:            sync.Mutex{},
-		organizations: make(map[primitive.ObjectID]*models.Organization),
-	}
+	members := utils.NewSafeUsers()
+	organizations := utils.NewSafeOrganization()
 
 	// get clubs organization data if they have any
 	for i := range clubs {
@@ -137,8 +107,8 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 			// if the club has a parent
 			if clubs[index].ParentID != nil {
 				// lookup org in the dictionary
-				o, ok := organizations.organizations[*clubs[index].ParentID]
-				if !ok { // if org is not in found fetch it
+				o := organizations.FindOrganization(*clubs[index].ParentID)
+				if o == nil { // if org is not in found fetch it
 					var org models.Organization
 					err := s.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": clubs[index].ParentID}).Decode(&org)
 					if err == nil {
@@ -161,13 +131,14 @@ func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error)
 			defer wg.Done()
 			// get club members data
 			for j := range clubs[index].Members {
+				uuid := clubs[index].Members[j].UUID
 				// lookup member in dictionary
-				u, ok := members.members[clubs[index].Members[j].UUID]
-				if !ok { // if not found search for it
+				u := members.FindUser(uuid)
+				if u == nil { // if not found search for it
 					usr, err := s.SearchService.SearchUserByUUID(clubs[index].Members[j].UUID)
 					if err == nil {
 						clubs[index].Members[j].Data = &usr
-						members.AddMember(&usr)
+						members.AddUser(&usr)
 					} else {
 						s.Logger.Error("Failed to get user data: ", err.Error())
 					}

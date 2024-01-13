@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/utils"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -1165,5 +1167,219 @@ func (e *Service) NotifyClubMembers() http.HandlerFunc {
 		e.NotifService.SendNotificationToTopic(&req)
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
+	}
+}
+
+func (e *Service) Location() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// query params
+		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
+		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
+		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
+		limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 2, 64)
+
+		sports := r.URL.Query().Get("sports")
+		status := r.URL.Query().Get("status")
+
+		// query checking
+		if longitude == 0 || latitude == 0 || radius == 0 || sports == "" || status == "" {
+			http.Error(rw, "missing query param - long/lat/sports/status", http.StatusBadRequest)
+			return
+		}
+
+		if limit == 0 {
+			limit = 100 // max query size for events
+		}
+
+		splicedSports := strings.Split(sports, ",")
+
+		// user location
+		loc := models.GeoJSON{
+			Type:        "Point",
+			Coordinates: []float64{longitude, latitude},
+		}
+
+		// fields filter
+		filter := bson.M{
+			"location": bson.M{
+				"$nearSphere": bson.M{
+					"$geometry":    loc,
+					"$maxDistance": radius,
+				},
+			},
+			"sports": bson.M{
+				"$in": splicedSports,
+			},
+		}
+
+		clubs := utils.NewSafeClub()
+		organizations := utils.NewSafeOrganization()
+		fields := utils.NewSafeFields()
+		fieldsArr := []models.Field{}
+		users := utils.NewSafeUsers()
+		// timestamp := time.Now().Unix()
+
+		// fetch the nearby fields
+		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				e.Logger.Error(err.Error())
+				http.Error(rw, "no events found", http.StatusNotFound)
+				return
+			} else {
+				e.Logger.Error(err.Error())
+			}
+		}
+
+		// decode fields
+		var fieldsIDs []primitive.ObjectID
+		for cursor.Next(context.TODO()) {
+			// decode field
+			var field models.Field
+			err := cursor.Decode(&field)
+			if err != nil {
+				e.Logger.Error(err.Error())
+			}
+			fieldsIDs = append(fieldsIDs, field.ID)
+			fields.AddField(&field)
+			fieldsArr = append(fieldsArr, field)
+		}
+
+		if len(fieldsIDs) == 0 {
+			http.Error(rw, "no events", http.StatusNoContent)
+			return
+		}
+
+		var exists bool
+
+		// status filters
+		if status == "live" {
+			exists = false
+		} else if status == "ended" {
+			exists = true
+		}
+
+		// filter to find events
+		filter = bson.M{
+			"field._id": bson.M{
+				"$in": fieldsIDs,
+			},
+			"sport": bson.M{
+				"$in": splicedSports,
+			},
+			// "stop_time": bson.M{
+			// 	"$gt": timestamp,
+			// },
+			"actual_stop_time": bson.M{
+				"$exists": exists,
+			},
+			"visibility": "public",
+		}
+
+		var events []models.Event
+		err = e.FindEvents(context.Background(), filter, &events)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				rw.WriteHeader(http.StatusNotFound)
+				rw.Write([]byte(`{ "msg": "field does not exist" }`))
+				return
+			}
+		}
+
+		var wg sync.WaitGroup
+
+		// fetch owner data for all events
+		for i := range events {
+
+			data := models.EventData{}
+			dataClubs := []models.Club{}
+			dataOrganizations := []models.Organization{}
+
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+
+				// fetch user data if not in users map
+				user := users.FindUser(events[i].Poster)
+				if user == nil {
+					user, err := e.SearchService.SearchUserByUUID(events[i].Poster)
+					if err != nil {
+						e.Logger.Error(err.Error())
+					} else {
+						users.AddUser(&user)
+						data.Poster = &user
+					}
+				}
+
+				// fetch club/organization data if not in their respective maps
+				for j := range events[i].Organizers {
+					organizer := events[i].Organizers[j]
+					if organizer.Type == "club" {
+						id := organizer.ID
+						c := clubs.FindClub(id)
+						if c == nil {
+							var club models.Club
+							err := e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&club)
+							if err != nil {
+								e.Logger.Error(err.Error())
+							} else {
+								clubs.AddClub(&club)
+								dataClubs = append(dataClubs, club)
+							}
+						} else {
+							dataClubs = append(dataClubs, *c)
+						}
+					} else if organizer.Type == "organization" {
+						id := organizer.ID
+						o := organizations.FindOrganization(id)
+						if o == nil {
+							var org models.Organization
+							err := e.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&org)
+							if err != nil {
+								e.Logger.Error(err.Error())
+							} else {
+								organizations.AddOrganization(&org)
+								dataOrganizations = append(dataOrganizations, org)
+							}
+						} else {
+							dataOrganizations = append(dataOrganizations, *o)
+						}
+					}
+				}
+
+				data := models.EventData{
+					Poster:        user,
+					Field:         fields.FindField(events[i].Field.ID),
+					Clubs:         &dataClubs,
+					Organizations: &dataOrganizations,
+				}
+				events[i].Data = &data
+			}(i)
+
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				// add user data to participants
+				for ptp := range events[i].Participants {
+					data, err := e.SearchService.SearchUserByUUID(events[i].Participants[ptp].UUID)
+					if err != nil {
+						e.Logger.Error(err.Error())
+					}
+					events[i].Participants[ptp].Data = &data
+				}
+			}(i)
+		}
+
+		wg.Wait()
+
+		resp := models.LocationResponse{
+			Fields: &fieldsArr,
+			Events: &events,
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
 	}
 }
