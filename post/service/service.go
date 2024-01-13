@@ -503,7 +503,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req models.Comment
+		var req models.CommentDao
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
@@ -511,8 +511,11 @@ func (p *Service) AddComment() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "failed to decode comments" }`, http.StatusBadRequest)
 			return
 		}
-		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
+
+		newID := primitive.NewObjectID()
+		timestamp := time.Now().Unix()
+		req.ID = &newID
+		req.CreatedAt = &timestamp
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
