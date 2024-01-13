@@ -165,12 +165,13 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		// add aditional data to post model
+		id := primitive.NewObjectID()
 		timeStamp := time.Now().Unix()
 		req.CreatedAt = &timeStamp
 		post := models.PostDao{
-			ID:           primitive.NewObjectID(),
+			ID:           &id,
 			Type:         req.Type,
-			Poster:       uuid,
+			Poster:       &uuid,
 			GroupID:      req.GroupID,
 			EventID:      req.EventID,
 			Body:         req.Body,
@@ -190,7 +191,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		// create post notif topic
 		p.NotifService.CreateTopic(post.ID.Hex())
 
-		if req.Type == "announcement" {
+		if *req.Type == "announcement" {
 
 			// grab org data
 			var org models.Organization
@@ -211,6 +212,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error("No children found")
 				rw.WriteHeader(http.StatusCreated)
+				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
 			}
 
 			// send a notification to all of them
@@ -230,7 +232,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				p.NotifService.SendNotificationToTopic(&note)
 			}
 
-		} else if req.Type == "post" {
+		} else if *req.Type == "post" {
 
 			// grab club info
 			var club models.Club
@@ -239,6 +241,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error("failed to fetch club data: ", err.Error())
 				rw.WriteHeader(http.StatusCreated)
+				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
 				return
 			}
 
@@ -247,6 +250,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error("failed to fetch user data: ", err.Error())
 				rw.WriteHeader(http.StatusCreated)
+				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
 				return
 			}
 
@@ -260,6 +264,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusCreated)
+		rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
 	}
 }
 
@@ -292,7 +297,7 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		}
 
 		// decode request
-		var req models.PostUpdate
+		var req models.PostDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			p.Logger.Error("failed to decode request: ", err.Error())
@@ -305,13 +310,16 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		change := bson.M{}
 		update := bson.M{"$set": change}
 
-		if *req.Body != "" {
+		if req.Body != nil {
 			change["body"] = req.Body
 		}
-		if len(*req.Images) > 0 {
+		if req.EventID != nil {
+			change["event_id"] = req.EventID
+		}
+		if req.Images != nil {
 			change["images"] = req.Images
 		}
-		if *req.ExternalLink != "" {
+		if req.ExternalLink != nil {
 			change["external_link"] = req.ExternalLink
 		}
 

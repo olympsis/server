@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.5.0
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.5.1
-	github.com/olympsis/models v0.0.0-20240112222528-031a7d386e92
+	github.com/olympsis/models v0.0.0-20240113103607-20229e42c6ca
 	github.com/olympsis/notif v0.0.0-20231231195317-3af63c75d7b7
 	github.com/olympsis/search v0.0.0-20230611042356-b6bf21f0e201
 	github.com/sirupsen/logrus v1.9.3
