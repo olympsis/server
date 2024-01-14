@@ -289,10 +289,6 @@ func (c *Service) CreateClub() http.HandlerFunc {
 func (c *Service) ModifyClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// id := r.Header.Get("clubID") // idk if i should take the id this way
-		// uuid := r.Header.Get("UUID")
-		// role := r.Header.Get("clubRole")
-
 		// Grab club id from path and validate it
 		id := mux.Vars(r)["id"]
 		valid := utils.ValidateClubID(id)
@@ -366,9 +362,6 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 // Deletes a club
 func (c *Service) DeleteClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// uuid := r.Header.Get("UUID")
-		// role := r.Header.Get("clubRole")
 
 		// Grab club id from path and validate it
 		id := mux.Vars(r)["id"]
