@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"time"
@@ -399,6 +400,10 @@ Returns:
 */
 func (p *Service) AddLike() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// grab uuid of the user who made this request
+		uuid := r.Header.Get("UUID")
+
 		// grab id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
@@ -407,29 +412,32 @@ func (p *Service) AddLike() http.HandlerFunc {
 			return
 		}
 
-		var req models.Like
-		// decode request
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			p.Logger.Error("failed to decode post: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to decode post" }`, http.StatusBadRequest)
-			return
+		like := models.Like{
+			ID:        primitive.NewObjectID(),
+			UUID:      uuid,
+			CreatedAt: time.Now().Unix(),
 		}
-		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
 
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		change := bson.M{"$push": bson.M{"likes": req}}
+		filter := bson.M{"_id": oid, "likes.uuid": bson.M{"$ne": uuid}}
+		change := bson.M{
+			"$push": bson.M{
+				"likes": like,
+			},
+		}
 
-		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
-		if err != nil {
+		resp, err := p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
+		if err != nil { // unexpected error
 			p.Logger.Error("failed to add like: ", err.Error())
 			http.Error(rw, `{ "msg" : "failed to add like" }`, http.StatusInternalServerError)
 			return
+		} else if resp.ModifiedCount != 1 { // the like already exits
+			rw.WriteHeader(http.StatusOK)
+			return
+		} else { // newly created like
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
 		}
-
-		rw.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -495,6 +503,10 @@ Returns:
 */
 func (p *Service) AddComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// grab uuid of the user who made this request
+		uuid := r.Header.Get("UUID")
+
 		// grab id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
@@ -514,7 +526,9 @@ func (p *Service) AddComment() http.HandlerFunc {
 
 		newID := primitive.NewObjectID()
 		timestamp := time.Now().Unix()
+
 		req.ID = &newID
+		req.UUID = &uuid
 		req.CreatedAt = &timestamp
 
 		oid, _ := primitive.ObjectIDFromHex(id)
@@ -524,11 +538,12 @@ func (p *Service) AddComment() http.HandlerFunc {
 		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
 		if err != nil {
 			p.Logger.Error("failed to update post: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to update post" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "failed to update post" }`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, req.ID.Hex())))
 	}
 }
 
