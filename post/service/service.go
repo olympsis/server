@@ -229,6 +229,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 					Title: org.Name,
 					Body:  "New announcement!",
 					Topic: club.ID.Hex(),
+					Data:  post,
 				}
 				p.NotifService.SendNotificationToTopic(&note)
 			}
@@ -260,6 +261,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				Title: club.Name,
 				Body:  user.Username + " created a post!",
 				Topic: club.ID.Hex(),
+				Data:  post,
 			}
 			p.NotifService.SendNotificationToTopic(&note)
 		}
