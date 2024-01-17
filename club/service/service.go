@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/utils"
@@ -832,6 +833,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
+		ctx := context.Background()
 
 		// Grab club id from path and validate it
 		id := mux.Vars(r)["id"]
@@ -843,7 +845,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			c.Logger.Error(err.Error())
+			c.Logger.Error("failed to convert club id: ", err.Error())
 			http.Error(rw, "failed to convert club id", http.StatusBadRequest)
 			return
 		}
@@ -872,24 +874,32 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		// create club application in database
 		_, err = c.Database.ClubApplicationCol.InsertOne(context.Background(), app)
 		if err != nil {
-			c.Logger.Error(err.Error())
+			c.Logger.Error("failed to create application: ", err.Error())
 			http.Error(rw, "failed to create application", http.StatusInternalServerError)
 			return
 		}
 
+		// find club info after successful application creation
+		var club models.Club
+		err = c.Database.ClubCol.FindOne(ctx, bson.M{"_id": oid}).Decode(&club)
+		if err != nil {
+			c.Logger.Error("failed to find club: ", err.Error())
+			http.Error(rw, "failed to create application", http.StatusInternalServerError)
+		}
+
 		// notify admins
 		note := notif.Notification{
-			Title: "New Club Application",
+			Title: fmt.Sprintf("[%s]New Application", club.Name),
 			Body:  "You have a new club application",
 			Topic: app.ClubID.Hex() + "_admin",
 		}
 		err = c.NotifService.SendNotificationToTopic(&note)
 		if err != nil {
-			c.Logger.Error(err.Error())
+			c.Logger.Error(fmt.Sprintf("failed to notify %s's admins: %s", club.ID.Hex(), err.Error()))
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(app)
+		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s"}`, app.ID.Hex())))
 	}
 }
 
@@ -966,9 +976,8 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			filter := bson.M{"_id": aoid}
 			err = c.Database.ClubApplicationCol.FindOne(context.TODO(), filter).Decode(&app)
 			if err != nil {
-				c.Logger.Error(err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+				c.Logger.Error("failed to find application: ", err.Error())
+				http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 				return
 			}
 
@@ -980,9 +989,8 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				change := bson.M{"$set": bson.M{"status": req.Status}}
 				_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
 				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+					c.Logger.Error("failed to update application: ", err.Error())
+					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 					return
 				}
 
@@ -991,9 +999,8 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				change = bson.M{"$push": bson.M{"clubs": oid}}
 				_, err = c.Database.UserCol.UpdateOne(context.TODO(), filter, change)
 				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+					c.Logger.Error("failed to add club to user data: ", err.Error())
+					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 					return
 				}
 
@@ -1009,9 +1016,8 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				change = bson.M{"$push": bson.M{"members": member}}
 				_, err = c.Database.ClubCol.UpdateOne(context.TODO(), filter, change)
 				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+					c.Logger.Error("failed to update club: ", err.Error())
+					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 					return
 				}
 
@@ -1019,9 +1025,8 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				var club models.Club
 				err = c.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+					c.Logger.Error("failed to find club: ", err.Error())
+					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 					return
 				}
 
@@ -1033,18 +1038,16 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 
 				// notify user they were accepted to the club
 				notification := notif.Notification{
-					Title: "Club Application",
-					Body:  club.Name + " accepted your application.",
+					Title: fmt.Sprintf("[%s]Application", club.Name),
+					Body:  club.Name + "Accepted your application!",
+					Data:  club,
 				}
 				c.NotifService.AddTokenToTopic(club.ID.Hex(), usr.UUID)
 				c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
-
-				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusOK)
 				return
 			}
 
-			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusOK)
 			return
 		} else {
@@ -1053,11 +1056,11 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			change := bson.M{"$set": bson.M{"status": req.Status}}
 			_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
 			if err != nil {
-				c.Logger.Error(err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+				c.Logger.Error("failed to update application: " + err.Error())
+				http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 				return
 			}
+
 			rw.WriteHeader(http.StatusOK)
 			return
 		}
