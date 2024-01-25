@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -50,16 +50,8 @@ func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database, n *n
 /*
 Create Event Data (POST)
 
-  - Creates new Event for olympsis
-
-  - Decode request body
-
-  - Create Event data in databse
-
-Returns:
-
-	Http handler
-		- Writes object back to client
+	http handler
+	create an event and add it into the database
 */
 func (e *Service) CreateEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -67,26 +59,27 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req models.Event
+		var req models.EventDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			http.Error(rw, `{ "msg": " `+err.Error()+`" }`, http.StatusBadRequest)
-			e.Logger.Error("Failed to decode request: " + err.Error())
+			e.Logger.Error("failed to decode request: " + err.Error())
+			http.Error(rw, `{ "msg": "failed to decode event" }`, http.StatusBadRequest)
 			return
 		}
 
+		// create timestamp & participant
 		timestamp := time.Now().Unix()
-		participant := models.Participant{
+		participant := models.ParticipantDao{
 			ID:        primitive.NewObjectID(),
 			UUID:      uuid,
 			Status:    "yes",
-			CreatedAt: timestamp,
+			CreatedAt: &timestamp,
 		}
 
-		event := models.Event{
-			ID:              primitive.NewObjectID(),
+		// create event model
+		event := models.EventDao{
 			Type:            req.Type,
-			Poster:          uuid,
+			Poster:          &uuid,
 			Organizers:      req.Organizers,
 			Field:           req.Field,
 			ImageURL:        req.ImageURL,
@@ -97,152 +90,68 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			StopTime:        req.StopTime,
 			MinParticipants: req.MinParticipants,
 			MaxParticipants: req.MaxParticipants,
-			Participants:    []models.Participant{participant},
+			Participants:    &[]models.ParticipantDao{participant},
 			Level:           req.Level,
 			Visibility:      req.Visibility,
 			ExternalLink:    req.ExternalLink,
-			CreatedAt:       timestamp,
+			CreatedAt:       &timestamp,
 		}
 
-		// insert event in database
-		err = e.InsertEvent(context.Background(), &event)
+		// insert event into database
+		id, err := e.InsertEvent(context.Background(), &event)
 		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "failed to insert event", http.StatusInternalServerError)
+			e.Logger.Error("failed to insert event: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to insert event" }`, http.StatusInternalServerError)
 			return
 		}
 
 		// subscribe owner to notifications
-		e.NotifService.CreateTopic(event.ID.Hex())
-		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
+		e.NotifService.CreateTopic(id.Hex())
+		e.NotifService.AddTokenToTopic(id.Hex(), uuid)
+
+		organizers := *event.Organizers
 
 		// notify all of the organizers and their members about this new event
-		for i := range event.Organizers {
-			organizer := event.Organizers[i]
+		for i := range organizers {
+			organizer := organizers[i]
 			note := notif.Notification{
 				Title: "New Event Created",
-				Body:  event.Title,
+				Body:  *event.Title,
 				Topic: organizer.ID.Hex(),
-				Data:  event,
+				Data:  fmt.Sprintf(`"id": "%s"`, id.Hex()),
 			}
 			e.NotifService.SendNotificationToTopic(&note)
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(event)
+		rw.Write([]byte(fmt.Sprintf(`"id": "%s"`, id.Hex())))
 	}
 }
 
 /*
 Get Event (GET)
--	Grab event id from path
--	Grabs event data from database
 
-Returns:
-
-	Http handler
-		- Writes event back to client
+	http handler
+	get an event by it's id
 */
 func (e *Service) GetEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
-
-		// grab event id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no event id found in request" }`))
+			http.Error(rw, `{ "msg": "no/bad event id found in request" }`, http.StatusBadRequest)
 			return
 		}
 
-		// find event data in database
-		var event models.Event
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		err := e.FindEvent(context.TODO(), filter, &event)
+
+		event, err := FindEvent(oid, e.Database)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, "event not found", http.StatusNotFound)
-				return
-			}
+			e.Logger.Error("failed to find event", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 		}
 
-		// find field data in database
-		var field models.Field
-		filter = bson.M{"_id": event.Field.ID}
-		err = e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": event.Field.ID}).Decode(&field)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				e.Logger.Error("Event field not found")
-			}
-		}
-
-		// add user data to participants
-		for ptp := range event.Participants {
-			data, err := e.SearchService.SearchUserByUUID(event.Participants[ptp].UUID)
-			if err != nil {
-				e.Logger.Error(err.Error())
-			}
-			event.Participants[ptp].Data = &data
-		}
-
-		// event data
-		user, err := e.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			e.Logger.Error(err.Error())
-		}
-
-		data := models.EventData{
-			Poster: &user,
-			Field:  &field,
-		}
-		dataClubs := []models.Club{}
-		dataOrganizations := []models.Organization{}
-		clubs := make(map[primitive.ObjectID]models.Club)
-		organizations := make(map[primitive.ObjectID]models.Organization)
-
-		// fetch club/organization data if not in their respective maps
-		for j := range event.Organizers {
-			if event.Organizers[j].Type == "club" {
-				id := event.Organizers[j].ID
-				c, ok := clubs[id]
-				if !ok {
-					var club models.Club
-					err := e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&club)
-					if err != nil {
-						e.Logger.Error(err.Error())
-					} else {
-						clubs[id] = club
-						dataClubs = append(dataClubs, club)
-					}
-				} else {
-					dataClubs = append(dataClubs, c)
-				}
-			} else {
-				id := event.Organizers[j].ID
-				o, ok := organizations[id]
-				if !ok {
-					var org models.Organization
-					err := e.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&org)
-					if err != nil {
-						e.Logger.Error(err.Error())
-					} else {
-						organizations[id] = org
-						dataOrganizations = append(dataOrganizations, org)
-					}
-				} else {
-					dataOrganizations = append(dataOrganizations, o)
-				}
-			}
-		}
-
-		data.Clubs = &dataClubs
-		data.Organizations = &dataOrganizations
-		event.Data = &data
-
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
 	}
@@ -250,12 +159,9 @@ func (e *Service) GetEvent() http.HandlerFunc {
 
 /*
 Get Events (GET)
--	Grabs events from database
 
-Returns:
-
-	Http handler
-		- Writes an array of events back to client
+	http handler
+	gets a list of events by a location
 */
 func (e *Service) GetEventsByLocation() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -269,7 +175,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 
 		// query checking
 		if longitude == 0 || latitude == 0 || radius == 0 || sports == "" || status == "" {
-			http.Error(rw, "missing query param - long/lat/sports/status", http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "missing query param - long/lat/sports/status" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -280,6 +186,9 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
+
+		uuid := r.Header.Get("UUID")
+
 		// fields filter
 		filter := bson.M{
 			"location": bson.M{
@@ -297,8 +206,11 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				http.Error(rw, "no events found", http.StatusNotFound)
+				http.Error(rw, `{ "msg": "no events found" }`, http.StatusNotFound)
 				return
+			} else {
+				e.Logger.Error("failed to find fields", err.Error())
+				http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
 			}
 		}
 
@@ -309,145 +221,27 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			var field models.Field
 			err := cursor.Decode(&field)
 			if err != nil {
-				e.Logger.Error(err.Error())
+				e.Logger.Error("failed to decode field", err.Error())
 			}
 			fieldsIDs = append(fieldsIDs, field.ID)
 		}
 
-		var exists bool
-
-		// status filters
-		if status == "live" {
-			exists = false
-		} else if status == "ended" {
-			exists = true
-		}
-
-		// filter to find events
-		filter = bson.M{
-			"field._id": bson.M{
-				"$in": fieldsIDs,
-			},
-			"sport": bson.M{
-				"$in": splicedSports,
-			},
-			"actual_stop_time": bson.M{
-				"$exists": exists,
-			},
-			"visibility": "public",
-		}
-
-		var events []models.Event
-		err = e.FindEvents(context.Background(), filter, &events)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "field does not exist" }`))
-				return
-			}
-		}
-
-		data := models.EventData{}
-		dataClubs := []models.Club{}
-		dataOrganizations := []models.Organization{}
-
-		// fetch owner data for all events
-		for i := range events {
-
-			fields := make(map[primitive.ObjectID]models.Field)
-			users := make(map[string]models.UserData)
-			clubs := make(map[primitive.ObjectID]models.Club)
-			organizations := make(map[primitive.ObjectID]models.Organization)
-
-			// fetch user data if not in users map
-			u, ok := users[events[i].Poster]
-			if !ok {
-				user, err := e.SearchService.SearchUserByUUID(events[i].Poster)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				} else {
-					users[events[i].Poster] = user
-					data.Poster = &user
-				}
-			} else {
-				data.Poster = &u
-			}
-
-			// fetch fields if we don't have it on the map
-			f, ok := fields[events[i].Field.ID]
-			if !ok {
-				var field models.Field
-				err = e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": events[i].Field.ID}).Decode(&field)
-				if err != nil {
-					e.Logger.Error("Failed to fetch field:" + err.Error())
-				} else {
-					fields[field.ID] = field
-					data.Field = &field
-				}
-			} else {
-				data.Field = &f
-			}
-
-			// fetch club/organization data if not in their respective maps
-			for j := range events[i].Organizers {
-				if events[i].Organizers[j].Type == "club" {
-					id := events[i].Organizers[j].ID
-					c, ok := clubs[id]
-					if !ok {
-						var club models.Club
-						err := e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&club)
-						if err != nil {
-							e.Logger.Error(err.Error())
-						} else {
-							clubs[id] = club
-							dataClubs = append(dataClubs, club)
-						}
-					} else {
-						dataClubs = append(dataClubs, c)
-					}
-				} else {
-					id := events[i].Organizers[j].ID
-					o, ok := organizations[id]
-					if !ok {
-						var org models.Organization
-						err := e.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&org)
-						if err != nil {
-							e.Logger.Error(err.Error())
-						} else {
-							organizations[id] = org
-							dataOrganizations = append(dataOrganizations, org)
-						}
-					} else {
-						dataOrganizations = append(dataOrganizations, o)
-					}
-				}
-			}
-
-			data.Clubs = &dataClubs
-			data.Organizations = &dataOrganizations
-			events[i].Data = &data
-
-			// add user data to participants
-			for ptp := range events[i].Participants {
-				data, err := e.SearchService.SearchUserByUUID(events[i].Participants[ptp].UUID)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				}
-				events[i].Participants[ptp].Data = &data
-			}
-		}
-
-		if len(events) == 0 {
-			http.Error(rw, "no events", http.StatusNoContent)
+		// find the events
+		events, err := FindEvents(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
+		if err != nil { // unexpected error
+			e.Logger.Error("failed to find events", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 			return
 		}
-
+		if len(*events) == 0 { // no content error
+			http.Error(rw, `{ "msg": "no events found" }`, http.StatusNoContent)
+			return
+		}
 		resp := models.EventsResponse{
-			TotalEvents: len(events),
-			Events:      events,
+			TotalEvents: len(*events),
+			Events:      *events,
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
@@ -455,151 +249,9 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 
 /*
 Get Events (GET)
-- 	Grabs events by club ID
 
-Returns:
-
-	Http handler
-		- Writes an array of events back to client
-*/
-func (e *Service) GetEventsByClub() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no club Id found in request." }`))
-			return
-		}
-		id := vars["id"]
-		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"club_id": oid}
-
-		var events []models.Event
-		err := e.FindEvents(context.Background(), filter, &events)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "club does not exist" }`))
-				return
-			}
-		}
-
-		var club models.Club
-		fields := make(map[primitive.ObjectID]models.Field)
-		users := make(map[string]models.UserData)
-		clubs := make(map[primitive.ObjectID]models.Club)
-		organizations := make(map[primitive.ObjectID]models.Organization)
-
-		e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
-
-		data := models.EventData{}
-		dataClubs := []models.Club{club}
-		dataOrganizations := []models.Organization{}
-
-		for i := range events {
-
-			// fetch user data if not in users map
-			u, ok := users[events[i].Poster]
-			if !ok {
-				user, err := e.SearchService.SearchUserByUUID(events[i].Poster)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				} else {
-					users[events[i].Poster] = user
-					data.Poster = &user
-				}
-			} else {
-				data.Poster = &u
-			}
-
-			// fetch fields if we don't have it on the map
-			f, ok := fields[events[i].Field.ID]
-			if !ok {
-				var field models.Field
-				err = e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": events[i].Field.ID}).Decode(&field)
-				if err != nil {
-					e.Logger.Error("Failed to fetch field:" + err.Error())
-				} else {
-					fields[field.ID] = field
-					data.Field = &field
-				}
-			} else {
-				data.Field = &f
-			}
-
-			// fetch club/organization data if not in their respective maps
-			for j := range events[i].Organizers {
-				if events[i].Organizers[j].Type == "club" {
-					id := events[i].Organizers[j].ID
-					c, ok := clubs[id]
-					if !ok {
-						var club models.Club
-						err := e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&club)
-						if err != nil {
-							e.Logger.Error(err.Error())
-						} else {
-							clubs[id] = club
-							dataClubs = append(dataClubs, club)
-						}
-					} else {
-						dataClubs = append(dataClubs, c)
-					}
-				} else {
-					id := events[i].Organizers[j].ID
-					o, ok := organizations[id]
-					if !ok {
-						var org models.Organization
-						err := e.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&org)
-						if err != nil {
-							e.Logger.Error(err.Error())
-						} else {
-							organizations[id] = org
-							dataOrganizations = append(dataOrganizations, org)
-						}
-					} else {
-						dataOrganizations = append(dataOrganizations, o)
-					}
-				}
-			}
-
-			data.Clubs = &dataClubs
-			data.Organizations = &dataOrganizations
-			events[i].Data = &data
-
-			// add user data to participants
-			for ptp := range events[i].Participants {
-				data, err := e.SearchService.SearchUserByUUID(events[i].Participants[ptp].UUID)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				}
-				events[i].Participants[ptp].Data = &data
-			}
-		}
-
-		if len(events) == 0 {
-			http.Error(rw, "no events", http.StatusNoContent)
-			return
-		}
-
-		resp := models.EventsResponse{
-			TotalEvents: len(events),
-			Events:      events,
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
-	}
-}
-
-/*
-Get Events (GET)
-- 	Grabs events by club ID
-
-Returns:
-
-	Http handler
-		- Writes an array of events back to client
+	http handler
+	gets a list of events by a field id
 */
 func (e *Service) GetEventsByField() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -608,114 +260,26 @@ func (e *Service) GetEventsByField() http.HandlerFunc {
 		id := vars["id"]
 		if len(id) < 24 {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no field Id found in request." }`))
+			rw.Write([]byte(`{ "msg": "no field id found in request." }`))
 			return
 		}
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"field_id": oid}
-
-		var events []models.Event
-		err := e.FindEvents(context.Background(), filter, &events)
+		events, err := FindEventsByField(oid, 100, e.Database)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "field does not exist" }`))
-				return
-			}
+			e.Logger.Error("failed to find events", err.Error())
+			http.Error(rw, `{ "msg": "failed to find events"}`, http.StatusInternalServerError)
+			return
 		}
-
-		var field models.Field
-		users := make(map[string]models.UserData)
-		clubs := make(map[primitive.ObjectID]models.Club)
-		organizations := make(map[primitive.ObjectID]models.Organization)
-
-		err = e.Database.FieldCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&field)
-		if err != nil {
-			e.Logger.Error("Failed to fetch field: " + err.Error())
-		}
-
-		data := models.EventData{
-			Field: &field,
-		}
-		dataClubs := []models.Club{}
-		dataOrganizations := []models.Organization{}
-
-		for i := range events {
-
-			// fetch user data if not in users map
-			u, ok := users[events[i].Poster]
-			if !ok {
-				user, err := e.SearchService.SearchUserByUUID(events[i].Poster)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				} else {
-					users[events[i].Poster] = user
-					data.Poster = &user
-				}
-			} else {
-				data.Poster = &u
-			}
-
-			// fetch club/organization data if not in their respective maps
-			for j := range events[i].Organizers {
-				if events[i].Organizers[j].Type == "club" {
-					id := events[i].Organizers[j].ID
-					c, ok := clubs[id]
-					if !ok {
-						var club models.Club
-						err := e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&club)
-						if err != nil {
-							e.Logger.Error(err.Error())
-						} else {
-							clubs[id] = club
-							dataClubs = append(dataClubs, club)
-						}
-					} else {
-						dataClubs = append(dataClubs, c)
-					}
-				} else {
-					id := events[i].Organizers[j].ID
-					o, ok := organizations[id]
-					if !ok {
-						var org models.Organization
-						err := e.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&org)
-						if err != nil {
-							e.Logger.Error(err.Error())
-						} else {
-							organizations[id] = org
-							dataOrganizations = append(dataOrganizations, org)
-						}
-					} else {
-						dataOrganizations = append(dataOrganizations, o)
-					}
-				}
-			}
-
-			data.Clubs = &dataClubs
-			data.Organizations = &dataOrganizations
-			events[i].Data = &data
-
-			// add user data to participants
-			for ptp := range events[i].Participants {
-				data, err := e.SearchService.SearchUserByUUID(events[i].Participants[ptp].UUID)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				}
-				events[i].Participants[ptp].Data = &data
-			}
-		}
-
-		if len(events) == 0 {
-			http.Error(rw, "no events", http.StatusNoContent)
+		if len(*events) == 0 {
+			http.Error(rw, `{ "msg": "no events found" }`, http.StatusNoContent)
 			return
 		}
 
 		resp := models.EventsResponse{
-			TotalEvents: len(events),
-			Events:      events,
+			TotalEvents: len(*events),
+			Events:      *events,
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
@@ -724,35 +288,25 @@ func (e *Service) GetEventsByField() http.HandlerFunc {
 /*
 Update Event (UPDATE)
 
-  - grab event id from path
-
-  - decode request body
-
-  - update document
-
-Returns:
-
-	Http handler
-		- write back ok to client
+	http handler
+	updates an event in the database
 */
 func (e *Service) UpdateAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// grab event id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no event Id found in request." }`))
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{ "msg": "no event Id found in request." }`, http.StatusInternalServerError)
 			return
 		}
-		id := vars["id"]
 
 		// decode request
-		var req models.Event
+		var req models.EventDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			http.Error(rw, `{ "msg": "failed to decode user" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -761,25 +315,25 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		changes := bson.M{}
 		updates := bson.M{"$set": changes}
 
-		if req.Title != "" {
+		if req.Title != nil {
 			changes["title"] = req.Title
 		}
-		if req.Body != "" {
+		if req.Body != nil {
 			changes["body"] = req.Body
 		}
-		if req.ImageURL != "" {
+		if req.ImageURL != nil {
 			changes["image_url"] = req.ImageURL
 		}
-		if req.StartTime != 0 {
+		if req.StartTime != nil {
 			changes["start_time"] = req.StartTime
 		}
-		if req.ActualStartTime != 0 {
+		if req.ActualStartTime != nil {
 			changes["actual_start_time"] = req.ActualStartTime
 		}
-		if req.ActualStopTime != 0 {
+		if req.ActualStopTime != nil {
 			changes["actual_stop_time"] = req.ActualStopTime
 		}
-		if req.Visibility != "" {
+		if req.Visibility != nil {
 			changes["visibility"] = req.Visibility
 		}
 
@@ -788,86 +342,83 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		changes["level"] = req.Level
 		changes["external_link"] = req.ExternalLink
 
-		if req.StopTime == 0 {
+		if req.StopTime == nil {
 			updates["$unset"] = bson.M{"stop_time": 1}
 		} else {
 			changes["stop_time"] = req.StopTime
 		}
 
-		var event models.Event
-
-		err = e.UpdateEvent(context.Background(), filter, updates, &event)
+		err = e.UpdateEvent(context.Background(), filter, updates)
 		if err != nil {
-			e.Logger.Error(err)
-			http.Error(rw, "failed to update event", http.StatusInternalServerError)
+			e.Logger.Error("failed to find event", err.Error())
+			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
+			return
+		}
+
+		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
+		if err != nil {
+			e.Logger.Error("failed to find event", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 			return
 		}
 
 		// notify participants
-		if req.ActualStartTime != 0 {
+		if req.ActualStartTime != nil {
 			// notify participants that the event is starting
 			note := notif.Notification{
-				Title: event.Title,
+				Title: *event.Title,
 				Body:  "Event is starting",
-				Topic: event.ID.Hex(),
+				Topic: id,
 			}
 			e.NotifService.SendNotificationToTopic(&note)
 
-		} else if req.ActualStopTime != 0 {
+		} else if req.ActualStopTime != nil {
 			// notify participants that the event ended
 			note := notif.Notification{
-				Title: event.Title,
+				Title: *event.Title,
 				Body:  "Event ended",
-				Topic: event.ID.Hex(),
+				Topic: id,
 			}
 			e.NotifService.SendNotificationToTopic(&note)
-			e.NotifService.DeleteTopic(event.ID.Hex())
+			e.NotifService.DeleteTopic(id)
 
 		} else {
 			// notify participants that the details changes
 			note := notif.Notification{
-				Title: event.Title,
+				Title: *event.Title,
 				Body:  "Event details has changed",
-				Topic: event.ID.Hex(),
+				Topic: id,
 			}
 			e.NotifService.SendNotificationToTopic(&note)
 
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(&event)
 	}
 }
 
 /*
 Delete Event Data (Delete)
 
-  - Updates event data
-
-  - Grab parameters and update
-
-Returns:
-
-	Http handler
-		- Writes OK  back to client
+	http handler
+	deletes an event from the database
 */
 func (e *Service) DeleteAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
-		id := vars["id"]
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
 		err := e.DeleteEvent(context.Background(), filter)
 		if err != nil {
-			e.Logger.Debug(err.Error())
-			http.Error(rw, "failed to delete event", http.StatusInternalServerError)
+			e.Logger.Error("failed to delete event", err.Error())
+			http.Error(rw, `{ "msg": "failed to delete event" }`, http.StatusInternalServerError)
 		}
 
 		// delete notification topic
@@ -879,16 +430,9 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 /*
 Add Participant (POST)
 
-  - grab event id from path
-
-  - decode body
-
-  - add participant to event
-
-Returns:
-
-	Http handler
-		- Writes back participant object to client
+	http handler
+	adds a participant to an event
+	adds a participant to an event's topic
 */
 func (e *Service) AddParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -897,94 +441,85 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 
 		// grab id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `"msg": "bad event id" `, http.StatusBadRequest)
 			return
 		}
-		id := vars["id"]
 
-		var req models.Participant
 		// decode request
+		var req models.ParticipantDao
 		json.NewDecoder(r.Body).Decode(&req)
 
-		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
-
 		oid, _ := primitive.ObjectIDFromHex(id)
+		timestamp := time.Now().Unix()
 
 		// find event data in database
-		var event models.Event
 		filter := bson.M{"_id": oid}
-		err := e.FindEvent(context.Background(), filter, &event)
+		event, err := e.FindEvent(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				http.Error(rw, "event not found", http.StatusNotFound)
+				http.Error(rw, `{ "msg": "event not found" }`, http.StatusNotFound)
 				return
 			}
+			e.Logger.Error("failed to find event", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+			return
 		}
 
 		// check if participant already exists
-		for i := range event.Participants {
-			if event.Participants[i].UUID == uuid {
+		particpants := *event.Participants
+		for i := range particpants {
+			if particpants[i].UUID == uuid {
 				rw.WriteHeader(http.StatusOK)
-				json.NewEncoder(rw).Encode(event.Participants[i])
 				return
 			}
 		}
 
 		// if event is full
-		if event.MaxParticipants != 0 {
-			if len(event.Participants) >= int(event.MaxParticipants) {
-				errResponse := models.FullEventError{
-					MSG:   "event capacity is full",
-					Event: event,
-				}
-
-				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusConflict)
-				json.NewEncoder(rw).Encode(errResponse)
+		if *event.MaxParticipants != 0 {
+			if len(particpants) >= int(*event.MaxParticipants) {
+				http.Error(rw, `{ "msg": "event capacity is full" }`, http.StatusBadRequest)
 				return
 			}
 		}
 
 		// participant object
-		part := &models.Participant{
+		part := &models.ParticipantDao{
 			ID:        primitive.NewObjectID(),
 			UUID:      uuid,
 			Status:    req.Status,
-			CreatedAt: time.Now().Unix(),
+			CreatedAt: &timestamp,
 		}
-
 		change := bson.M{"$push": bson.M{"participants": part}}
-		err = e.UpdateEvent(context.Background(), filter, change, &event)
+		err = e.UpdateEvent(context.Background(), filter, change)
 		if err != nil {
-			e.Logger.Error(err.Error())
+			e.Logger.Error("failed to update event", err.Error())
 			http.Error(rw, "failed to update event", http.StatusInternalServerError)
 			return
 		}
 
-		// subscribe user to notifications
-		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
+		// notify all participants
+		notif := notif.Notification{
+			Title: *event.Title,
+			Body:  "New Participant RSVP'd!",
+			Topic: id,
+		}
+		e.NotifService.SendNotificationToTopic(&notif)
 
-		rw.Header().Set("Content-Type", "application/json")
+		// subscribe user to notifications
+		e.NotifService.AddTokenToTopic(id, uuid)
+
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(event)
 	}
 }
 
 /*
 Remove Participant (DELETE)
 
-  - grab event id from path
-
-  - grab participant id from path
-
-  - pull participant from event
-
-Returns:
-
-	Http handler
-		- Writes back OK to client
+	http handler
+	removes participant from the event object
+	removes participant from the event topic
 */
 func (e *Service) RemoveParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
@@ -993,179 +528,90 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 
 		// grab id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
-		id := vars["id"]
 
 		partId := vars["participantID"]
-
 		oid, _ := primitive.ObjectIDFromHex(id)
 		poid, _ := primitive.ObjectIDFromHex(partId)
 
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"participants": bson.M{"_id": poid}}}
 
-		var event models.Event
-		err := e.UpdateEvent(context.Background(), match, change, &event)
+		err := e.UpdateEvent(context.Background(), match, change)
 		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, "failed to update event", http.StatusInternalServerError)
+			e.Logger.Error("failed to update event: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
 			return
 		}
 
 		// unsubscribe user from notifications
-		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), uuid)
-
+		e.NotifService.RemoveTokenFromTopic(id, uuid)
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(event)
 	}
 }
 
 /*
-Subscribe to event (POST)
+Notify Event Participants (POST)
 
-  - grab uuid from token
-
-Returns:
-
-	Http handler
-		- Writes back OK to client
-*/
-func (e *Service) SubscribeToEvent() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		uuid := r.Header.Get("UUID")
-
-		// grab id from path
-		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
-			return
-		}
-		id := vars["id"]
-
-		oid, _ := primitive.ObjectIDFromHex(id)
-
-		// fetch event
-		var event models.Event
-		filter := bson.M{"_id": oid}
-		err := e.FindEvent(context.Background(), filter, &event)
-		if err != nil {
-			http.Error(rw, "event not found", http.StatusNotFound)
-			return
-		}
-
-		// subscribe user to notifications
-		e.NotifService.AddTokenToTopic(event.ID.Hex(), uuid)
-	}
-}
-
-/*
-Unsubscribe from event (POST)
-
-  - grab uuid from token
-
-Returns:
-
-	Http handler
-		- Writes back OK to client
-*/
-func (e *Service) UnsubscribeFromEvent() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		uuid := r.Header.Get("UUID")
-
-		// grab id from path
-		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
-			return
-		}
-		id := vars["id"]
-
-		oid, _ := primitive.ObjectIDFromHex(id)
-
-		// fetch event
-		var event models.Event
-		filter := bson.M{"_id": oid}
-		err := e.FindEvent(context.Background(), filter, &event)
-		if err != nil {
-			http.Error(rw, "event not found", http.StatusNotFound)
-			return
-		}
-
-		// unsubscribe user from notifications
-		e.NotifService.RemoveTokenFromTopic(event.ID.Hex(), uuid)
-
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(event)
-	}
-}
-
-/*
-Notify Event Participants
-
-  - Notifies all of event's participants
+	http handler
+	sends a custom notification to the event's participants
 */
 func (e *Service) NotifyParticipants() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// grab id from path
 		vars := mux.Vars(r)
-		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
-
-		id := vars["id"]
 
 		// decode request
 		var req notif.Notification
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			e.Logger.Error("failed to decode notification", err.Error())
+			http.Error(rw, `{ "msg": "failed to decode notification" }`, http.StatusInternalServerError)
 			return
 		}
 
 		req.Topic = id
-
 		e.NotifService.SendNotificationToTopic(&req)
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 	}
 }
 
 /*
-Notify Club members
+Notify Club members (POST)
 
-  - Notifies all of club members about event and to RSVP
+	http handler
+	notifies all club members of an event
 */
 func (e *Service) NotifyClubMembers() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
+		id := vars["id"]
 		if len(vars["id"]) < 24 {
-			http.Error(rw, "bad event id", http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
-
-		id := vars["id"]
 
 		// decode request
 		var req notif.Notification
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusInternalServerError)
 			return
 		}
 
 		req.Topic = id
-
 		e.NotifService.SendNotificationToTopic(&req)
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -1213,11 +659,10 @@ func (e *Service) Location() http.HandlerFunc {
 			},
 		}
 
-		clubs := utils.NewSafeClub()
-		organizations := utils.NewSafeOrganization()
+		uuid := r.Header.Get("UUID")
+
 		fields := utils.NewSafeFields()
 		fieldsArr := []models.Field{}
-		users := utils.NewSafeUsers()
 		// timestamp := time.Now().Unix()
 
 		// fetch the nearby fields
@@ -1251,131 +696,15 @@ func (e *Service) Location() http.HandlerFunc {
 			return
 		}
 
-		var exists bool
-
-		// status filters
-		if status == "live" {
-			exists = false
-		} else if status == "ended" {
-			exists = true
-		}
-
-		// filter to find events
-		filter = bson.M{
-			"field._id": bson.M{
-				"$in": fieldsIDs,
-			},
-			"sport": bson.M{
-				"$in": splicedSports,
-			},
-			// "stop_time": bson.M{
-			// 	"$gt": timestamp,
-			// },
-			"actual_stop_time": bson.M{
-				"$exists": exists,
-			},
-			"visibility": "public",
-		}
-
-		var events []models.Event
-		err = e.FindEvents(context.Background(), filter, &events)
+		events, err := FindEvents(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`{ "msg": "field does not exist" }`))
-				return
-			}
+			e.Logger.Error("failed to find events", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+			return
 		}
-
-		var wg sync.WaitGroup
-
-		// fetch owner data for all events
-		for i := range events {
-
-			data := models.EventData{}
-			dataClubs := []models.Club{}
-			dataOrganizations := []models.Organization{}
-
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-
-				// fetch user data if not in users map
-				user := users.FindUser(events[i].Poster)
-				if user == nil {
-					user, err := e.SearchService.SearchUserByUUID(events[i].Poster)
-					if err != nil {
-						e.Logger.Error(err.Error())
-					} else {
-						users.AddUser(&user)
-						data.Poster = &user
-					}
-				}
-
-				// fetch club/organization data if not in their respective maps
-				for j := range events[i].Organizers {
-					organizer := events[i].Organizers[j]
-					if organizer.Type == "club" {
-						id := organizer.ID
-						c := clubs.FindClub(id)
-						if c == nil {
-							var club models.Club
-							err := e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&club)
-							if err != nil {
-								e.Logger.Error(err.Error())
-							} else {
-								clubs.AddClub(&club)
-								dataClubs = append(dataClubs, club)
-							}
-						} else {
-							dataClubs = append(dataClubs, *c)
-						}
-					} else if organizer.Type == "organization" {
-						id := organizer.ID
-						o := organizations.FindOrganization(id)
-						if o == nil {
-							var org models.Organization
-							err := e.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": id}).Decode(&org)
-							if err != nil {
-								e.Logger.Error(err.Error())
-							} else {
-								organizations.AddOrganization(&org)
-								dataOrganizations = append(dataOrganizations, org)
-							}
-						} else {
-							dataOrganizations = append(dataOrganizations, *o)
-						}
-					}
-				}
-
-				data := models.EventData{
-					Poster:        user,
-					Field:         fields.FindField(events[i].Field.ID),
-					Clubs:         &dataClubs,
-					Organizations: &dataOrganizations,
-				}
-				events[i].Data = &data
-			}(i)
-
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-				// add user data to participants
-				for ptp := range events[i].Participants {
-					data, err := e.SearchService.SearchUserByUUID(events[i].Participants[ptp].UUID)
-					if err != nil {
-						e.Logger.Error(err.Error())
-					}
-					events[i].Participants[ptp].Data = &data
-				}
-			}(i)
-		}
-
-		wg.Wait()
-
 		resp := models.LocationResponse{
 			Fields: &fieldsArr,
-			Events: &events,
+			Events: events,
 		}
 
 		rw.Header().Set("Content-Type", "application/json")

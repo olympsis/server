@@ -4,49 +4,52 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Insert new event into database
-func (s *Service) InsertEvent(ctx context.Context, event *models.Event) error {
-	s.Database.EventCol.InsertOne(ctx, event)
-	return nil
+func (s *Service) InsertEvent(ctx context.Context, event *models.EventDao) (*primitive.ObjectID, error) {
+	resp, err := s.Database.EventCol.InsertOne(ctx, event)
+	if err != nil {
+		return nil, err
+	}
+	return resp.InsertedID.(*primitive.ObjectID), err
 }
 
 // Get event from database
-func (s *Service) FindEvent(ctx context.Context, filter interface{}, event *models.Event) error {
-	s.Database.EventCol.FindOne(ctx, filter).Decode(&event)
-	return nil
+func (s *Service) FindEvent(ctx context.Context, filter interface{}) (*models.EventDao, error) {
+	var event models.EventDao
+	err := s.Database.EventCol.FindOne(ctx, filter).Decode(&event)
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
 }
 
 // get events from database
-func (s *Service) FindEvents(ctx context.Context, filter interface{}, events *[]models.Event) error {
+func (s *Service) FindEvents(ctx context.Context, filter interface{}) (*[]models.EventDao, error) {
+	var events []models.EventDao
 	cursor, err := s.Database.EventCol.Find(ctx, filter)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for cursor.Next(context.TODO()) {
-		var event models.Event
+		var event models.EventDao
 		err := cursor.Decode(&event)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		*events = append(*events, event)
+		events = append(events, event)
 	}
-	return nil
+	return &events, nil
 }
 
 // update user in database
-func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}, event *models.Event) error {
+func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}) error {
 
 	// update user
 	_, err := s.Database.EventCol.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	// find and return updated user
-	err = s.FindEvent(ctx, filter, event)
 	if err != nil {
 		return err
 	}
@@ -55,16 +58,10 @@ func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update in
 }
 
 // update event in database
-func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}, events *[]models.Event) error {
+func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}) error {
 
 	// update event
 	_, err := s.Database.EventCol.UpdateMany(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	// find updated users
-	err = s.FindEvents(ctx, filter, events)
 	if err != nil {
 		return err
 	}

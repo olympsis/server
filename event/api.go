@@ -45,15 +45,6 @@ func (e *EventAPI) Ready() {
 		),
 	).Methods("GET")
 
-	// get events by club
-	e.Router.Handle("/events/club/{id}",
-		middleware.Chain(
-			e.Service.GetEventsByClub(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("GET")
-
 	// get events by field
 	e.Router.Handle("/events/field/{id}",
 		middleware.Chain(
@@ -124,24 +115,6 @@ func (e *EventAPI) Ready() {
 	/*
 		EVENT NOTIFICATIONS
 	*/
-
-	// subscribe to event notifications
-	e.Router.Handle("/events/{id}/subscribe",
-		middleware.Chain(
-			e.Service.SubscribeToEvent(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("POST")
-
-	// unsubscribe from event notifications
-	e.Router.Handle("/events/{id}/unsubscribe",
-		middleware.Chain(
-			e.Service.UnsubscribeFromEvent(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("POST")
 
 	// notify participants
 	e.Router.Handle("/events/{id}/notify/participants",
