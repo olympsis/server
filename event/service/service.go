@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/olympsis/notif"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -25,26 +24,17 @@ import (
 Event Service Struct
 */
 type Service struct {
-	Database *database.Database
-
-	// logrus logger to Logger information about service and errors
-	Logger *logrus.Logger
-
-	// mux Router to complete http requests
-	Router *mux.Router
-
-	// notif service
-	NotifService *notif.Service
-
-	// search service
-	SearchService *search.Service
+	Database     *database.Database // database for read/write operations
+	Logger       *logrus.Logger     // logger for logging errors
+	Router       *mux.Router        // router for handling incoming requests
+	NotifService *notif.Service     // notification service for notifying users
 }
 
 /*
-Create new field service struct
+Create new event service struct
 */
-func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
+func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, NotifService: n}
 }
 
 /*
@@ -124,7 +114,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(fmt.Sprintf(`"id": "%s"`, id.Hex())))
+		rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, id.Hex())))
 	}
 }
 
@@ -201,7 +191,6 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 				"$in": splicedSports,
 			},
 		}
-
 		// fetch the nearby fields
 		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
 		if err != nil {
@@ -230,7 +219,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		events, err := FindEvents(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
 		if err != nil { // unexpected error
 			e.Logger.Error("failed to find events", err.Error())
-			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
 			return
 		}
 		if len(*events) == 0 { // no content error
@@ -534,12 +523,9 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			return
 		}
 
-		partId := vars["participantID"]
 		oid, _ := primitive.ObjectIDFromHex(id)
-		poid, _ := primitive.ObjectIDFromHex(partId)
-
 		match := bson.M{"_id": oid}
-		change := bson.M{"$pull": bson.M{"participants": bson.M{"_id": poid}}}
+		change := bson.M{"$pull": bson.M{"participants": bson.M{"uuid": uuid}}}
 
 		err := e.UpdateEvent(context.Background(), match, change)
 		if err != nil {
@@ -660,10 +646,8 @@ func (e *Service) Location() http.HandlerFunc {
 		}
 
 		uuid := r.Header.Get("UUID")
-
 		fields := utils.NewSafeFields()
 		fieldsArr := []models.Field{}
-		// timestamp := time.Now().Unix()
 
 		// fetch the nearby fields
 		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)

@@ -13,7 +13,8 @@ func (s *Service) InsertEvent(ctx context.Context, event *models.EventDao) (*pri
 	if err != nil {
 		return nil, err
 	}
-	return resp.InsertedID.(*primitive.ObjectID), err
+	id := resp.InsertedID.(primitive.ObjectID)
+	return &id, err
 }
 
 // Get event from database

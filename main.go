@@ -52,7 +52,7 @@ func main() {
 	fieldAPI := field.NewFieldAPI(l, r, d)
 	clubAPI := club.NewClubAPI(l, r, d, n, sh)
 	postAPI := post.NewPostAPI(l, r, d, n, sh)
-	eventAPI := event.NewEventAPI(l, r, d, n, sh)
+	eventAPI := event.NewEventAPI(l, r, d, n)
 	storageAPI := storage.NewStorageAPI(l, r, d)
 	organizationAPI := organization.NewOrganizationAPI(l, r, d, n, sh)
 

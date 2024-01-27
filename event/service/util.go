@@ -139,23 +139,25 @@ func FindEvent(id primitive.ObjectID, database *database.Database) (*models.Even
 
 	// clean up data
 	projectPipeline := bson.M{
-		"_poster":                         0,
-		"poster._id":                      0,
-		"poster.clubs":                    0,
-		"poster.sports":                   0,
-		"poster.visibility":               0,
-		"poster.device_token":             0,
-		"poster.organizations":            0,
-		"participants.uuid":               0,
-		"participants.user._id":           0,
-		"participants.user.clubs":         0,
-		"participants.user.sports":        0,
-		"participants.user.visibility":    0,
-		"participants.user.device_token":  0,
-		"participants.user.organizations": 0,
-		"_participants":                   0,
-		"clubs.members":                   0,
-		"organizations.managers":          0,
+		"$project": bson.M{
+			"_poster":                         0,
+			"poster._id":                      0,
+			"poster.clubs":                    0,
+			"poster.sports":                   0,
+			"poster.visibility":               0,
+			"poster.device_token":             0,
+			"poster.organizations":            0,
+			"participants.uuid":               0,
+			"participants.user._id":           0,
+			"participants.user.clubs":         0,
+			"participants.user.sports":        0,
+			"participants.user.visibility":    0,
+			"participants.user.device_token":  0,
+			"participants.user.organizations": 0,
+			"_participants":                   0,
+			"clubs.members":                   0,
+			"organizations.managers":          0,
+		},
 	}
 
 	// complete pipeline
@@ -202,19 +204,17 @@ func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, loc
 		"$match": bson.M{
 			"$or": bson.A{
 				bson.M{
-					"field_id": bson.M{
+					"field._id": bson.M{
 						"$exists": true,
-						"$in": bson.A{
-							fieldIDs,
-						},
+						"$in":     fieldIDs,
 					},
 				},
 				bson.M{
 					"field.location": bson.M{
-						"geoWithin": bson.M{
-							"circle": bson.M{
-								"center": location,
-								"radius": radius,
+						"$geoWithin": bson.M{
+							"$center": bson.A{
+								location.Coordinates,
+								radius,
 							},
 						},
 					},
@@ -225,9 +225,9 @@ func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, loc
 
 	// filter out events by the sport
 	sportsPipeline := bson.M{
-		"sport": bson.M{
-			"$in": bson.A{
-				sports,
+		"$match": bson.M{
+			"sport": bson.M{
+				"$in": sports,
 			},
 		},
 	}
@@ -393,22 +393,25 @@ func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, loc
 
 	// remove unecessary data
 	projectPipeline := bson.M{
-		"_poster":                         0,
-		"poster._id":                      0,
-		"poster.clubs":                    0,
-		"poster.sports":                   0,
-		"poster.visibility":               0,
-		"poster.device_token":             0,
-		"poster.organizations":            0,
-		"participants.uuid":               0,
-		"participants.user._id":           0,
-		"participants.user.clubs":         0,
-		"participants.user.sports":        0,
-		"participants.user.visibility":    0,
-		"participants.user.device_token":  0,
-		"participants.user.organizations": 0,
-		"_participants":                   0,
-		"organizations.managers":          0,
+		"$project": bson.M{
+			"_poster":                         0,
+			"poster._id":                      0,
+			"poster.clubs":                    0,
+			"poster.sports":                   0,
+			"poster.visibility":               0,
+			"poster.device_token":             0,
+			"poster.organizations":            0,
+			"participants.uuid":               0,
+			"participants.user._id":           0,
+			"participants.user.clubs":         0,
+			"participants.user.sports":        0,
+			"participants.user.visibility":    0,
+			"participants.user.device_token":  0,
+			"participants.user.organizations": 0,
+			"_participants":                   0,
+			"clubs.members":                   0,
+			"organizations.managers":          0,
+		},
 	}
 
 	// complete pipeline
@@ -440,9 +443,8 @@ func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, loc
 		var event models.Event
 		err := cur.Decode(&event)
 		if err != nil {
-			database.Logger.Error(err)
+			database.Logger.Error("failed to decode event", err)
 		}
-
 		response = append(response, event)
 	}
 
@@ -575,23 +577,25 @@ func FindEventsByField(id primitive.ObjectID, limit int, database *database.Data
 
 	// clean up data
 	projectPipeline := bson.M{
-		"_poster":                         0,
-		"poster._id":                      0,
-		"poster.clubs":                    0,
-		"poster.sports":                   0,
-		"poster.visibility":               0,
-		"poster.device_token":             0,
-		"poster.organizations":            0,
-		"participants.uuid":               0,
-		"participants.user._id":           0,
-		"participants.user.clubs":         0,
-		"participants.user.sports":        0,
-		"participants.user.visibility":    0,
-		"participants.user.device_token":  0,
-		"participants.user.organizations": 0,
-		"_participants":                   0,
-		"clubs.members":                   0,
-		"organizations.managers":          0,
+		"$project": bson.M{
+			"_poster":                         0,
+			"poster._id":                      0,
+			"poster.clubs":                    0,
+			"poster.sports":                   0,
+			"poster.visibility":               0,
+			"poster.device_token":             0,
+			"poster.organizations":            0,
+			"participants.uuid":               0,
+			"participants.user._id":           0,
+			"participants.user.clubs":         0,
+			"participants.user.sports":        0,
+			"participants.user.visibility":    0,
+			"participants.user.device_token":  0,
+			"participants.user.organizations": 0,
+			"_participants":                   0,
+			"clubs.members":                   0,
+			"organizations.managers":          0,
+		},
 	}
 
 	// limit documents returned
