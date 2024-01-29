@@ -132,9 +132,8 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		}
 
 		// find organization data in database
-		OID, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.D{primitive.E{Key: "_id", Value: OID}}
-		org, err := e.FindAnOrganization(context.TODO(), filter)
+		oid, _ := primitive.ObjectIDFromHex(id)
+		org, err := FindOrganization(&oid, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
@@ -143,11 +142,13 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		}
 
 		// check to see if object is empty
-		if org.Name == nil {
+		if org == nil {
 			http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
 			return
 		}
-		// FIXME
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(org)
 	}
 }
 
@@ -161,8 +162,10 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		state := r.URL.Query().Get("state")
 		country := r.URL.Query().Get("country")
 		filter := bson.M{
-			"state":   state,
-			"country": country,
+			"$match": bson.M{
+				"state":   state,
+				"country": country,
+			},
 		}
 
 		if state == "" || country == "" {
@@ -171,16 +174,23 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		}
 
 		// fetch organizations
-		var orgs []models.Organization
-		e.FindOrganizations(context.Background(), filter, &orgs)
-		if len(orgs) == 0 {
-			http.Error(rw, "no organizations", http.StatusNoContent)
+		orgs, err := FindOrganizations(filter, e.Database)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNoContent)
+				return
+			}
+			e.Logger.Error("failed to find organization", err.Error())
+		}
+
+		if orgs == nil {
+			http.Error(rw, `{ "msg": "organizations not found" }`, http.StatusNoContent)
 			return
 		}
 
 		resp := models.OrganizationsResponse{
-			TotalEvents:   len(orgs),
-			Organizations: orgs,
+			TotalEvents:   len(*orgs),
+			Organizations: *orgs,
 		}
 
 		rw.WriteHeader(http.StatusOK)
