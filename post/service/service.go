@@ -195,7 +195,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		if *req.Type == "announcement" {
 
 			// grab org data
-			var org models.Organization
+			var org models.OrganizationDao
 			filter := bson.M{"_id": post.GroupID}
 			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
 			if err != nil {
@@ -204,12 +204,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				return
 			}
 
-			for i := 0; i < len(org.Members); i++ {
-				p.NotifService.AddTokenToTopic(post.ID.Hex(), org.Members[i].UUID)
+			members := *org.Members
+
+			for i := 0; i < len(members); i++ {
+				p.NotifService.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
 			}
 
 			// find child clubs
-			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": org.ID})
+			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": post.GroupID})
 			if err != nil {
 				p.Logger.Error("No children found")
 				rw.WriteHeader(http.StatusCreated)
@@ -226,7 +228,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 				// send notification to club members
 				note := notif.Notification{
-					Title: org.Name,
+					Title: *org.Name,
 					Body:  "New announcement!",
 					Topic: club.ID.Hex(),
 					Data:  post,

@@ -2,153 +2,341 @@ package service
 
 import (
 	"context"
-	"olympsis-server/utils"
-	"sync"
+	"olympsis-server/database"
 
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-/*
-Provided a filter, return a club and their metadata.
+func FindClub(id *primitive.ObjectID, database *database.Database) (*models.Club, error) {
 
-Returns:
+	ctx := context.Background()
 
-	models.Club // an club struct if found if not is nil
-	error - // if there is one otherwise is nil
-
-The two return values are mutually exclusive.
-If there is an error the error value will be populated and the model struct will be empty and vice versa.
-*/
-func (s *Service) GetClubAndMetadata(filter interface{}) (models.Club, error) {
-
-	// fetch club data
-	var club models.Club
-	err := s.FindClub(context.TODO(), filter, &club)
-	if err != nil {
-		return models.Club{}, err
+	// filter out all docs by our ID
+	idPipeline := bson.M{
+		"$match": bson.M{
+			"_id": id,
+		},
 	}
 
-	var wg sync.WaitGroup
-	members := utils.NewSafeUsers()
-
-	// get parent data if it exists
-	if club.ParentID != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var org models.Organization
-			err := s.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": club.ParentID}).Decode(&org)
-			if err != nil {
-				s.Logger.Error("failed to find organization: ", err.Error())
-			}
-		}()
+	parentPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "organizations",
+			"localField":   "parent_id",
+			"foreignField": "_id",
+			"as":           "organizations",
+		},
 	}
 
-	// fetch club members data
-	for i := range club.Members {
-		wg.Add(1)
-		go func(index int) {
-			uuid := club.Members[index].UUID
-			defer wg.Done()
-			// lookup member in dictionary
-			u := members.FindUser(uuid)
-			if u == nil { // if not found search for it
-				usr, err := s.SearchService.SearchUserByUUID(uuid)
-				if err == nil {
-					club.Members[index].Data = &usr
-					members.AddUser(&usr)
-				} else {
-					s.Logger.Error("failed to get user data: ", err.Error())
-				}
-			} else { // if found just assign it
-				club.Members[index].Data = u
-			}
-		}(i)
+	addParentPipeline := bson.M{
+		"$addFields": bson.M{
+			"parent": bson.M{
+				"$arrayElemAt": bson.A{
+					"$organizations",
+					0,
+				},
+			},
+		},
 	}
 
-	wg.Wait()
+	membersPiepline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "members.uuid",
+			"foreignField": "uuid",
+			"as":           "users",
+		},
+	}
 
-	return club, nil
-}
+	addMembersPiepline := bson.M{
+		"$addFields": bson.M{
+			"members": bson.M{
+				"$map": bson.M{
+					"input": "$members",
+					"as":    "member",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$member",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$users",
+												"as":    "u",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$u.uuid",
+														"$$member.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 
-/*
-Provided a filter, return all of the clubs and their metadata.
+	managersPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "parent.members.uuid",
+			"foreignField": "uuid",
+			"as":           "managers",
+		},
+	}
 
-Returns:
+	addManagersPipeline := bson.M{
+		"$addFields": bson.M{
+			"parent.members": bson.M{
+				"$map": bson.M{
+					"input": "$parent.members",
+					"as":    "manager",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$manager",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$managers",
+												"as":    "m",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$m.uuid",
+														"$$manager.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 
-	*[]models.Club // an array of the clubs found if not is nil
-	error - // if there is one otherwise is nil
+	projectPiepline := bson.M{
+		"$project": bson.M{
+			"users":                             0,
+			"managers":                          0,
+			"organizations":                     0,
+			"members.uuid":                      0,
+			"members.user._id":                  0,
+			"members.user.clubs":                0,
+			"members.user.sports":               0,
+			"members.user.visibility":           0,
+			"members.user.device_token":         0,
+			"members.user.organizations":        0,
+			"parent.members.uuid":               0,
+			"parent.members.user._id":           0,
+			"parent.members.user.clubs":         0,
+			"parent.members.user.sports":        0,
+			"parent.members.user.visibility":    0,
+			"parent.members.user.device_token":  0,
+			"parent.members.user.organizations": 0,
+		},
+	}
 
-The two return values are mutually exclusive.
-If there is an error the error value will be populated and the array of clubs will be set to nil and vice versa.
-*/
-func (s *Service) GetClubsAndMetadata(filter interface{}) ([]models.Club, error) {
+	pipeline := bson.A{
+		idPipeline,
+		parentPipeline,
+		addParentPipeline,
+		membersPiepline,
+		addMembersPiepline,
+		managersPipeline, addManagersPipeline,
+		projectPiepline,
+	}
 
-	// find clubs data
-	var clubs []models.Club
-	err := s.FindClubs(context.TODO(), filter, &clubs)
+	cur, err := database.ClubCol.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
 
-	// wait group for goroutines
-	// dictionary for org/user data
-	var wg sync.WaitGroup
-
-	members := utils.NewSafeUsers()
-	organizations := utils.NewSafeOrganization()
-
-	// get clubs organization data if they have any
-	for i := range clubs {
-		wg.Add(1)
-		go func(index int) {
-			defer wg.Done()
-			// if the club has a parent
-			if clubs[index].ParentID != nil {
-				// lookup org in the dictionary
-				o := organizations.FindOrganization(*clubs[index].ParentID)
-				if o == nil { // if org is not in found fetch it
-					var org models.Organization
-					err := s.Database.OrgCol.FindOne(context.Background(), bson.M{"_id": clubs[index].ParentID}).Decode(&org)
-					if err == nil {
-						clubs[index].Data = &models.ClubData{
-							Parent: &org,
-						}
-						organizations.AddOrganization(&org)
-					}
-				} else { // if found just assign it
-					clubs[index].Data = &models.ClubData{
-						Parent: o,
-					}
-				}
-
-			}
-		}(i)
-
-		wg.Add(1)
-		go func(index int) {
-			defer wg.Done()
-			// get club members data
-			for j := range clubs[index].Members {
-				uuid := clubs[index].Members[j].UUID
-				// lookup member in dictionary
-				u := members.FindUser(uuid)
-				if u == nil { // if not found search for it
-					usr, err := s.SearchService.SearchUserByUUID(clubs[index].Members[j].UUID)
-					if err == nil {
-						clubs[index].Members[j].Data = &usr
-						members.AddUser(&usr)
-					} else {
-						s.Logger.Error("Failed to get user data: ", err.Error())
-					}
-				} else { // if found just assign it
-					clubs[index].Members[j].Data = u
-				}
-			}
-		}(i)
+	var club models.Club
+	if cur.Next(ctx) {
+		err = cur.Decode(&club)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, mongo.ErrNoDocuments
 	}
-	wg.Wait()
 
-	return clubs, nil
+	return &club, nil
+}
+
+func FindClubs(filter interface{}, database *database.Database) (*[]models.Club, error) {
+
+	ctx := context.Background()
+
+	parentPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "organizations",
+			"localField":   "parent_id",
+			"foreignField": "_id",
+			"as":           "organizations",
+		},
+	}
+
+	addParentPipeline := bson.M{
+		"$addFields": bson.M{
+			"parent": bson.M{
+				"$arrayElemAt": bson.A{
+					"$organizations",
+					0,
+				},
+			},
+		},
+	}
+
+	membersPiepline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "members.uuid",
+			"foreignField": "uuid",
+			"as":           "users",
+		},
+	}
+
+	addMembersPiepline := bson.M{
+		"$addFields": bson.M{
+			"members": bson.M{
+				"$map": bson.M{
+					"input": "$members",
+					"as":    "member",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$member",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$users",
+												"as":    "u",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$u.uuid",
+														"$$member.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	managersPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "parent.members.uuid",
+			"foreignField": "uuid",
+			"as":           "managers",
+		},
+	}
+
+	addManagersPipeline := bson.M{
+		"$addFields": bson.M{
+			"parent.members": bson.M{
+				"$map": bson.M{
+					"input": "$parent.members",
+					"as":    "manager",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$manager",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$managers",
+												"as":    "m",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$m.uuid",
+														"$$manager.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	projectPiepline := bson.M{
+		"$project": bson.M{
+			"users":                             0,
+			"managers":                          0,
+			"organizations":                     0,
+			"members.uuid":                      0,
+			"members.user._id":                  0,
+			"members.user.clubs":                0,
+			"members.user.sports":               0,
+			"members.user.visibility":           0,
+			"members.user.device_token":         0,
+			"members.user.organizations":        0,
+			"parent.members.uuid":               0,
+			"parent.members.user._id":           0,
+			"parent.members.user.clubs":         0,
+			"parent.members.user.sports":        0,
+			"parent.members.user.visibility":    0,
+			"parent.members.user.device_token":  0,
+			"parent.members.user.organizations": 0,
+		},
+	}
+
+	pipeline := bson.A{
+		filter,
+		parentPipeline,
+		addParentPipeline,
+		membersPiepline,
+		addMembersPiepline,
+		managersPipeline, addManagersPipeline,
+		projectPiepline,
+	}
+
+	cur, err := database.ClubCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []models.Club
+	for cur.Next(context.TODO()) {
+		var club models.Club
+		err := cur.Decode(&club)
+		if err != nil {
+			database.Logger.Error("failed to decode event", err)
+		}
+		response = append(response, club)
+	}
+
+	return &response, nil
 }

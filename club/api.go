@@ -35,15 +35,6 @@ func (s *ClubAPI) Ready() {
 		),
 	).Methods("GET")
 
-	// get all of the clubs given
-	s.Router.Handle("/clubs/user",
-		middleware.Chain(
-			s.Service.GetClubsList(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("GET")
-
 	// get a club
 	s.Router.Handle("/clubs/{id}",
 		middleware.Chain(

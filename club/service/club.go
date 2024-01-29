@@ -4,16 +4,25 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func (s *Service) InsertClub(ctx context.Context, club *models.Club) error {
-	s.Database.ClubCol.InsertOne(ctx, club)
-	return nil
+func (s *Service) InsertClub(ctx context.Context, club *models.ClubDao) (*primitive.ObjectID, error) {
+	resp, err := s.Database.ClubCol.InsertOne(ctx, club)
+	if err != nil {
+		return nil, err
+	}
+	id := resp.InsertedID.(primitive.ObjectID)
+	return &id, err
 }
 
-func (s *Service) FindClub(ctx context.Context, filter interface{}, club *models.Club) error {
-	s.Database.ClubCol.FindOne(ctx, filter).Decode(&club)
-	return nil
+func (s *Service) FindClub(ctx context.Context, filter interface{}) (*models.ClubDao, error) {
+	var club models.ClubDao
+	err := s.Database.ClubCol.FindOne(ctx, filter).Decode(&club)
+	if err != nil {
+		return nil, err
+	}
+	return &club, err
 }
 
 func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]models.Club) error {

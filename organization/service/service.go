@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/utils"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -58,7 +58,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req models.Organization
+		var req models.OrganizationDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
@@ -69,15 +69,15 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		timeStamp := time.Now().Unix()
 
 		// creator of the organization
-		member := models.Member{
+		member := models.MemberDao{
+			ID:       primitive.NewObjectID(),
 			UUID:     uuid,
 			Role:     "manager",
 			JoinedAt: timeStamp,
 		}
-
+		members := []models.MemberDao{member}
 		// new organization model
-		organization := models.Organization{
-			ID:           primitive.NewObjectID(),
+		organization := models.OrganizationDao{
 			Name:         req.Name,
 			Description:  req.Description,
 			Sport:        req.Sport,
@@ -86,13 +86,12 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			Country:      req.Country,
 			ImageURL:     req.ImageURL,
 			ImageGallery: req.ImageGallery,
-			Members:      []models.Member{member},
-			CreatedAt:    timeStamp,
+			Members:      &members,
+			CreatedAt:    &timeStamp,
 		}
-		organization.Members[0].ID = primitive.NewObjectID()
 
 		// insert organization into database
-		err = e.InsertAnOrganization(context.Background(), &organization)
+		id, err := e.InsertAnOrganization(context.Background(), &organization)
 		if err != nil {
 			e.Logger.Error(err.Error())
 			http.Error(rw, `{ "msg": "Failed to create organization" }`, http.StatusInternalServerError)
@@ -102,14 +101,14 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		// update user data
 		update := bson.M{
 			"$push": bson.M{
-				"organizations": organization.ID,
+				"organizations": id,
 			},
 		}
 		e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
 
 		// subscribe to notifications
-		e.NotifService.CreateTopic(organization.ID.Hex())
-		e.NotifService.AddTokenToTopic(organization.ID.Hex(), uuid)
+		e.NotifService.CreateTopic(id.Hex())
+		e.NotifService.AddTokenToTopic(id.Hex(), uuid)
 
 		// return created organization
 		rw.WriteHeader(http.StatusCreated)
@@ -133,10 +132,9 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		}
 
 		// find organization data in database
-		var org models.Organization
 		OID, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.D{primitive.E{Key: "_id", Value: OID}}
-		err := e.FindAnOrganization(context.TODO(), filter, &org)
+		org, err := e.FindAnOrganization(context.TODO(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
@@ -145,58 +143,11 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		}
 
 		// check to see if object is empty
-		if org.Name == "" {
+		if org.Name == nil {
 			http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
 			return
 		}
-
-		var wg sync.WaitGroup
-		var clubs []models.Club
-
-		// fetch organization members
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for ptp := range org.Members {
-				data, err := e.SearchService.SearchUserByUUID(org.Members[ptp].UUID)
-				if err != nil {
-					e.Logger.Error(err.Error())
-				}
-				org.Members[ptp].Data = &data
-			}
-		}()
-
-		// fetch children clubs
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			cursor, err := e.Database.ClubCol.Find(context.Background(), bson.M{"parent_id": org.ID})
-			if err != nil {
-				e.Logger.Error(err.Error())
-				return
-			}
-
-			for cursor.Next(context.TODO()) {
-				var club models.Club
-				err := cursor.Decode(&club)
-				if err != nil {
-					e.Logger.Error(err.Error())
-					return
-				}
-				clubs = append(clubs, club)
-			}
-		}()
-
-		wg.Wait()
-
-		if len(clubs) != 0 {
-			org.Data = &models.OrganizationData{
-				Children: &clubs,
-			}
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(&org)
+		// FIXME
 	}
 }
 
@@ -293,8 +244,7 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		}
 
 		// update and return updated organization
-		var org models.Organization
-		err = e.UpdateAnOrganization(context.Background(), filter, updates, &org)
+		err = e.UpdateAnOrganization(context.Background(), filter, updates)
 		if err != nil {
 			e.Logger.Error(err)
 			http.Error(rw, "failed to update organization", http.StatusInternalServerError)
@@ -302,7 +252,6 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(org)
 	}
 }
 
@@ -321,17 +270,20 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
-		var org models.Organization
-		e.FindAnOrganization(context.Background(), filter, &org)
+		org, err := e.FindAnOrganization(context.Background(), filter)
+		if err != nil {
+			e.Logger.Debug(fmt.Sprintf(`failed to find org: %s`, err.Error()))
+		}
+		members := *org.Members
 
 		// delete org from users data
-		for i := 0; i < len(org.Members); i++ {
-			filter := bson.M{"uuid": org.Members[i].UUID}
+		for i := 0; i < len(members); i++ {
+			filter := bson.M{"uuid": members[i].UUID}
 			update := bson.M{"$pull": bson.M{"organizations": oid}}
 			e.Database.UserCol.UpdateOne(context.Background(), filter, update)
 		}
 
-		err := e.DeleteAnOrganization(context.Background(), filter)
+		err = e.DeleteAnOrganization(context.Background(), filter)
 		if err != nil {
 			e.Logger.Debug(err.Error())
 			http.Error(rw, `{ "msg": "failed to delete event" }`, http.StatusInternalServerError)
@@ -723,7 +675,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		}
 
 		if req.Status == "accepted" {
-			member := models.Member{
+			member := models.MemberDao{
 				ID:       primitive.NewObjectID(),
 				UUID:     req.Recipient,
 				Role:     "manager",
