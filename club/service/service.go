@@ -59,7 +59,7 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 		}
 
 		// get all of the clubs data
-		clubs, err := FindClubs(filter, s.Database)
+		clubs, err := FindClubs(bson.M{"$match": filter}, s.Database)
 		if err != nil {
 			s.Logger.Error("failed to find clubs: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find clubs" }`, http.StatusInternalServerError)
