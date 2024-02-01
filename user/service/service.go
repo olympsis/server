@@ -491,6 +491,11 @@ func (s *Service) CheckIn() http.HandlerFunc {
 			s.Log.Error("failed to check user in: ", err.Error())
 			http.Error(w, `{ "msg": "failed to check user in" }`, http.StatusInternalServerError)
 		}
+		if user == nil {
+			s.Log.Error("failed to get user. user object is nill")
+			http.Error(w, `{ "msg": "failed to get user" }`, http.StatusUnauthorized)
+			return
+		}
 		response.User = *user
 		var wg sync.WaitGroup
 
