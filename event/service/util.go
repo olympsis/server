@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"olympsis-server/database"
 	"time"
 
@@ -198,7 +199,7 @@ Find events data by location
 func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, location models.GeoJSON, radius int, limit int, database *database.Database) (*[]models.Event, error) {
 
 	ctx := context.Background()
-
+	fmt.Println(time.Now().Add(-time.Hour * 2).Unix())
 	// match events by the field ids and a geo location if they have one
 	filterPipeline := bson.M{
 		"$match": bson.M{
@@ -236,14 +237,26 @@ func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, loc
 	timePipeline := bson.M{
 		"$match": bson.M{
 			"$or": bson.A{
-				bson.M{
+				bson.M{ // event with stop time
 					"actual_stop_time": bson.M{
-						"exists": false,
+						"$exists": false,
 					},
-				},
-				bson.M{
 					"stop_time": bson.M{
 						"$gte": time.Now().Add(-time.Hour * 2).Unix(),
+					},
+				},
+				bson.M{ //event with no stop time
+					"type": bson.M{
+						"$eq": "pickup",
+					},
+					"actual_stop_time": bson.M{
+						"$exists": false,
+					},
+					"stop_time": bson.M{
+						"$exists": false,
+					},
+					"start_time": bson.M{
+						"$gte": time.Now().Add(-time.Hour * 3).Unix(),
 					},
 				},
 			},

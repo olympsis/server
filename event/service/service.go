@@ -204,7 +204,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		// decode fields
-		var fieldsIDs []primitive.ObjectID
+		fieldsIDs := []primitive.ObjectID{}
 		for cursor.Next(context.TODO()) {
 			// decode field
 			var field models.Field
@@ -326,10 +326,21 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			changes["visibility"] = req.Visibility
 		}
 
-		changes["min_participants"] = req.MinParticipants
-		changes["max_participants"] = req.MaxParticipants
-		changes["level"] = req.Level
-		changes["external_link"] = req.ExternalLink
+		if req.MinParticipants != nil {
+			changes["min_participants"] = req.MinParticipants
+		}
+
+		if req.MaxParticipants != nil {
+			changes["max_participants"] = req.MaxParticipants
+		}
+
+		if req.Level != nil {
+			changes["level"] = req.Level
+		}
+
+		if req.ExternalLink != nil {
+			changes["external_link"] = req.ExternalLink
+		}
 
 		if req.StopTime == nil {
 			updates["$unset"] = bson.M{"stop_time": 1}
@@ -356,7 +367,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			// notify participants that the event is starting
 			note := notif.Notification{
 				Title: *event.Title,
-				Body:  "Event is starting",
+				Body:  "Event is starting!",
 				Topic: id,
 			}
 			e.NotifService.SendNotificationToTopic(&note)
@@ -365,7 +376,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			// notify participants that the event ended
 			note := notif.Notification{
 				Title: *event.Title,
-				Body:  "Event ended",
+				Body:  "Event ended!",
 				Topic: id,
 			}
 			e.NotifService.SendNotificationToTopic(&note)
@@ -375,7 +386,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			// notify participants that the details changes
 			note := notif.Notification{
 				Title: *event.Title,
-				Body:  "Event details has changed",
+				Body:  "Event details have changed!",
 				Topic: id,
 			}
 			e.NotifService.SendNotificationToTopic(&note)
