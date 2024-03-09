@@ -14,33 +14,39 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func (s *Service) CreateBugReport() http.HandlerFunc {
+func (s *Service) CreatePostReport() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// decode request
-		var req models.BugReportDao
+		var req models.PostReportDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
+		if req.GroupID == nil || req.GroupID == &primitive.NilObjectID {
+			http.Error(rw, `{ "msg": "group ID not found in body" }`, http.StatusBadRequest)
+			return
+		}
+		if req.PostID == nil || req.PostID == &primitive.NilObjectID {
+			http.Error(rw, `{ "msg": "post ID not found in body" }`, http.StatusBadRequest)
+			return
+		}
 
 		// set necessary data
-		uuid := r.Header.Get("UUID")
 		id := primitive.NewObjectID()
 		status := "pending"
 		timestamp := time.Now().Unix()
 		options := options.InsertOneOptions{}
 		req.ID = &id
-		req.User = &uuid
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
 		// insert model into database
-		err = s.BugReport.Insert(context.Background(), &req, &options)
+		err = s.PostReport.Insert(context.Background(), &req, &options)
 		if err != nil {
-			http.Error(rw, `{ "msg": "failed to create bug report" }`, http.StatusInternalServerError)
-			s.Logger.Error(fmt.Sprintf(`failed to insert bug report: %s`, err.Error()))
+			http.Error(rw, `{ "msg": "failed to create report" }`, http.StatusInternalServerError)
+			s.Logger.Error(fmt.Sprintf(`failed to insert report: %s`, err.Error()))
 			return
 		}
 
@@ -49,23 +55,26 @@ func (s *Service) CreateBugReport() http.HandlerFunc {
 	}
 }
 
-func (s *Service) ReadBugReports() http.HandlerFunc {
+func (s *Service) ReadPostReports() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{ "msg": "no/bad ID found in request" }`, http.StatusBadRequest)
+			return
+		}
 
-		uuid := r.URL.Query().Get("uuid")
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}
 		options := options.AggregateOptions{}
-
-		if uuid != "" {
-			filter["user"] = uuid
-		}
+		oid, _ := primitive.ObjectIDFromHex(id)
+		filter["group_id"] = oid
 		if status != "" {
 			filter["status"] = status
 		}
 
-		reports, err := s.BugReport.Find(context.Background(), bson.M{"$match": filter}, &options)
+		reports, err := s.PostReport.Find(context.Background(), bson.M{"$match": filter}, &options)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf("failed to find reports: %s", err.Error()))
 			http.Error(rw, `{ "msg": "failed to find reports" }`, http.StatusInternalServerError)
@@ -82,7 +91,7 @@ func (s *Service) ReadBugReports() http.HandlerFunc {
 	}
 }
 
-func (s *Service) UpdateBugReport() http.HandlerFunc {
+func (s *Service) UpdatePostReport() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// grab report id
@@ -94,7 +103,7 @@ func (s *Service) UpdateBugReport() http.HandlerFunc {
 		}
 
 		// grab body
-		var req models.BugReportDao
+		var req models.PostReportDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
@@ -116,17 +125,8 @@ func (s *Service) UpdateBugReport() http.HandlerFunc {
 		if req.Status != nil {
 			changes["status"] = req.Status
 		}
-		if req.Images != nil {
-			changes["images"] = req.Images
-		}
-		if req.Videos != nil {
-			changes["videos"] = req.Videos
-		}
-		if req.Blobs != nil {
-			changes["blobs"] = req.Blobs
-		}
 
-		err = s.BugReport.Update(context.TODO(), filter, update)
+		err = s.PostReport.Update(context.TODO(), filter, update)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf(`failed to update report: %s`, err.Error()))
 			http.Error(rw, `{ "msg": "failed to update report" }`, http.StatusInternalServerError)
@@ -137,7 +137,7 @@ func (s *Service) UpdateBugReport() http.HandlerFunc {
 	}
 }
 
-func (s *Service) DeleteBugReport() http.HandlerFunc {
+func (s *Service) DeletePostReport() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// grab report id
@@ -155,7 +155,7 @@ func (s *Service) DeleteBugReport() http.HandlerFunc {
 		}
 
 		// delete transaction
-		err := s.BugReport.Delete(context.Background(), filter)
+		err := s.PostReport.Delete(context.Background(), filter)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to delete report" }`, http.StatusBadRequest)
 			return

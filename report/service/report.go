@@ -15,10 +15,15 @@ type Service struct {
 	Router       *mux.Router
 	NotifService *notif.Service
 	BugReport    *orm.BugReportORM
+	PostReport   *orm.PostReportORM
 }
 
 func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *notif.Service) *Service {
 	bugORM := orm.BugReportORM{
+		Database: d,
+		Logger:   l,
+	}
+	postORM := orm.PostReportORM{
 		Database: d,
 		Logger:   l,
 	}
@@ -28,5 +33,6 @@ func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *
 		Router:       r,
 		NotifService: n,
 		BugReport:    &bugORM,
+		PostReport:   &postORM,
 	}
 }

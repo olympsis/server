@@ -100,7 +100,7 @@ func (orm *BugReportORM) Find(ctx context.Context, filter interface{}, opts *opt
 }
 
 func (orm *BugReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.BugReportCol.UpdateMany(ctx, filter, update)
+	_, err := orm.Database.BugReportCol.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}

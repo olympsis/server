@@ -65,4 +65,44 @@ func (e *ReportAPI) Setup() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("DELETE")
+
+	/*
+		POST REPORTS
+	*/
+
+	// get post reports
+	e.Router.Handle("/report/{id}/posts",
+		middleware.Chain(
+			e.Service.ReadPostReports(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// create a post report
+	e.Router.Handle("/report/{id}/posts",
+		middleware.Chain(
+			e.Service.CreatePostReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// change a post report
+	e.Router.Handle("/report/posts/{id}",
+		middleware.Chain(
+			e.Service.UpdatePostReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// delete a post report
+	e.Router.Handle("/report/posts/{id}",
+		middleware.Chain(
+			e.Service.DeletePostReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
 }
