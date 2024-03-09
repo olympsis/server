@@ -35,6 +35,12 @@ ENV EVENT_INVITATIONS_COL=eventInvitations
 ENV CLUB_INVITATIONS_COL=clubInvitations
 ENV ORG_INVITATIONS_COL=organizationInvitations
 
+ENV BUG_REPORT_COL=bugReports
+ENV POST_REPORT_COL=postReports
+ENV FIELD_REPORT_COL=fieldReports
+ENV EVENT_REPORT_COL=eventReports
+ENV MEMBER_REPORT_COL=memberReports
+
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 EXPOSE 80

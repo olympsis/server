@@ -35,6 +35,12 @@ export EVENT_INVITATIONS_COL=eventInvitations
 export CLUB_INVITATIONS_COL=clubInvitations
 export ORG_INVITATIONS_COL=organizationInvitations
 
+export BUG_REPORT_COL=bugReports
+export POST_REPORT_COL=postReports
+export FIELD_REPORT_COL=fieldReports
+export EVENT_REPORT_COL=eventReports
+export MEMBER_REPORT_COL=memberReports
+
 export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
 

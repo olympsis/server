@@ -10,6 +10,7 @@ import (
 	"olympsis-server/field"
 	"olympsis-server/organization"
 	"olympsis-server/post"
+	"olympsis-server/report"
 	"olympsis-server/storage"
 	"olympsis-server/user"
 	"os"
@@ -55,6 +56,7 @@ func main() {
 	eventAPI := event.NewEventAPI(l, r, d, n)
 	storageAPI := storage.NewStorageAPI(l, r, d)
 	organizationAPI := organization.NewOrganizationAPI(l, r, d, n, sh)
+	reportAPI := report.NewReportAPI(l, r, d, n)
 
 	authAPI.Ready()
 	userAPI.Ready()
@@ -64,6 +66,7 @@ func main() {
 	eventAPI.Ready()
 	storageAPI.Ready()
 	organizationAPI.Ready()
+	reportAPI.Setup()
 
 	port := os.Getenv("PORT")
 	if port == "" {

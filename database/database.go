@@ -36,6 +36,12 @@ type Database struct {
 	EventInvitationCol *mongo.Collection
 	ClubInvitationCol  *mongo.Collection
 	OrgInvitationCol   *mongo.Collection
+
+	BugReportCol    *mongo.Collection
+	PostReportCol   *mongo.Collection
+	MemberReportCol *mongo.Collection
+	FieldReportCol  *mongo.Collection
+	EventReportCol  *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {
@@ -76,23 +82,30 @@ func (d *Database) EstablishConnection() {
 	}
 
 	d.Client = client
-	d.AuthCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("AUTH_COL"))
-	d.UserCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("USER_COL"))
-	d.ClubCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CLUB_COL"))
-	d.OrgCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("ORG_COL"))
-	d.EventCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("EVENT_COL"))
-	d.FieldCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("FIELD_COL"))
-	d.PostCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("POST_COL"))
-	d.ClubInvCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CINVITE_COL"))
-	d.CommentsCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("COMMENTS_COL"))
-	d.FriendReqCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("FREQUEST_COL"))
+	database := d.Client.Database(os.Getenv("DB_NAME"))
+	d.AuthCol = database.Collection(os.Getenv("AUTH_COL"))
+	d.UserCol = database.Collection(os.Getenv("USER_COL"))
+	d.ClubCol = database.Collection(os.Getenv("CLUB_COL"))
+	d.OrgCol = database.Collection(os.Getenv("ORG_COL"))
+	d.EventCol = database.Collection(os.Getenv("EVENT_COL"))
+	d.FieldCol = database.Collection(os.Getenv("FIELD_COL"))
+	d.PostCol = database.Collection(os.Getenv("POST_COL"))
+	d.ClubInvCol = database.Collection(os.Getenv("CINVITE_COL"))
+	d.CommentsCol = database.Collection(os.Getenv("COMMENTS_COL"))
+	d.FriendReqCol = database.Collection(os.Getenv("FREQUEST_COL"))
 
-	d.ClubApplicationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CAPPICATIONS_COL"))
-	d.OrgApplicationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("OAPPICATIONS_COL"))
+	d.ClubApplicationCol = database.Collection(os.Getenv("CAPPICATIONS_COL"))
+	d.OrgApplicationCol = database.Collection(os.Getenv("OAPPICATIONS_COL"))
 
-	d.EventInvitationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("EVENT_INVITATIONS_COL"))
-	d.ClubInvitationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("CLUB_INVITATIONS_COL"))
-	d.OrgInvitationCol = d.Client.Database(os.Getenv("DB_NAME")).Collection(os.Getenv("ORG_INVITATIONS_COL"))
+	d.EventInvitationCol = database.Collection(os.Getenv("EVENT_INVITATIONS_COL"))
+	d.ClubInvitationCol = database.Collection(os.Getenv("CLUB_INVITATIONS_COL"))
+	d.OrgInvitationCol = database.Collection(os.Getenv("ORG_INVITATIONS_COL"))
+
+	d.BugReportCol = database.Collection(os.Getenv("BUG_REPORT_COL"))
+	d.PostReportCol = database.Collection(os.Getenv("POST_REPORT_COL"))
+	d.FieldReportCol = database.Collection(os.Getenv("FIELD_REPORT_COL"))
+	d.EventReportCol = database.Collection(os.Getenv("EVENT_REPORT_COL"))
+	d.MemberReportCol = database.Collection(os.Getenv("MEMBER_REPORT_COL"))
 
 	d.NotifClient = client2
 	d.NotifCol = d.NotifClient.Database(os.Getenv("NOTIF_DB_NAME")).Collection(os.Getenv("NOTIF_COL"))

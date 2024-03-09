@@ -19,7 +19,7 @@ func UserMiddleware() Middleware {
 			var token string
 			token, err := utils.GetTokenFromHeader(r)
 			if err != nil {
-				http.Error(w, "failed to get token from header", http.StatusUnauthorized)
+				http.Error(w, `{ "msg": "failed to get token from header" }`, http.StatusUnauthorized)
 				return
 			}
 
@@ -29,7 +29,7 @@ func UserMiddleware() Middleware {
 			*/
 			sub, pod, _, exp, err := utils.ValidateAuthToken(token)
 			if err != nil {
-				http.Error(w, "invalid auth token", http.StatusUnauthorized)
+				http.Error(w, `{ "msg": "invalid auth token" }`, http.StatusUnauthorized)
 				return
 			} else {
 				// add uuid to header
