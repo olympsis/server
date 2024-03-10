@@ -201,6 +201,8 @@ github.com/olympsis/models v0.0.0-20240306011442-f1d8991fb143 h1:1CBFscOzOXE5gG/
 github.com/olympsis/models v0.0.0-20240306011442-f1d8991fb143/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
 github.com/olympsis/models v0.0.0-20240309213524-146620ae977c h1:X2xuTBW8KyWJvKYKtOhwmy5kun1wRvIEcxB4R+Uz2MI=
 github.com/olympsis/models v0.0.0-20240309213524-146620ae977c/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
+github.com/olympsis/models v0.0.0-20240310015821-a2572e041d1c h1:dVfJpgKgp/8R9WkScnh9ifHB+2TznN0g+uFMD8rj0lk=
+github.com/olympsis/models v0.0.0-20240310015821-a2572e041d1c/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
 github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd h1:Lo7WjM4+wtppkqozFZGQ1nqNgx/8zPbvyLBRu2Q1QNw=
 github.com/olympsis/notif v0.0.0-20230630033802-e485febcd6fd/go.mod h1:rDFeCPBq0nfh51qFkfgrGVReMXgxdhkLvIMIKissZ7g=
 github.com/olympsis/notif v0.0.0-20231231195317-3af63c75d7b7 h1:qNP9ftxrdh6e03gGobK+oKZ5xUx+fJdYhkvA3LOz+BE=
