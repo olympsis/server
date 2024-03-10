@@ -145,4 +145,44 @@ func (e *ReportAPI) Setup() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("DELETE")
+
+	/*
+		FIELD REPORTS
+	*/
+
+	// get bug reports
+	e.Router.Handle("/report/fields",
+		middleware.Chain(
+			e.Service.ReadFieldReports(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// create a bug report
+	e.Router.Handle("/report/fields",
+		middleware.Chain(
+			e.Service.CreateFieldReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// change a bug report
+	e.Router.Handle("/report/fields/{id}",
+		middleware.Chain(
+			e.Service.UpdateFieldReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// delete a bug report
+	e.Router.Handle("/report/fields/{id}",
+		middleware.Chain(
+			e.Service.DeleteFieldReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
 }
