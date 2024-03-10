@@ -60,11 +60,18 @@ func (s *Service) CreateEventReport() http.HandlerFunc {
 func (s *Service) ReadEventReports() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		groupID := r.URL.Query().Get("groupID")
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}
 		options := options.AggregateOptions{}
 
+		if groupID != "" {
+			oid, _ := primitive.ObjectIDFromHex(groupID)
+			filter["groups"] = bson.M{
+				"$in": bson.A{oid},
+			}
+		}
 		if status != "" {
 			filter["status"] = status
 		}
