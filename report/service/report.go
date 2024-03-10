@@ -18,6 +18,7 @@ type Service struct {
 	PostReport   *orm.PostReportORM
 	MemberReport *orm.MemberReportORM
 	FieldReport  *orm.FieldReportORM
+	EventReport  *orm.EventReportORM
 }
 
 func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *notif.Service) *Service {
@@ -37,6 +38,10 @@ func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *
 		Database: d,
 		Logger:   l,
 	}
+	eventORM := orm.EventReportORM{
+		Database: d,
+		Logger:   l,
+	}
 	return &Service{
 		Database:     d,
 		Logger:       l,
@@ -46,5 +51,6 @@ func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *
 		PostReport:   &postORM,
 		MemberReport: &memberORM,
 		FieldReport:  &fieldORM,
+		EventReport:  &eventORM,
 	}
 }

@@ -55,18 +55,13 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 			"user": bson.M{
 				"$arrayElemAt": bson.A{"$users", 0},
 			},
-		},
-	}
-
-	pipeline4 := bson.M{
-		"$addFields": bson.M{
 			"field": bson.M{
 				"$arrayElemAt": bson.A{"$fields", 0},
 			},
 		},
 	}
 
-	pipeline5 := bson.M{
+	pipeline4 := bson.M{
 		"$addFields": bson.M{
 			"user.first_name": bson.M{
 				"$arrayElemAt": bson.A{"$_auth.first_name", 0},
@@ -80,7 +75,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		},
 	}
 
-	pipeline6 := bson.M{
+	pipeline5 := bson.M{
 		"$project": bson.M{
 			"users":      0,
 			"fields":     0,
@@ -97,7 +92,6 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		pipeline3,
 		pipeline4,
 		pipeline5,
-		pipeline6,
 	}
 
 	cur, err := orm.Database.FieldReportCol.Aggregate(context.TODO(), pipeline, opts)

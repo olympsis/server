@@ -185,4 +185,44 @@ func (e *ReportAPI) Setup() {
 			middleware.UserMiddleware(),
 		),
 	).Methods("DELETE")
+
+	/*
+		EVENT REPORTS
+	*/
+
+	// get bug reports
+	e.Router.Handle("/report/events",
+		middleware.Chain(
+			e.Service.ReadEventReports(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("GET")
+
+	// create a bug report
+	e.Router.Handle("/report/events",
+		middleware.Chain(
+			e.Service.CreateEventReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("POST")
+
+	// change a bug report
+	e.Router.Handle("/report/events/{id}",
+		middleware.Chain(
+			e.Service.UpdateEventReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("PUT")
+
+	// delete a bug report
+	e.Router.Handle("/report/events/{id}",
+		middleware.Chain(
+			e.Service.DeleteEventReport(),
+			middleware.Logging(),
+			middleware.UserMiddleware(),
+		),
+	).Methods("DELETE")
 }
