@@ -111,7 +111,7 @@ func (e *ReportAPI) Setup() {
 	*/
 
 	// get post reports
-	e.Router.Handle("/report/{id}/members",
+	e.Router.Handle("/report/members",
 		middleware.Chain(
 			e.Service.ReadMemberReports(),
 			middleware.Logging(),

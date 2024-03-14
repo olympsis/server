@@ -78,8 +78,11 @@ local:
 run:
 	go run -x main.go
 
-mongo:
-	docker run -p 27017:27017 -d -e MONGO_INITDB_ROOT_USERNAME=service -e MONGO_INITDB_ROOT_PASSWORD=qN1PHHgo6L942AvpTgGQ mongo:latest
+server-up:
+	docker-compose -f tools/dev-compose.yaml up -d
+
+server-down:
+	docker-compose -f tools/dev-compose.yaml down
 
 clean: ## Remove previous build
 	rm -f $(SERVICE_NAME)
