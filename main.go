@@ -98,7 +98,7 @@ func main() {
 
 	sig := <-sigs
 
-	l.Printf("Recieved Termination(%s), graceful shutdown \n", sig)
+	l.Printf("Received Termination(%s), graceful shutdown \n", sig)
 
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
 

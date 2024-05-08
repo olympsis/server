@@ -71,7 +71,7 @@ func (e *ReportAPI) Setup() {
 	*/
 
 	// get post reports
-	e.Router.Handle("/report/{id}/posts",
+	e.Router.Handle("/report/posts",
 		middleware.Chain(
 			e.Service.ReadPostReports(),
 			middleware.Logging(),
@@ -80,7 +80,7 @@ func (e *ReportAPI) Setup() {
 	).Methods("GET")
 
 	// create a post report
-	e.Router.Handle("/report/{id}/posts",
+	e.Router.Handle("/report/posts",
 		middleware.Chain(
 			e.Service.CreatePostReport(),
 			middleware.Logging(),

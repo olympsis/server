@@ -1,5 +1,8 @@
-VERSION := v0.4.0
-SERVICE_NAME := olympsis/server
+VERSION := v0.4.1
+PROJECT_ID := olympsis-408521
+LOCATION := us-central1-docker.pkg.dev
+SERVICE_NAME := server
+REPO_NAME := main
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
@@ -68,8 +71,8 @@ build: dep ## Build the binary file
 
 docker:
 	docker build . -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
-	docker tag $(SERVICE_NAME):latest $(SERVICE_NAME):$(VERSION)
-	docker push $(SERVICE_NAME):$(VERSION)
+	docker tag $(SERVICE_NAME) $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
+	docker push $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
 
 local:
 	docker build . -t $(SERVICE_NAME)
@@ -79,6 +82,7 @@ run:
 	go run -x main.go
 
 server-up:
+	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-dev-server" | xargs -I {} docker rmi {}
 	docker-compose -f tools/dev-compose.yaml up -d
 
 server-down:

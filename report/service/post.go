@@ -57,8 +57,7 @@ func (s *Service) CreatePostReport() http.HandlerFunc {
 
 func (s *Service) ReadPostReports() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		id := vars["id"]
+		id := r.URL.Query().Get("groupID")
 		if len(id) < 24 {
 			http.Error(rw, `{ "msg": "no/bad ID found in request" }`, http.StatusBadRequest)
 			return

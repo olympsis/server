@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -13,7 +12,6 @@ import (
 
 type Database struct {
 	Logger      *logrus.Logger
-	Pool        *pgxpool.Pool
 	Client      *mongo.Client
 	NotifClient *mongo.Client
 
@@ -55,33 +53,73 @@ func (d *Database) EstablishConnection() {
 	/*
 		Connect to Mongo Database
 	*/
+	mode := os.Getenv("MODE")
 	dbUser := os.Getenv("DB_USR")
 	dbPass := os.Getenv("DB_PASS")
 	dbLoc := os.Getenv("DB_ADDR")
-	opts := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
-	client, err := mongo.Connect(context.Background(), opts)
-	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+
+	if mode == "PRODUCTION" {
+		opts := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
+		client, err := mongo.Connect(context.Background(), opts)
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		err = client.Ping(context.Background(), readpref.Primary())
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		noteLoc := os.Getenv("NOTIF_DB_ADDR")
+		opts2 := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + noteLoc + `/?retryWrites=true&w=majority`)
+		client2, err := mongo.Connect(context.Background(), opts2)
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		err = client2.Ping(context.Background(), readpref.Primary())
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		d.Client = client
+		d.NotifClient = client2
+
+	} else {
+
+		opts := options.Client().ApplyURI(`mongodb://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
+		client, err := mongo.Connect(context.Background(), opts)
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		err = client.Ping(context.Background(), readpref.Primary())
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		noteLoc := os.Getenv("NOTIF_DB_ADDR")
+		opts2 := options.Client().ApplyURI(`mongodb://` + dbUser + `:` + dbPass + `@` + noteLoc + `/?retryWrites=true&w=majority`)
+		client2, err := mongo.Connect(context.Background(), opts2)
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		err = client2.Ping(context.Background(), readpref.Primary())
+		if err != nil {
+			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		}
+
+		d.Client = client
+		d.NotifClient = client2
 	}
 
-	err = client.Ping(context.Background(), readpref.Primary())
-	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	}
+	d.LinkCollections()
 
-	noteLoc := os.Getenv("NOTIF_DB_ADDR")
-	opts2 := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + noteLoc + `/?retryWrites=true&w=majority`)
-	client2, err := mongo.Connect(context.Background(), opts2)
-	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	}
+	d.Logger.Info("Database connection successful.")
+}
 
-	err = client2.Ping(context.Background(), readpref.Primary())
-	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	}
-
-	d.Client = client
+func (d *Database) LinkCollections() {
 	database := d.Client.Database(os.Getenv("DB_NAME"))
 	d.AuthCol = database.Collection(os.Getenv("AUTH_COL"))
 	d.UserCol = database.Collection(os.Getenv("USER_COL"))
@@ -107,8 +145,5 @@ func (d *Database) EstablishConnection() {
 	d.EventReportCol = database.Collection(os.Getenv("EVENT_REPORT_COL"))
 	d.MemberReportCol = database.Collection(os.Getenv("MEMBER_REPORT_COL"))
 
-	d.NotifClient = client2
 	d.NotifCol = d.NotifClient.Database(os.Getenv("NOTIF_DB_NAME")).Collection(os.Getenv("NOTIF_COL"))
-
-	d.Logger.Info("Database connection successful.")
 }
