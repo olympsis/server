@@ -177,8 +177,9 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			EventID:      req.EventID,
 			Body:         req.Body,
 			Images:       req.Images,
-			CreatedAt:    &timeStamp,
+			IsSensitive:  req.IsSensitive,
 			ExternalLink: req.ExternalLink,
+			CreatedAt:    &timeStamp,
 		}
 
 		// create post in database
@@ -334,6 +335,9 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		}
 		if req.ExternalLink != nil {
 			change["external_link"] = req.ExternalLink
+		}
+		if req.IsSensitive != nil {
+			change["is_sensitive"] = req.IsSensitive
 		}
 
 		// update post
