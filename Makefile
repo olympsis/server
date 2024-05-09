@@ -76,7 +76,7 @@ docker:
 
 local:
 	docker build . -t $(SERVICE_NAME)
-	docker run -p 8080:8080 $(SERVICE_NAME):latest
+	docker run -p 80:80 $(SERVICE_NAME):latest
 
 run:
 	go run -x main.go

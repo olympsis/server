@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/utils"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -44,6 +45,8 @@ Get Posts (GET)
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		uuid := r.Header.Get("UUID")
+
 		// grab query parameters
 		group := r.URL.Query().Get("groupID")
 		parent := r.URL.Query().Get("parentID")
@@ -67,25 +70,44 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			ids = append(ids, parentID)
 		}
 
-		// run aggregation pipeline
-		posts, err := FindPosts(ids, p.Database, 100)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
-				return
-			} else {
-				p.Logger.Error("failed to get posts: ", err.Error())
-				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
+		var wg sync.WaitGroup
+		var user *models.UserData
+		var posts *[]models.Post
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			user, err = utils.FindUser(uuid, p.Database)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// run aggregation pipeline
+			posts, err = FindPosts(ids, p.Database, 100)
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
+					return
+				} else {
+					p.Logger.Error("failed to get posts: ", err.Error())
+					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
+				}
 			}
-		}
-		if posts == nil || len(*posts) == 0 {
+		}()
+
+		wg.Wait()
+
+		_posts := removePostsByPosterUUIDs(posts, user.BlockedUsers)
+
+		if _posts == nil || len(*_posts) == 0 {
 			http.Error(rw, `{ "msg": "no posts content not found" }`, http.StatusNoContent)
 			return
 		}
 
 		resp := models.PostsResponse{
-			TotalPosts: len(*posts),
-			Posts:      *posts,
+			TotalPosts: len(*_posts),
+			Posts:      *_posts,
 		}
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
@@ -611,4 +633,21 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 
 		rw.WriteHeader(http.StatusOK)
 	}
+}
+
+func removePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Post {
+	var result []models.Post
+	for _, post := range *posts {
+		found := false
+		for _, uuid := range uuids {
+			if post.Poster.UUID == uuid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, post)
+		}
+	}
+	return &result
 }

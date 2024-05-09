@@ -2,17 +2,21 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"olympsis-server/database"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func GetTokenFromHeader(r *http.Request) (string, error) {
@@ -397,4 +401,64 @@ func RemoveTokenFromTopic(topic string, user string) error {
 	}
 
 	return nil
+}
+
+func FindUser(uuid string, database *database.Database) (*models.UserData, error) {
+
+	ctx := context.Background()
+
+	filter := bson.M{
+		"$match": bson.M{
+			"uuid": uuid,
+		},
+	}
+
+	authLookup := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "uuid",
+			"foreignField": "uuid",
+			"as":           "_auth",
+		},
+	}
+
+	authAddFields := bson.M{
+		"$addFields": bson.M{
+			"first_name": bson.M{
+				"$arrayElemAt": bson.A{
+					"$_auth.first_name",
+					0,
+				},
+			},
+			"last_name": bson.M{
+				"$arrayElemAt": bson.A{
+					"$_auth.last_name",
+					0,
+				},
+			},
+		},
+	}
+
+	pipeline := bson.A{
+		filter,
+		authLookup,
+		authAddFields,
+	}
+
+	cur, err := database.UserCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	var data models.UserData
+	if cur.Next(ctx) {
+		err = cur.Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, mongo.ErrNoDocuments
+	}
+
+	return &data, nil
 }
