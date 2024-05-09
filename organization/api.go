@@ -6,7 +6,6 @@ import (
 	"olympsis-server/organization/service"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
@@ -17,8 +16,8 @@ type OrganizationAPI struct {
 	Service *service.Service
 }
 
-func NewOrganizationAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *OrganizationAPI {
-	return &OrganizationAPI{Logger: l, Router: r, Service: service.NewOrganizationService(l, r, d, n, sh)}
+func NewOrganizationAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *OrganizationAPI {
+	return &OrganizationAPI{Logger: l, Router: r, Service: service.NewOrganizationService(l, r, d, sh)}
 }
 
 func (e *OrganizationAPI) Ready() {

@@ -6,7 +6,6 @@ import (
 	"olympsis-server/middleware"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
@@ -17,8 +16,8 @@ type ClubAPI struct {
 	Service *service.Service
 }
 
-func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *ClubAPI {
-	return &ClubAPI{Logger: l, Router: r, Service: service.NewClubService(l, r, d, n, sh)}
+func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *ClubAPI {
+	return &ClubAPI{Logger: l, Router: r, Service: service.NewClubService(l, r, d, sh)}
 }
 
 func (s *ClubAPI) Ready() {

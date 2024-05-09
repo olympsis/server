@@ -6,7 +6,6 @@ import (
 	"olympsis-server/report/service"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,11 +15,11 @@ type ReportAPI struct {
 	Service *service.Service // service for handing requests to
 }
 
-func NewReportAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *ReportAPI {
+func NewReportAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *ReportAPI {
 	return &ReportAPI{
 		Logger:  l,
 		Router:  r,
-		Service: service.NewReportService(d, l, r, n),
+		Service: service.NewReportService(d, l, r),
 	}
 }
 

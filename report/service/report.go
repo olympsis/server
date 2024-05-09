@@ -5,7 +5,6 @@ import (
 	"olympsis-server/report/orm"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 )
 
@@ -13,7 +12,6 @@ type Service struct {
 	Database     *database.Database
 	Logger       *logrus.Logger
 	Router       *mux.Router
-	NotifService *notif.Service
 	BugReport    *orm.BugReportORM
 	PostReport   *orm.PostReportORM
 	MemberReport *orm.MemberReportORM
@@ -21,7 +19,7 @@ type Service struct {
 	EventReport  *orm.EventReportORM
 }
 
-func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *notif.Service) *Service {
+func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router) *Service {
 	bugORM := orm.BugReportORM{
 		Database: d,
 		Logger:   l,
@@ -46,7 +44,6 @@ func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router, n *
 		Database:     d,
 		Logger:       l,
 		Router:       r,
-		NotifService: n,
 		BugReport:    &bugORM,
 		PostReport:   &postORM,
 		MemberReport: &memberORM,

@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
@@ -35,28 +34,18 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
-	// notifications service
-	k := os.Getenv("KEYID")
-	t := os.Getenv("TEAMID")
-	f := "./files/AuthKey_JN25FUC9X2.p8"
-	n := notif.NewNotificationService(l, d.NotifCol, d.UserCol)
-	err := n.CreateNewClient(k, t, f)
-	if err != nil {
-		panic(err.Error())
-	}
-
 	// search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
 	authAPI := auth.NewAuthAPI(l, r, d)
-	userAPI := user.NewUserAPI(l, r, d, n)
+	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
-	clubAPI := club.NewClubAPI(l, r, d, n, sh)
-	postAPI := post.NewPostAPI(l, r, d, n, sh)
-	eventAPI := event.NewEventAPI(l, r, d, n)
+	clubAPI := club.NewClubAPI(l, r, d, sh)
+	postAPI := post.NewPostAPI(l, r, d, sh)
+	eventAPI := event.NewEventAPI(l, r, d)
 	storageAPI := storage.NewStorageAPI(l, r, d)
-	organizationAPI := organization.NewOrganizationAPI(l, r, d, n, sh)
-	reportAPI := report.NewReportAPI(l, r, d, n)
+	organizationAPI := organization.NewOrganizationAPI(l, r, d, sh)
+	reportAPI := report.NewReportAPI(l, r, d)
 
 	authAPI.Ready()
 	userAPI.Ready()

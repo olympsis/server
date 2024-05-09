@@ -6,7 +6,6 @@ import (
 	"olympsis-server/middleware"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,8 +15,8 @@ type EventAPI struct {
 	Service *service.Service // service for handing requests to
 }
 
-func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *EventAPI {
-	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d, n)}
+func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *EventAPI {
+	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d)}
 }
 
 func (e *EventAPI) Ready() {

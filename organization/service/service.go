@@ -11,7 +11,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -31,9 +30,6 @@ type Service struct {
 	// mux Router to complete http requests
 	Router *mux.Router
 
-	// notif service
-	NotifService *notif.Service
-
 	// search service
 	SearchService *search.Service
 }
@@ -41,8 +37,8 @@ type Service struct {
 /*
 Create new field service struct
 */
-func NewOrganizationService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
+func NewOrganizationService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
 }
 
 /*
@@ -107,8 +103,15 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
 
 		// subscribe to notifications
-		e.NotifService.CreateTopic(id.Hex())
-		e.NotifService.AddTokenToTopic(id.Hex(), uuid)
+		err = utils.CreateNotificationTopic(id.Hex())
+		if err != nil {
+			e.Logger.Error("failed to create topic: ", err.Error())
+		}
+
+		err = utils.AddTokenToTopic(id.Hex(), uuid)
+		if err != nil {
+			e.Logger.Error("failed to add token to topic: ", err.Error())
+		}
 
 		// return created organization
 		rw.WriteHeader(http.StatusCreated)
@@ -300,7 +303,10 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 		}
 
 		// delete notification topic
-		e.NotifService.DeleteTopic(id)
+		err = utils.DeleteNotificationTopic(id)
+		if err != nil {
+			e.Logger.Error("failed to delete topic: ", err.Error())
+		}
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -345,12 +351,12 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 		}
 
 		// notify org members
-		note := notif.Notification{
+		note := models.Notification{
 			Title: "New Application",
-			Body:  "You've recieved an application",
+			Body:  "You've received an application",
 			Topic: application.OrganizationID.Hex(),
 		}
-		e.NotifService.SendNotificationToTopic(&note)
+		utils.SendNotificationToTopic(&note)
 
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(req)
@@ -570,12 +576,13 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 		}
 
 		// notify user
-		note := notif.Notification{
+		note := models.Notification{
 			Title: "New Invitation",
 			Body:  "You've been invited to join the " + org.Name + " organization",
 			Data:  org,
 		}
-		e.NotifService.SendNotificationToToken(&note, user.DeviceToken)
+
+		utils.SendNotificationToToken(user.DeviceToken, &note)
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(req)
@@ -742,16 +749,17 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		}
 
 		// notify club admins
-		note := notif.Notification{
+		note := models.Notification{
 			Title: "Invitation Status",
 			Body:  usr.Username + " " + req.Status + " their invite.",
 			Topic: req.SubjectID.Hex(),
 		}
-		err = e.NotifService.SendNotificationToTopic(&note)
+
+		err = utils.SendNotificationToTopic(&note)
 		if err != nil {
 			e.Logger.Error("Failed to send notification: " + err.Error())
 		}
-		err = e.NotifService.AddTokenToTopic(req.SubjectID.Hex(), req.Recipient)
+		err = utils.AddTokenToTopic(req.SubjectID.Hex(), req.Recipient)
 		if err != nil {
 			e.Logger.Error("Failed to add token to topic: " + err.Error())
 		}

@@ -6,7 +6,6 @@ import (
 	"olympsis-server/post/service"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
@@ -17,8 +16,8 @@ type PostAPI struct {
 	Service *service.Service
 }
 
-func NewPostAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *PostAPI {
-	return &PostAPI{Logger: l, Router: r, Service: service.NewPostService(l, r, d, n, sh)}
+func NewPostAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *PostAPI {
+	return &PostAPI{Logger: l, Router: r, Service: service.NewPostService(l, r, d, sh)}
 }
 
 func (p *PostAPI) Ready() {
@@ -47,7 +46,7 @@ func (p *PostAPI) Ready() {
 		middleware.UserMiddleware(),
 	)).Methods("POST")
 
-	// udpdate a post
+	// update a post
 	p.Router.Handle("/posts/{id}", middleware.Chain(
 		p.Service.ModifyPost(),
 		middleware.Logging(),

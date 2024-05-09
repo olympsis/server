@@ -44,6 +44,9 @@ ENV MEMBER_REPORT_COL=memberReports
 
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
 
+ENV NOTIFY=true
+ENV NOTIF_URL=https://notifications-p3dy744wqq-uc.a.run.app
+
 EXPOSE 80
 
 CMD ["/docker"]

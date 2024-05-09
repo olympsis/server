@@ -15,7 +15,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -34,8 +33,6 @@ type Service struct {
 	// logrus logger to Log information about service and errors
 	Log *logrus.Logger
 
-	Notif *notif.Service
-
 	// mux Router to complete http requests
 	Router *mux.Router
 }
@@ -43,7 +40,7 @@ type Service struct {
 /*
 Creates New Auth Service
 
-  - Creates new instace of auth service object
+  - Creates new instance of auth service object
 
 Args:
 
@@ -54,8 +51,8 @@ Returns:
 
 	*AuthenticationService - pointer referencing to new instance of service object
 */
-func NewUserService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *Service {
-	return &Service{Log: l, Router: r, Database: d, Notif: n}
+func NewUserService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
+	return &Service{Log: l, Router: r, Database: d}
 }
 
 /*
@@ -105,11 +102,11 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 /*
 Create User Data (PUT)
 
-  - Creates new user for playfest (on sign up)
+  - Creates new user for olympsis (on sign up)
 
   - Grab request body
 
-  - Create User data in user databse
+  - Create User data in user database
 
 Returns:
 

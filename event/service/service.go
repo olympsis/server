@@ -13,7 +13,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -24,17 +23,16 @@ import (
 Event Service Struct
 */
 type Service struct {
-	Database     *database.Database // database for read/write operations
-	Logger       *logrus.Logger     // logger for logging errors
-	Router       *mux.Router        // router for handling incoming requests
-	NotifService *notif.Service     // notification service for notifying users
+	Database *database.Database // database for read/write operations
+	Logger   *logrus.Logger     // logger for logging errors
+	Router   *mux.Router        // router for handling incoming requests
 }
 
 /*
 Create new event service struct
 */
-func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n}
+func NewEventService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
+	return &Service{Logger: l, Router: r, Database: d}
 }
 
 /*
@@ -96,21 +94,21 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		}
 
 		// subscribe owner to notifications
-		e.NotifService.CreateTopic(id.Hex())
-		e.NotifService.AddTokenToTopic(id.Hex(), uuid)
+		utils.CreateNotificationTopic(id.Hex())
+		utils.AddTokenToTopic(id.Hex(), uuid)
 
 		organizers := *event.Organizers
 
 		// notify all of the organizers and their members about this new event
 		for i := range organizers {
 			organizer := organizers[i]
-			note := notif.Notification{
+			note := models.Notification{
 				Title: "New Event Created",
 				Body:  *event.Title,
 				Topic: organizer.ID.Hex(),
 				Data:  fmt.Sprintf(`"id": "%s"`, id.Hex()),
 			}
-			e.NotifService.SendNotificationToTopic(&note)
+			utils.SendNotificationToTopic(&note)
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -365,31 +363,31 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		// notify participants
 		if req.ActualStartTime != nil {
 			// notify participants that the event is starting
-			note := notif.Notification{
+			note := models.Notification{
 				Title: *event.Title,
 				Body:  "Event is starting!",
 				Topic: id,
 			}
-			e.NotifService.SendNotificationToTopic(&note)
+			utils.SendNotificationToTopic(&note)
 
 		} else if req.ActualStopTime != nil {
 			// notify participants that the event ended
-			note := notif.Notification{
+			note := models.Notification{
 				Title: *event.Title,
 				Body:  "Event ended!",
 				Topic: id,
 			}
-			e.NotifService.SendNotificationToTopic(&note)
-			e.NotifService.DeleteTopic(id)
+			utils.SendNotificationToTopic(&note)
+			utils.DeleteNotificationTopic(id)
 
 		} else {
 			// notify participants that the details changes
-			note := notif.Notification{
+			note := models.Notification{
 				Title: *event.Title,
 				Body:  "Event details have changed!",
 				Topic: id,
 			}
-			e.NotifService.SendNotificationToTopic(&note)
+			utils.SendNotificationToTopic(&note)
 
 		}
 
@@ -422,7 +420,7 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		}
 
 		// delete notification topic
-		e.NotifService.DeleteTopic(id)
+		utils.DeleteNotificationTopic(id)
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -468,9 +466,9 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// check if participant already exists
-		particpants := *event.Participants
-		for i := range particpants {
-			if particpants[i].UUID == uuid {
+		participants := *event.Participants
+		for i := range participants {
+			if participants[i].UUID == uuid {
 				rw.WriteHeader(http.StatusOK)
 				return
 			}
@@ -478,7 +476,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 
 		// if event is full
 		if *event.MaxParticipants != 0 {
-			if len(particpants) >= int(*event.MaxParticipants) {
+			if len(participants) >= int(*event.MaxParticipants) {
 				http.Error(rw, `{ "msg": "event capacity is full" }`, http.StatusBadRequest)
 				return
 			}
@@ -500,15 +498,15 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// notify all participants
-		notif := notif.Notification{
+		notif := models.Notification{
 			Title: *event.Title,
 			Body:  "New Participant RSVP'd!",
 			Topic: id,
 		}
-		e.NotifService.SendNotificationToTopic(&notif)
+		utils.SendNotificationToTopic(&notif)
 
 		// subscribe user to notifications
-		e.NotifService.AddTokenToTopic(id, uuid)
+		utils.AddTokenToTopic(id, uuid)
 
 		rw.WriteHeader(http.StatusOK)
 	}
@@ -546,7 +544,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// unsubscribe user from notifications
-		e.NotifService.RemoveTokenFromTopic(id, uuid)
+		utils.RemoveTokenFromTopic(id, uuid)
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -569,7 +567,7 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 		}
 
 		// decode request
-		var req notif.Notification
+		var req models.Notification
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			e.Logger.Error("failed to decode notification", err.Error())
@@ -578,7 +576,7 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 		}
 
 		req.Topic = id
-		e.NotifService.SendNotificationToTopic(&req)
+		utils.SendNotificationToTopic(&req)
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -600,7 +598,7 @@ func (e *Service) NotifyClubMembers() http.HandlerFunc {
 		}
 
 		// decode request
-		var req notif.Notification
+		var req models.Notification
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusInternalServerError)
@@ -608,7 +606,7 @@ func (e *Service) NotifyClubMembers() http.HandlerFunc {
 		}
 
 		req.Topic = id
-		e.NotifService.SendNotificationToTopic(&req)
+		utils.SendNotificationToTopic(&req)
 		rw.WriteHeader(http.StatusOK)
 	}
 }

@@ -11,7 +11,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -23,15 +22,14 @@ type Service struct {
 	Database      *database.Database
 	Logger        *logrus.Logger
 	Router        *mux.Router
-	NotifService  *notif.Service
 	SearchService *search.Service
 }
 
 /*
 Create new Club service struct
 */
-func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
+func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
 }
 
 // Fetches all of the clubs in a given location
@@ -185,20 +183,22 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		clubAdminTopic := id.Hex() + "_admin"
 
 		// create topics and subscribe owner to it
-		err = c.NotifService.CreateTopic(clubTopic)
+		err = utils.CreateNotificationTopic(clubTopic)
 		if err != nil {
 			c.Logger.Error("failed to create club topic: ", err.Error())
 		}
-		err = c.NotifService.CreateTopic(clubAdminTopic)
+
+		err = utils.CreateNotificationTopic(clubAdminTopic)
 		if err != nil {
 			c.Logger.Error("failed to create club admin topic: ", err.Error())
 		}
 
-		err = c.NotifService.AddTokenToTopic(clubTopic, uuid)
+		err = utils.AddTokenToTopic(clubTopic, uuid)
 		if err != nil {
 			c.Logger.Error("failed to add token to club topic: ", err.Error())
 		}
-		err = c.NotifService.AddTokenToTopic(clubAdminTopic, uuid)
+
+		err = utils.AddTokenToTopic(clubAdminTopic, uuid)
 		if err != nil {
 			c.Logger.Error("failed to add token club admin topic: ", err.Error())
 		}
@@ -307,8 +307,17 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		// delete topics
 		clubTopic := id
 		clubAdminTopic := id + "_admin"
-		c.NotifService.DeleteTopic(clubTopic)
-		c.NotifService.DeleteTopic(clubAdminTopic)
+
+		err = utils.DeleteNotificationTopic(clubTopic)
+		if err != nil {
+			c.Logger.Error("failed to delete topic", err.Error())
+		}
+
+		err = utils.DeleteNotificationTopic(clubAdminTopic)
+		if err != nil {
+			c.Logger.Error("failed to delete topic", err.Error())
+		}
+
 		members := *club.Members
 
 		// delete club from users data
@@ -443,15 +452,19 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 
 		// if user was member then add them to the admin topic
 		if members[index].Role == "member" {
-			c.NotifService.AddTokenToTopic(id+"_admin", usr.UUID)
+			err = utils.AddTokenToTopic(id+"_admin", usr.UUID)
+			if err != nil {
+				c.Logger.Error("failed to add token to topic: ", err.Error())
+			}
 		}
 
 		// notify user that they had their rank changed
-		notification := notif.Notification{
+		notification := models.Notification{
 			Title: *club.Name,
 			Body:  text,
 		}
-		c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
+
+		utils.SendNotificationToToken(usr.DeviceToken, &notification)
 
 		// fetch updated club data
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
@@ -567,13 +580,21 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// notify user then remove them from the topics
-		notification := notif.Notification{
+		notification := models.Notification{
 			Title: *club.Name,
 			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
 		}
-		c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
-		c.NotifService.RemoveTokenFromTopic(id, usr.UUID)
-		c.NotifService.RemoveTokenFromTopic(id+"_admin", usr.UUID)
+
+		utils.SendNotificationToToken(usr.DeviceToken, &notification)
+		err = utils.RemoveTokenFromTopic(id, usr.UUID)
+		if err != nil {
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
+		}
+
+		err = utils.RemoveTokenFromTopic(id+"_admin", usr.UUID)
+		if err != nil {
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
+		}
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -642,8 +663,15 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 		}
 
 		// remove from topics
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), uuid)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
+		err = utils.RemoveTokenFromTopic(club.ID.Hex(), uuid)
+		if err != nil {
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
+		}
+
+		err = utils.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
+		if err != nil {
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
+		}
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -713,7 +741,7 @@ func (c *Service) GetApplications() http.HandlerFunc {
 			apps = append(apps, app)
 		}
 
-		// just in case mongo doesnt throw an error
+		// just in case mongo doesn't throw an error
 		if len(apps) == 0 {
 			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusNoContent)
@@ -804,12 +832,12 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		}
 
 		// notify admins
-		note := notif.Notification{
+		note := models.Notification{
 			Title: fmt.Sprintf("[%s]New Application", club.Name),
 			Body:  "You have a new club application",
 			Topic: app.ClubID.Hex() + "_admin",
 		}
-		err = c.NotifService.SendNotificationToTopic(&note)
+		err = utils.SendNotificationToTopic(&note)
 		if err != nil {
 			c.Logger.Error(fmt.Sprintf("failed to notify %s's admins: %s", club.ID.Hex(), err.Error()))
 		}
@@ -828,7 +856,7 @@ Update a Club Applications(PUT)
 
   - Grabs application id from path
 
-  - Update the satus of the specific application
+  - Update the status of the specific application
 
   - Must be club Admin
 
@@ -897,7 +925,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				return
 			}
 
-			// if someone else already accepted it we dont want to cause issues in user data where there are duplicated club id's
+			// if someone else already accepted it we don't want to cause issues in user data where there are duplicated club id's
 			if app.Status == "pending" {
 
 				// update club application in database
@@ -953,13 +981,22 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				}
 
 				// notify user they were accepted to the club
-				notification := notif.Notification{
+				notification := models.Notification{
 					Title: fmt.Sprintf("[%s]Application", club.Name),
 					Body:  club.Name + "Accepted your application!",
 					Data:  club,
 				}
-				c.NotifService.AddTokenToTopic(club.ID.Hex(), usr.UUID)
-				c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
+
+				err = utils.AddTokenToTopic(club.ID.Hex(), usr.UUID)
+				if err != nil {
+					c.Logger.Error("failed add token to topic: ", err.Error())
+				}
+
+				err = utils.SendNotificationToToken(usr.DeviceToken, &notification)
+				if err != nil {
+					c.Logger.Error("failed send notification to token: ", err.Error())
+				}
+
 				rw.WriteHeader(http.StatusOK)
 				return
 			}

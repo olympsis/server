@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/utils"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -23,8 +23,8 @@ Create new Post service struct
 
   - Create and Returns a pointer to a new post service struct
 */
-func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
+func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
 }
 
 /*
@@ -165,7 +165,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			return
 		}
 
-		// add aditional data to post model
+		// add additional data to post model
 		id := primitive.NewObjectID()
 		timeStamp := time.Now().Unix()
 		req.CreatedAt = &timeStamp
@@ -190,7 +190,11 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		// create post notif topic
-		p.NotifService.CreateTopic(post.ID.Hex())
+
+		err = utils.CreateNotificationTopic(post.ID.Hex())
+		if err != nil {
+			p.Logger.Error("failed to create topic: " + err.Error())
+		}
 
 		if *req.Type == "announcement" {
 
@@ -207,7 +211,10 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			members := *org.Members
 
 			for i := 0; i < len(members); i++ {
-				p.NotifService.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
+				err = utils.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
+				if err != nil {
+					p.Logger.Error("failed to create topic: " + err.Error())
+				}
 			}
 
 			// find child clubs
@@ -227,13 +234,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				}
 
 				// send notification to club members
-				note := notif.Notification{
+				note := models.Notification{
 					Title: *org.Name,
 					Body:  "New announcement!",
 					Topic: club.ID.Hex(),
 					Data:  post,
 				}
-				p.NotifService.SendNotificationToTopic(&note)
+
+				utils.SendNotificationToTopic(&note)
 			}
 
 		} else if *req.Type == "post" {
@@ -259,13 +267,13 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			}
 
 			// send notification to club members
-			note := notif.Notification{
+			note := models.Notification{
 				Title: club.Name,
 				Body:  user.Username + " created a post!",
 				Topic: club.ID.Hex(),
 				Data:  post,
 			}
-			p.NotifService.SendNotificationToTopic(&note)
+			utils.SendNotificationToTopic(&note)
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -282,7 +290,7 @@ Update Post (POST)
 
   - Grab request body
 
-  - updated post data in databse
+  - updated post data in database
 
 Returns:
 
@@ -382,7 +390,11 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		// delete notif topic
-		p.NotifService.DeleteTopic(id)
+		err = utils.DeleteNotificationTopic(id)
+		if err != nil {
+			p.Logger.Error("failed to delete topic: ", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusOK)
 	}
 }
