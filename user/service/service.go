@@ -193,6 +193,18 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 		if req.Visibility != "" {
 			changes["visibility"] = req.Visibility
 		}
+		if req.AcceptedEULA != nil {
+			changes["accepted_eula"] = req.AcceptedEULA
+		}
+		if req.Hometown != nil {
+			changes["hometown"] = req.Hometown
+		}
+		if req.LastLocation != nil {
+			changes["last_location"] = req.LastLocation
+		}
+		if req.BlockedUsers != nil {
+			changes["blocked_users"] = req.BlockedUsers
+		}
 
 		update := bson.M{"$set": changes}
 
