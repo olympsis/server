@@ -6,19 +6,19 @@ import (
 	"github.com/olympsis/models"
 )
 
-// Insert new user into database
+// Insert auth user into database
 func (a *Service) InsertUser(ctx context.Context, user *models.AuthUser) error {
 	a.Database.AuthCol.InsertOne(ctx, user)
 	return nil
 }
 
-// Get user from database
+// Get auth user from database
 func (a *Service) FindUser(ctx context.Context, filter interface{}, user *models.AuthUser) error {
 	a.Database.AuthCol.FindOne(ctx, filter).Decode(&user)
 	return nil
 }
 
-// get users from database
+// get auth users from database
 func (a *Service) FindUsers(ctx context.Context, filter interface{}, users *[]models.AuthUser) error {
 
 	cursor, err := a.Database.AuthCol.Find(ctx, filter)
@@ -37,7 +37,7 @@ func (a *Service) FindUsers(ctx context.Context, filter interface{}, users *[]mo
 	return nil
 }
 
-// update user in database
+// update auth user in database
 func (a *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *models.AuthUser) error {
 
 	// update user
@@ -55,7 +55,7 @@ func (a *Service) UpdateUser(ctx context.Context, filter interface{}, update int
 	return nil
 }
 
-// update users in database
+// update auth users in database
 func (a *Service) UpdateUsers(ctx context.Context, filter interface{}, update interface{}, users *[]models.AuthUser) error {
 
 	// update users
@@ -82,7 +82,7 @@ func (a *Service) UpdateUsers(ctx context.Context, filter interface{}, update in
 	return nil
 }
 
-// delete user in database
+// delete auth user from database
 func (a *Service) DeleteUser(ctx context.Context, filter interface{}) error {
 
 	// delete user
@@ -93,7 +93,7 @@ func (a *Service) DeleteUser(ctx context.Context, filter interface{}) error {
 	return nil
 }
 
-// delete users in database
+// delete auth users from database
 func (a *Service) DeleteUsers(ctx context.Context, filter interface{}) error {
 
 	// delete users

@@ -5,6 +5,7 @@ import (
 	"olympsis-server/event/service"
 	"olympsis-server/middleware"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -19,7 +20,7 @@ func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *EventAP
 	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d)}
 }
 
-func (e *EventAPI) Ready() {
+func (e *EventAPI) Ready(firebase *auth.Client) {
 
 	/*
 		EVENTS
@@ -30,7 +31,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.Location(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -39,7 +40,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetEventsByLocation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -48,7 +49,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetEventsByField(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -57,7 +58,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -66,7 +67,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.CreateEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -75,7 +76,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.UpdateAnEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -84,7 +85,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.DeleteAnEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -97,7 +98,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.AddParticipant(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -106,7 +107,7 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.RemoveParticipant(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -119,16 +120,16 @@ func (e *EventAPI) Ready() {
 		middleware.Chain(
 			e.Service.NotifyParticipants(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
 	// notify club members
-	e.Router.Handle("/events/{id}/notify/clbu",
+	e.Router.Handle("/events/{id}/notify/club",
 		middleware.Chain(
 			e.Service.NotifyClubMembers(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 }

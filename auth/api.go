@@ -5,6 +5,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/middleware"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -15,55 +16,31 @@ type AuthAPI struct {
 	Service *service.Service
 }
 
-func NewAuthAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *AuthAPI {
-	return &AuthAPI{Logger: l, Router: r, Service: service.NewAuthService(l, r, d)}
+func NewAuthAPI(l *logrus.Logger, r *mux.Router, d *database.Database, c *auth.Client) *AuthAPI {
+	return &AuthAPI{Logger: l, Router: r, Service: service.NewAuthService(l, r, d, c)}
 }
 
-func (s *AuthAPI) Ready() {
+func (s *AuthAPI) Ready(firebase *auth.Client) {
 
-	// routes
-	s.Router.Handle("/auth/signup",
+	s.Router.Handle("/v1/auth/register",
 		middleware.Chain(
-			s.Service.SignUp(),
+			s.Service.Register(),
 			middleware.Logging(),
 		),
 	).Methods("POST")
 
-	s.Router.Handle("/auth/login",
+	s.Router.Handle("/v1/auth/login",
 		middleware.Chain(
 			s.Service.Login(),
 			middleware.Logging(),
 		),
 	).Methods("POST")
 
-	s.Router.Handle("/auth/logout",
-		middleware.Chain(
-			s.Service.Logout(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("POST")
-
-	s.Router.Handle("/auth/delete",
+	s.Router.Handle("/v1/auth/delete",
 		middleware.Chain(
 			s.Service.Delete(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
-
-	s.Router.Handle("/auth/apple/notification",
-		middleware.Chain(
-			s.Service.AppleNotifications(),
-			middleware.Logging(),
-		),
-	).Methods("POST")
-
-	s.Router.Handle("/auth/token",
-		middleware.Chain(
-			s.Service.Token(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("POST")
 }

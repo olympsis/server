@@ -87,30 +87,53 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			posts, err = FindPosts(ids, p.Database, 100)
 			if err != nil {
 				if err == mongo.ErrNoDocuments {
-					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
+					http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
 					return
 				} else {
 					p.Logger.Error("failed to get posts: ", err.Error())
 					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
+					return
 				}
 			}
 		}()
 
 		wg.Wait()
 
-		_posts := removePostsByPosterUUIDs(posts, user.BlockedUsers)
-
-		if _posts == nil || len(*_posts) == 0 {
-			http.Error(rw, `{ "msg": "no posts content not found" }`, http.StatusNoContent)
+		if posts == nil || len(*posts) == 0 {
+			http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
 			return
 		}
 
-		resp := models.PostsResponse{
-			TotalPosts: len(*_posts),
-			Posts:      *_posts,
+		if user == nil {
+			http.Error(rw, `{ "msg": "user not found!" }`, http.StatusInternalServerError)
+			return
 		}
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
+
+		if user.BlockedUsers != nil {
+			_posts := removePostsByPosterUUIDs(posts, user.BlockedUsers)
+
+			if _posts == nil || len(*_posts) == 0 {
+				http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
+				return
+			}
+
+			resp := models.PostsResponse{
+				TotalPosts: len(*_posts),
+				Posts:      *_posts,
+			}
+
+			rw.WriteHeader(http.StatusOK)
+			json.NewEncoder(rw).Encode(resp)
+
+		} else {
+			resp := models.PostsResponse{
+				TotalPosts: len(*posts),
+				Posts:      *posts,
+			}
+
+			rw.WriteHeader(http.StatusOK)
+			json.NewEncoder(rw).Encode(resp)
+		}
 	}
 }
 

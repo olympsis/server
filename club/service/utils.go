@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func FindClub(id *primitive.ObjectID, database *database.Database) (*models.Club, error) {
+func AggregateClub(id *primitive.ObjectID, database *database.Database) (*models.Club, error) {
 
 	ctx := context.Background()
 
@@ -179,7 +179,7 @@ func FindClub(id *primitive.ObjectID, database *database.Database) (*models.Club
 	return &club, nil
 }
 
-func FindClubs(filter interface{}, database *database.Database) (*[]models.Club, error) {
+func AggregateClubs(filter interface{}, database *database.Database) (*[]models.Club, error) {
 
 	ctx := context.Background()
 

@@ -43,6 +43,7 @@ ENV EVENT_REPORT_COL=eventReports
 ENV MEMBER_REPORT_COL=memberReports
 
 ENV KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
+ENV SECRET=4aE8ENjmjnEAivkm9kDzXkq+oEsH5EWGbnrUdHBK72g/gJe8RF6B+G90wJp9o+LlEwMU/hqglKLE/nrzf9qUmw==
 
 ENV NOTIFY=true
 ENV NOTIF_URL=https://notifications-p3dy744wqq-uc.a.run.app

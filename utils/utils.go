@@ -65,33 +65,34 @@ func GenerateAuthToken(u string, p string) (string, error) {
 	return ts, nil
 }
 
-func ValidateAuthToken(s string) (string, string, float64, float64, error) {
+func ValidateAuthToken(s string) (string, float64, float64, error) {
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(s, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
+		return []byte(os.Getenv("SECRET")), nil
 	})
 
 	if err != nil {
-		return "", "", 0, 0, err
+		return "", 0, 0, err
 	} else {
 		uuid, ok := claims["sub"].(string)
 		if !ok {
-			return "", "", 0, 0, errors.New("sub claim not found")
-		}
-		provider, ok := claims["pod"].(string)
-		if !ok {
-			return "", "", 0, 0, errors.New("pod claim not found")
+			return "", 0, 0, errors.New("sub claim not found")
 		}
 		createdAt, ok := claims["iat"].(float64)
 		if !ok {
-			return "", "", 0, 0, errors.New("iat claim not found")
+			return "", 0, 0, errors.New("iat claim not found")
 		}
 		expiresAt, ok := claims["exp"].(float64)
 		if !ok {
-			return "", "", 0, 0, errors.New("exp claim not found")
+			return "", 0, 0, errors.New("exp claim not found")
+		} else {
+			now := time.Now().Unix()
+			if expiresAt < float64(now) {
+				return "", 0, 0, errors.New("token is expired")
+			}
 		}
 
-		return uuid, provider, createdAt, expiresAt, nil
+		return uuid, createdAt, expiresAt, nil
 	}
 }
 

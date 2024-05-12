@@ -5,6 +5,7 @@ import (
 	"olympsis-server/middleware"
 	"olympsis-server/report/service"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -23,7 +24,7 @@ func NewReportAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *Report
 	}
 }
 
-func (e *ReportAPI) Setup() {
+func (e *ReportAPI) Setup(firebase *auth.Client) {
 
 	/*
 		BUG REPORTS
@@ -34,7 +35,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.ReadBugReports(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -43,7 +44,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.CreateBugReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -52,7 +53,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.UpdateBugReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -61,7 +62,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.DeleteBugReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -74,7 +75,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.ReadPostReports(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -83,7 +84,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.CreatePostReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -92,7 +93,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.UpdatePostReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -101,7 +102,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.DeletePostReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -114,7 +115,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.ReadMemberReports(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -123,7 +124,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.CreateMemberReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -132,7 +133,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.UpdateMemberReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -141,7 +142,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.DeleteMemberReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -154,7 +155,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.ReadFieldReports(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -163,7 +164,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.CreateFieldReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -172,7 +173,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.UpdateFieldReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -181,7 +182,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.DeleteFieldReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -194,7 +195,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.ReadEventReports(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -203,7 +204,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.CreateEventReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -212,7 +213,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.UpdateEventReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -221,7 +222,7 @@ func (e *ReportAPI) Setup() {
 		middleware.Chain(
 			e.Service.DeleteEventReport(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 }

@@ -5,6 +5,7 @@ import (
 	"olympsis-server/middleware"
 	"olympsis-server/storage/service"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -19,13 +20,13 @@ func NewStorageAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *Stora
 	return &StorageAPI{Logger: l, Router: r, Service: service.NewStorageService(l, r)}
 }
 
-func (s *StorageAPI) Ready() {
+func (s *StorageAPI) Ready(firebase *auth.Client) {
 	s.Service.ConnectToClient()
 	s.Router.Handle("/storage/{fileBucket}",
 		middleware.Chain(
 			s.Service.UploadObject(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -33,7 +34,7 @@ func (s *StorageAPI) Ready() {
 		middleware.Chain(
 			s.Service.DeleteObject(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 }

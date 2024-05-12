@@ -5,6 +5,7 @@ import (
 	"olympsis-server/middleware"
 	"olympsis-server/organization/service"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
@@ -20,7 +21,7 @@ func NewOrganizationAPI(l *logrus.Logger, r *mux.Router, d *database.Database, s
 	return &OrganizationAPI{Logger: l, Router: r, Service: service.NewOrganizationService(l, r, d, sh)}
 }
 
-func (e *OrganizationAPI) Ready() {
+func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 
 	/*
 		ORGANIZATIONS
@@ -31,7 +32,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.CreateOrganization(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -40,7 +41,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetOrganizations(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -49,7 +50,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetOrganization(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -58,7 +59,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.UpdateOrganization(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -67,7 +68,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.DeleteOrganization(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -79,7 +80,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.CreateApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -88,7 +89,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetApplications(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -97,7 +98,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -106,7 +107,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.UpdateApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -115,7 +116,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.DeleteApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -127,7 +128,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.CreateInvitation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -136,7 +137,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetInvitations(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -145,7 +146,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetInvitation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -154,7 +155,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.UpdateInvitation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -163,7 +164,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.DeleteInvitation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -175,7 +176,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.PinOrgPost(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -183,7 +184,7 @@ func (e *OrganizationAPI) Ready() {
 		middleware.Chain(
 			e.Service.UnpinOrgPost(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 }

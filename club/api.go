@@ -5,6 +5,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/middleware"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
@@ -20,7 +21,7 @@ func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *searc
 	return &ClubAPI{Logger: l, Router: r, Service: service.NewClubService(l, r, d, sh)}
 }
 
-func (s *ClubAPI) Ready() {
+func (s *ClubAPI) Ready(firebase *auth.Client) {
 	/*
 		BASIC
 	*/
@@ -30,7 +31,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetClubsByLocation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -39,7 +40,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -48,7 +49,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.ModifyClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -57,7 +58,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.CreateClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -66,7 +67,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.DeleteClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -75,7 +76,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.LeaveClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -88,7 +89,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetApplications(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
@@ -97,7 +98,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.CreateApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
@@ -107,7 +108,7 @@ func (s *ClubAPI) Ready() {
 			s.Service.UpdateApplication(),
 			middleware.Logging(),
 
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -116,7 +117,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.DeleteApplication(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -129,7 +130,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.ChangeMemberRank(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -138,7 +139,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.KickMember(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -147,7 +148,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.LeaveClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -159,7 +160,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.PinClubPost(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
@@ -167,7 +168,7 @@ func (s *ClubAPI) Ready() {
 		middleware.Chain(
 			s.Service.UnpinClubPost(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 }

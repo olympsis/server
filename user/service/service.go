@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"strconv"
@@ -21,21 +23,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-/*
-Authentication Service
-- reference object for auth service
-*/
-type Service struct {
-	// database
-	Database *database.Database
-
-	// logrus logger to Log information about service and errors
-	Log *logrus.Logger
-
-	// mux Router to complete http requests
-	Router *mux.Router
-}
 
 /*
 Creates New Auth Service
@@ -113,8 +100,8 @@ Returns:
 	Http handler
 		- Writes token back to client
 */
-func (u *Service) CreateUserData() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
+func (s *Service) CreateUserData() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
 
@@ -122,8 +109,8 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 		var req models.User
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			s.Log.Error(fmt.Sprintf("Failed to decode request: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -136,15 +123,22 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 		}
 
 		// insert auth user in database
-		err = u.InsertUser(context.Background(), &user)
+		err = s.InsertUser(context.Background(), &user)
 		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Failed to Insert User", http.StatusInternalServerError)
+			s.Log.Error(fmt.Sprintf("Failed to insert user into database: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to insert user"}`, http.StatusInternalServerError)
 			return
 		}
 
-		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(user)
+		usr, err := aggregations.AggregateUser(&uuid, s.Database)
+		if err != nil {
+			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to find user data"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(usr)
 	}
 }
 
@@ -160,8 +154,8 @@ Returns:
 	Http handler
 		- Writes token back to client
 */
-func (u *Service) UpdateUserData() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
+func (s *Service) UpdateUserData() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
 
@@ -169,8 +163,9 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 		var req models.User
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			u.Log.Debug(err.Error())
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			s.Log.Error(fmt.Sprintf("Failed to decode request: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
+			return
 		}
 
 		filter := bson.M{"uuid": uuid}
@@ -208,13 +203,22 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 
 		update := bson.M{"$set": changes}
 
-		err = u.UpdateUser(context.Background(), filter, update, &req)
+		err = s.UpdateUser(context.Background(), filter, update, &req)
 		if err != nil {
-			u.Log.Debug(err)
+			s.Log.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to update user data" }`, http.StatusInternalServerError)
+			return
 		}
 
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(req)
+		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		if err != nil {
+			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -230,25 +234,21 @@ Returns:
 	Http handler
 		- Writes user data back to client
 */
-func (u *Service) GetUserData() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
+func (s *Service) GetUserData() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
 
-		// find user data in database
-		var user models.User
-		filter := bson.M{"uuid": uuid}
-		err := u.FindUser(context.Background(), filter, &user)
-
-		// username is a temp fix because empty users are not throwing an error
-		if err != nil || user.UserName == "" {
-			http.Error(rw, "user data not found", http.StatusNotFound)
+		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		if err != nil || user.Username == "" {
+			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusNotFound)
 			return
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(user)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -382,8 +382,8 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
-				users[i].FirstName = auth.FirstName
-				users[i].LastName = auth.LastName
+				users[i].FirstName = *auth.FirstName
+				users[i].LastName = *auth.LastName
 			}
 		}
 
@@ -433,8 +433,8 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 			UUID:        user.UUID,
 			Bio:         user.Bio,
 			Username:    user.UserName,
-			FirstName:   auth.FirstName,
-			LastName:    auth.LastName,
+			FirstName:   *auth.FirstName,
+			LastName:    *auth.LastName,
 			ImageURL:    user.ImageURL,
 			Visibility:  user.Visibility,
 			DeviceToken: user.DeviceToken,
@@ -519,7 +519,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 						},
 					},
 				}
-				clubs, err := service.FindClubs(filter, s.Database)
+				clubs, err := service.AggregateClubs(filter, s.Database)
 				if err != nil {
 					s.Log.Error("failed to check user in: ", err.Error())
 				}

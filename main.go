@@ -18,9 +18,12 @@ import (
 	"syscall"
 	"time"
 
+	firebase "firebase.google.com/go"
+
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/option"
 )
 
 func main() {
@@ -34,10 +37,23 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
+	opt := option.WithCredentialsFile("./files/firebase-credentials.json")
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		l.Fatalf("error starting firebase app: %s\n", err)
+		os.Exit(1)
+	}
+
+	client, err := app.Auth(context.TODO())
+	if err != nil {
+		l.Fatalf("error getting Auth client: %v\n", err)
+		os.Exit(1)
+	}
+
 	// search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
-	authAPI := auth.NewAuthAPI(l, r, d)
+	authAPI := auth.NewAuthAPI(l, r, d, client)
 	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
 	clubAPI := club.NewClubAPI(l, r, d, sh)
@@ -47,15 +63,15 @@ func main() {
 	organizationAPI := organization.NewOrganizationAPI(l, r, d, sh)
 	reportAPI := report.NewReportAPI(l, r, d)
 
-	authAPI.Ready()
-	userAPI.Ready()
+	authAPI.Ready(client)
+	userAPI.Ready(client)
 	fieldAPI.Ready()
-	clubAPI.Ready()
-	postAPI.Ready()
-	eventAPI.Ready()
-	storageAPI.Ready()
-	organizationAPI.Ready()
-	reportAPI.Setup()
+	clubAPI.Ready(client)
+	postAPI.Ready(client)
+	eventAPI.Ready(client)
+	storageAPI.Ready(client)
+	organizationAPI.Ready(client)
+	reportAPI.Setup(client)
 
 	port := os.Getenv("PORT")
 	if port == "" {
