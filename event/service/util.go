@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"olympsis-server/database"
 	"time"
 
@@ -199,7 +198,6 @@ Find events data by location
 func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, location models.GeoJSON, radius int, limit int, database *database.Database) (*[]models.Event, error) {
 
 	ctx := context.Background()
-	fmt.Println(time.Now().Add(-time.Hour * 2).Unix())
 	// match events by the field ids and a geo location if they have one
 	filterPipeline := bson.M{
 		"$match": bson.M{

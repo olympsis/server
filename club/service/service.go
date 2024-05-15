@@ -65,7 +65,6 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 
 		// no content
 		if len(*clubs) == 0 {
-			rw.WriteHeader(http.StatusNoContent)
 			http.Error(rw, `{ "msg": "no clubs found" }`, http.StatusNoContent)
 			return
 		}

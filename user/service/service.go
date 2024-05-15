@@ -7,13 +7,8 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/database"
-	"olympsis-server/utils"
-	"strconv"
 	"sync"
 	"time"
-
-	"olympsis-server/club/service"
-	org "olympsis-server/organization/service"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
@@ -456,53 +451,18 @@ func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
-		provider := r.Header.Get("Token-Provider")
-		tokenExpiry, _ := strconv.ParseInt(r.Header.Get("Token-Expiry"), 10, 64)
-
-		// check to see if their token is close to expiration
-		var newToken *string
-		if tokenExpiry == 0 {
-			t, _ := utils.GenerateAuthToken(uuid, provider)
-			newToken = &t
-
-			// update tokens
-			update := bson.M{"$set": bson.M{"token": newToken}}
-			_, err := s.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
-			if err != nil {
-				s.Log.Error(err.Error())
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		} else {
-			if tokenExpiry < time.Now().Add(15*24*time.Hour).Unix() {
-				t, _ := utils.GenerateAuthToken(uuid, provider)
-				newToken = &t
-
-				// update tokens
-				update := bson.M{"$set": bson.M{"token": newToken}}
-				_, err := s.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
-				if err != nil {
-					s.Log.Error(err.Error())
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-			}
-		}
-
 		response := models.CheckIn{}
-		if newToken != nil {
-			response.Token = newToken
-		}
 
 		// find user data
-		user, err := FindUser(uuid, s.Database)
+		user, err := aggregations.AggregateUser(&uuid, s.Database)
 		if err != nil {
-			s.Log.Error("failed to check user in: ", err.Error())
+			s.Log.Error(fmt.Sprintf("Failed to check user in: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to check user in" }`, http.StatusInternalServerError)
+			return
 		}
 		if user == nil {
-			s.Log.Error("failed to get user. user object is nill")
-			http.Error(w, `{ "msg": "failed to get user" }`, http.StatusUnauthorized)
+			s.Log.Error("Failed to get user. user object is nill")
+			http.Error(w, `{ "msg": "failed to get user" }`, http.StatusNotFound)
 			return
 		}
 		response.User = *user
@@ -519,7 +479,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 						},
 					},
 				}
-				clubs, err := service.AggregateClubs(filter, s.Database)
+				clubs, err := aggregations.AggregateClubs(filter, s.Database)
 				if err != nil {
 					s.Log.Error("failed to check user in: ", err.Error())
 				}
@@ -538,7 +498,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 						},
 					},
 				}
-				orgs, err := org.FindOrganizations(filter, s.Database)
+				orgs, err := aggregations.AggregateOrganizations(filter, s.Database)
 				if err != nil {
 					s.Log.Error("failed to check user in: ", err.Error())
 				}
