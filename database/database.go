@@ -26,8 +26,6 @@ type Database struct {
 	CommentsCol  *mongo.Collection
 	FriendReqCol *mongo.Collection
 
-	NotifCol *mongo.Collection
-
 	ClubApplicationCol *mongo.Collection
 	OrgApplicationCol  *mongo.Collection
 
@@ -70,20 +68,7 @@ func (d *Database) EstablishConnection() {
 			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 		}
 
-		noteLoc := os.Getenv("NOTIF_DB_ADDR")
-		opts2 := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + noteLoc + `/?retryWrites=true&w=majority`)
-		client2, err := mongo.Connect(context.Background(), opts2)
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
-		err = client2.Ping(context.Background(), readpref.Primary())
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
 		d.Client = client
-		d.NotifClient = client2
 
 	} else {
 
@@ -98,24 +83,10 @@ func (d *Database) EstablishConnection() {
 			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 		}
 
-		noteLoc := os.Getenv("NOTIF_DB_ADDR")
-		opts2 := options.Client().ApplyURI(`mongodb://` + dbUser + `:` + dbPass + `@` + noteLoc + `/?retryWrites=true&w=majority`)
-		client2, err := mongo.Connect(context.Background(), opts2)
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
-		err = client2.Ping(context.Background(), readpref.Primary())
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
 		d.Client = client
-		d.NotifClient = client2
 	}
 
 	d.LinkCollections()
-
 	d.Logger.Info("Database connection successful.")
 }
 
@@ -128,12 +99,12 @@ func (d *Database) LinkCollections() {
 	d.EventCol = database.Collection(os.Getenv("EVENT_COL"))
 	d.FieldCol = database.Collection(os.Getenv("FIELD_COL"))
 	d.PostCol = database.Collection(os.Getenv("POST_COL"))
-	d.ClubInvCol = database.Collection(os.Getenv("CINVITE_COL"))
+	d.ClubInvCol = database.Collection(os.Getenv("CLUB_INVITE_COL"))
 	d.CommentsCol = database.Collection(os.Getenv("COMMENTS_COL"))
-	d.FriendReqCol = database.Collection(os.Getenv("FREQUEST_COL"))
+	d.FriendReqCol = database.Collection(os.Getenv("FRIEND_REQUEST_COL"))
 
-	d.ClubApplicationCol = database.Collection(os.Getenv("CAPPICATIONS_COL"))
-	d.OrgApplicationCol = database.Collection(os.Getenv("OAPPICATIONS_COL"))
+	d.ClubApplicationCol = database.Collection(os.Getenv("CLUB_APPLICATIONS_COL"))
+	d.OrgApplicationCol = database.Collection(os.Getenv("ORG_APPLICATIONS_COL"))
 
 	d.EventInvitationCol = database.Collection(os.Getenv("EVENT_INVITATIONS_COL"))
 	d.ClubInvitationCol = database.Collection(os.Getenv("CLUB_INVITATIONS_COL"))
@@ -144,6 +115,4 @@ func (d *Database) LinkCollections() {
 	d.FieldReportCol = database.Collection(os.Getenv("FIELD_REPORT_COL"))
 	d.EventReportCol = database.Collection(os.Getenv("EVENT_REPORT_COL"))
 	d.MemberReportCol = database.Collection(os.Getenv("MEMBER_REPORT_COL"))
-
-	d.NotifCol = d.NotifClient.Database(os.Getenv("NOTIF_DB_NAME")).Collection(os.Getenv("NOTIF_COL"))
 }

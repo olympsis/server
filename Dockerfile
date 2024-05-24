@@ -26,11 +26,11 @@ ENV ORG_COL=organizations
 ENV EVENT_COL=events
 ENV FIELD_COL=fields
 ENV POST_COL=posts
-ENV CINVITE_COL=clubInvites
+ENV CLUB_INVITE_COL=clubInvites
 ENV COMMENTS_COL=comments
-ENV FREQUEST_COL=friendRequests
-ENV CAPPICATIONS_COL=clubApplications
-ENV OAPPICATIONS_COL=organizationApplications
+ENV FRIEND_REQUEST_COL=friendRequests
+ENV CLUB_APPLICATIONS_COL=clubApplications
+ENV ORG_APPLICATIONS_COL=organizationApplications
 
 ENV EVENT_INVITATIONS_COL=eventInvitations
 ENV CLUB_INVITATIONS_COL=clubInvitations
