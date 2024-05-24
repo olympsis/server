@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"olympsis-server/utils"
 
-	"firebase.google.com/go/auth"
+	"firebase.google.com/go/v4/auth"
 )
 
 /*

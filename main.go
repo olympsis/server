@@ -11,14 +11,13 @@ import (
 	"olympsis-server/organization"
 	"olympsis-server/post"
 	"olympsis-server/report"
-	"olympsis-server/storage"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	firebase "firebase.google.com/go"
+	firebase "firebase.google.com/go/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
@@ -59,7 +58,6 @@ func main() {
 	clubAPI := club.NewClubAPI(l, r, d, sh)
 	postAPI := post.NewPostAPI(l, r, d, sh)
 	eventAPI := event.NewEventAPI(l, r, d)
-	storageAPI := storage.NewStorageAPI(l, r, d)
 	organizationAPI := organization.NewOrganizationAPI(l, r, d, sh)
 	reportAPI := report.NewReportAPI(l, r, d)
 
@@ -69,7 +67,6 @@ func main() {
 	clubAPI.Ready(client)
 	postAPI.Ready(client)
 	eventAPI.Ready(client)
-	storageAPI.Ready(client)
 	organizationAPI.Ready(client)
 	reportAPI.Setup(client)
 

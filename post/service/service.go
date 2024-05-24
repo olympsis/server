@@ -660,16 +660,20 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 
 func removePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Post {
 	var result []models.Post
-	for _, post := range *posts {
-		found := false
-		for _, uuid := range uuids {
-			if post.Poster.UUID == uuid {
-				found = true
-				break
+	if len(*posts) > 0 {
+		for _, post := range *posts {
+			found := false
+			for _, uuid := range uuids {
+				if post.Poster != nil {
+					if post.Poster.UUID == uuid {
+						found = true
+						break
+					}
+				}
 			}
-		}
-		if !found {
-			result = append(result, post)
+			if !found {
+				result = append(result, post)
+			}
 		}
 	}
 	return &result

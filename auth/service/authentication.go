@@ -9,7 +9,7 @@ import (
 	"olympsis-server/database"
 	"time"
 
-	"firebase.google.com/go/auth"
+	"firebase.google.com/go/v4/auth"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
@@ -63,6 +63,7 @@ func (a *Service) Register() http.HandlerFunc {
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to verify ID Token: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to register new user" }`, http.StatusInternalServerError)
+			return
 		}
 
 		// New AuthUser
@@ -116,12 +117,14 @@ func (a *Service) Login() http.HandlerFunc {
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to decode AuthRequest: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "bad body in request"} `, http.StatusBadRequest)
+			return
 		}
 
 		token, err := a.Client.VerifyIDToken(context.TODO(), *request.Token)
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to verify ID Token: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to register new user" }`, http.StatusInternalServerError)
+			return
 		}
 
 		user, err := aggregations.AggregateUser(&token.UID, a.Database)

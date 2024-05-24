@@ -7,46 +7,6 @@ PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
-export PORT=80
-
-export KEYID=JN25FUC9X2
-export TEAMID=5A6H49Q85D
-
-export DB_USR=admin
-export DB_PASS=vM9pPgfHeZDxgBDv
-
-export DB_NAME=olympsis
-export DB_ADDR=database-0.i4q7nvi.mongodb.net
-export NOTIF_DB_ADDR=database-2.pdjjqal.mongodb.net
-export NOTIF_DB_NAME=notifications
-export NOTIF_COL=topics
-
-export AUTH_COL=auth
-export USER_COL=users
-export CLUB_COL=clubs
-export ORG_COL=organizations
-export EVENT_COL=events
-export FIELD_COL=fields
-export POST_COL=posts
-export CINVITE_COL=clubInvites
-export COMMENTS_COL=comments
-export FREQUEST_COL=friendRequests
-export CAPPICATIONS_COL=clubApplications
-export OAPPICATIONS_COL=organizationApplications
-
-export EVENT_INVITATIONS_COL=eventInvitations
-export CLUB_INVITATIONS_COL=clubInvitations
-export ORG_INVITATIONS_COL=organizationInvitations
-
-export BUG_REPORT_COL=bugReports
-export POST_REPORT_COL=postReports
-export FIELD_REPORT_COL=fieldReports
-export EVENT_REPORT_COL=eventReports
-export MEMBER_REPORT_COL=memberReports
-
-export KEY=SZkp78avQkxGyjRakxb5Ob08zqjguNRA
-
-
 .PHONY: all dep build clean test coverage coverhtml lint
 
 all: build
