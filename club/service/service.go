@@ -70,7 +70,7 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 		}
 
 		// get all of the clubs data
-		clubs, err := AggregateClubs(bson.M{"$match": filter}, s.Database)
+		clubs, err := aggregations.AggregateClubs(bson.M{"$match": filter}, s.Database)
 		if err != nil {
 			s.Logger.Error("failed to find clubs: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find clubs" }`, http.StatusInternalServerError)
@@ -112,7 +112,7 @@ func (c *Service) GetClub() http.HandlerFunc {
 		defer ctx()
 
 		// find club data in database
-		club, err := AggregateClub(&oid, c.Database)
+		club, err := aggregations.AggregateClub(&oid, c.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
