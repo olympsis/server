@@ -340,3 +340,214 @@ func AggregateClubs(filter interface{}, database *database.Database) (*[]models.
 
 	return &response, nil
 }
+
+func AggregateClubApplication(id *primitive.ObjectID, database *database.Database) (*models.ClubApplication, error) {
+
+	ctx := context.Background()
+
+	idPipeline := bson.M{
+		"$match": bson.M{
+			"_id": id,
+		},
+	}
+
+	metaLookup := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "uuid",
+			"foreignField": "uuid",
+			"as":           "meta",
+		},
+	}
+
+	authLookup := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "uuid",
+			"foreignField": "uuid",
+			"as":           "auth",
+		},
+	}
+
+	authObject := bson.M{
+		"$addFields": bson.M{
+			"auth": bson.M{
+				"$arrayElemAt": bson.A{
+					"$auth",
+					0,
+				},
+			},
+		},
+	}
+
+	metaObject := bson.M{
+		"$addFields": bson.M{
+			"meta": bson.M{
+				"$arrayElemAt": bson.A{
+					"$meta",
+					0,
+				},
+			},
+		},
+	}
+
+	userObject := bson.M{
+		"$addFields": bson.M{
+			"applicant": bson.M{
+				"$mergeObjects": bson.A{
+					"$auth",
+					"$meta",
+				},
+			},
+		},
+	}
+
+	cleanUp := bson.M{
+		"$project": bson.M{
+			"meta":    0,
+			"auth":    0,
+			"uuid":    0,
+			"club_id": 0,
+			"user": bson.M{
+				"_id":          0,
+				"email":        0,
+				"token":        0,
+				"access_token": 0,
+				"provider":     0,
+			},
+		},
+	}
+
+	pipeline := bson.A{
+		idPipeline,
+		metaLookup,
+		authLookup,
+		authObject,
+		metaObject,
+		userObject,
+		cleanUp,
+	}
+
+	cur, err := database.ClubApplicationCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	var application models.ClubApplication
+	if cur.Next(ctx) {
+		err = cur.Decode(&application)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, mongo.ErrNoDocuments
+	}
+
+	return &application, nil
+}
+
+func AggregateClubApplications(clubId *primitive.ObjectID, status string, database *database.Database) (*[]models.ClubApplication, error) {
+
+	ctx := context.Background()
+
+	filter := bson.M{
+		"$match": bson.M{
+			"club_id": clubId,
+			"status":  status,
+		},
+	}
+
+	metaLookup := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "uuid",
+			"foreignField": "uuid",
+			"as":           "meta",
+		},
+	}
+
+	authLookup := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "uuid",
+			"foreignField": "uuid",
+			"as":           "auth",
+		},
+	}
+
+	authObject := bson.M{
+		"$addFields": bson.M{
+			"auth": bson.M{
+				"$arrayElemAt": bson.A{
+					"$auth",
+					0,
+				},
+			},
+		},
+	}
+
+	metaObject := bson.M{
+		"$addFields": bson.M{
+			"meta": bson.M{
+				"$arrayElemAt": bson.A{
+					"$meta",
+					0,
+				},
+			},
+		},
+	}
+
+	userObject := bson.M{
+		"$addFields": bson.M{
+			"applicant": bson.M{
+				"$mergeObjects": bson.A{
+					"$auth",
+					"$meta",
+				},
+			},
+		},
+	}
+
+	cleanUp := bson.M{
+		"$project": bson.M{
+			"meta":    0,
+			"auth":    0,
+			"uuid":    0,
+			"club_id": 0,
+			"user": bson.M{
+				"_id":          0,
+				"email":        0,
+				"token":        0,
+				"access_token": 0,
+				"provider":     0,
+			},
+		},
+	}
+
+	pipeline := bson.A{
+		filter,
+		metaLookup,
+		authLookup,
+		authObject,
+		metaObject,
+		userObject,
+		cleanUp,
+	}
+
+	cur, err := database.ClubApplicationCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []models.ClubApplication
+	for cur.Next(context.TODO()) {
+		var app models.ClubApplication
+		err := cur.Decode(&app)
+		if err != nil {
+			database.Logger.Error("failed to decode event", err)
+		}
+		response = append(response, app)
+	}
+
+	return &response, nil
+}

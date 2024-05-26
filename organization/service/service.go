@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"time"
@@ -57,8 +58,8 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		var req models.OrganizationDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			e.Logger.Error(fmt.Sprintf("Failed to decode request: %s", err.Error()))
+			http.Error(rw, `{ "msg" : "Bad request" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -68,28 +69,30 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		member := models.MemberDao{
 			ID:       primitive.NewObjectID(),
 			UUID:     uuid,
-			Role:     "manager",
+			Role:     "owner",
 			JoinedAt: timeStamp,
 		}
 		members := []models.MemberDao{member}
+
 		// new organization model
 		organization := models.OrganizationDao{
-			Name:         req.Name,
-			Description:  req.Description,
-			Sport:        req.Sport,
-			City:         req.City,
-			State:        req.State,
-			Country:      req.Country,
-			ImageURL:     req.ImageURL,
-			ImageGallery: req.ImageGallery,
-			Members:      &members,
-			CreatedAt:    &timeStamp,
+			Name:        req.Name,
+			Description: req.Description,
+			Sports:      req.Sports,
+			City:        req.City,
+			State:       req.State,
+			Country:     req.Country,
+			Logo:        req.Logo,
+			Banner:      req.Banner,
+			Members:     &members,
+			IsVerified:  req.IsVerified,
+			CreatedAt:   &timeStamp,
 		}
 
 		// insert organization into database
 		id, err := e.InsertAnOrganization(context.Background(), &organization)
 		if err != nil {
-			e.Logger.Error(err.Error())
+			e.Logger.Error(fmt.Sprintf("Failed to create organization: %s", err.Error()))
 			http.Error(rw, `{ "msg": "Failed to create organization" }`, http.StatusInternalServerError)
 			return
 		}
@@ -100,22 +103,26 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 				"organizations": id,
 			},
 		}
-		e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
+		_, err = e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
+		if err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
+		}
 
 		// subscribe to notifications
 		err = utils.CreateNotificationTopic(id.Hex())
 		if err != nil {
-			e.Logger.Error("failed to create topic: ", err.Error())
+			e.Logger.Error("Failed to create topic: ", err.Error())
 		}
-
 		err = utils.AddTokenToTopic(id.Hex(), uuid)
 		if err != nil {
-			e.Logger.Error("failed to add token to topic: ", err.Error())
+			e.Logger.Error("Failed to add token to topic: ", err.Error())
 		}
+
+		resp := models.CreateResponse{ID: id.Hex()}
 
 		// return created organization
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(organization)
+		json.NewEncoder(rw).Encode(resp)
 	}
 }
 
@@ -129,16 +136,17 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no organization id found in request" }`))
+			e.Logger.Error("No organization ID found in request")
+			http.Error(rw, `{ "msg": "No organization ID found in request" }`, http.StatusBadRequest)
 			return
 		}
 
 		// find organization data in database
 		oid, _ := primitive.ObjectIDFromHex(id)
-		org, err := FindOrganization(&oid, e.Database)
+		org, err := aggregations.AggregateOrganization(&oid, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
+				e.Logger.Error(fmt.Sprintf("Organization not found ID: %s", id))
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
 				return
 			}
@@ -146,6 +154,7 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 
 		// check to see if object is empty
 		if org == nil {
+			e.Logger.Error("Organization not found")
 			http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNotFound)
 			return
 		}
@@ -172,18 +181,19 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		}
 
 		if state == "" || country == "" {
+			e.Logger.Error("You need a state and a country to query organizations")
 			http.Error(rw, `{ "msg": "You need a state and a country to query organizations" }`, http.StatusBadRequest)
 			return
 		}
 
 		// fetch organizations
-		orgs, err := FindOrganizations(filter, e.Database)
+		orgs, err := aggregations.AggregateOrganizations(filter, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNoContent)
 				return
 			}
-			e.Logger.Error("failed to find organization", err.Error())
+			e.Logger.Error(fmt.Sprintf("Failed to find organizations %s", err.Error()))
 		}
 
 		if orgs == nil {
@@ -192,8 +202,8 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		}
 
 		resp := models.OrganizationsResponse{
-			TotalEvents:   len(*orgs),
-			Organizations: *orgs,
+			TotalOrganizations: len(*orgs),
+			Organizations:      *orgs,
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -210,18 +220,18 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		// grab event id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "no organization ID found in request." }`))
+			e.Logger.Error("No/Bad organization ID found in request")
+			http.Error(rw, "No/Bad organization ID found in request", http.StatusBadRequest)
 			return
 		}
 		id := vars["id"]
 
 		// decode request
-		var req models.Organization
+		var req models.OrganizationDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			e.Logger.Error(fmt.Sprintf("Failed to decode request: %s", err.Error()))
+			http.Error(rw, `{ "msg": "Failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -231,35 +241,41 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		changes := bson.M{}
 		updates := bson.M{"$set": changes}
 
-		if req.Name != "" {
+		if req.Name != nil {
 			changes["name"] = req.Name
 		}
-		if req.Description != "" {
+		if req.Description != nil {
 			changes["description"] = req.Description
 		}
-		if req.City != "" {
+		if req.Sports != nil {
+			changes["sports"] = req.Sports
+		}
+		if req.City != nil {
 			changes["city"] = req.City
 		}
-		if req.State != "" {
+		if req.State != nil {
 			changes["state"] = req.State
 		}
-		if req.Country != "" {
+		if req.Country != nil {
 			changes["country"] = req.Country
 		}
-		if req.ImageURL != "" {
-			changes["image_url"] = req.ImageURL
+		if req.Logo != nil {
+			changes["logo"] = req.Logo
 		}
-		if len(req.ImageGallery) != 0 {
-			changes["image_gallery"] = req.ImageGallery
+		if req.Banner != nil {
+			changes["banner"] = req.Banner
 		}
-		if req.PinnedPostID.Hex() != "" {
-			changes["pinned_post_id"] = req.PinnedPostID
+		if len(*req.BlackList) > 0 {
+			changes["blacklist"] = req.BlackList
+		}
+		if len(*req.PinnedPosts) > 0 {
+			changes["pinned_posts"] = req.PinnedPosts
 		}
 
 		// update and return updated organization
 		err = e.UpdateAnOrganization(context.Background(), filter, updates)
 		if err != nil {
-			e.Logger.Error(err)
+			e.Logger.Error("Failed to update organization")
 			http.Error(rw, "failed to update organization", http.StatusInternalServerError)
 			return
 		}
@@ -276,6 +292,7 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 		// grab id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
+			e.Logger.Error("No/Bad organization ID in request")
 			http.Error(rw, `{ "msg": "bad organization id" }`, http.StatusBadRequest)
 			return
 		}
@@ -285,7 +302,9 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 		filter := bson.M{"_id": oid}
 		org, err := e.FindAnOrganization(context.Background(), filter)
 		if err != nil {
-			e.Logger.Debug(fmt.Sprintf(`failed to find org: %s`, err.Error()))
+			e.Logger.Error(fmt.Sprintf(`Failed to find org: %s`, err.Error()))
+			http.Error(rw, `{ "msg": "Failed to find organization" }`, http.StatusNotFound)
+			return
 		}
 		members := *org.Members
 
@@ -295,17 +314,16 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 			update := bson.M{"$pull": bson.M{"organizations": oid}}
 			e.Database.UserCol.UpdateOne(context.Background(), filter, update)
 		}
-
 		err = e.DeleteAnOrganization(context.Background(), filter)
 		if err != nil {
-			e.Logger.Debug(err.Error())
-			http.Error(rw, `{ "msg": "failed to delete event" }`, http.StatusInternalServerError)
+			e.Logger.Error(fmt.Sprintf("Failed to delete organization: %s", err.Error()))
+			http.Error(rw, `{ "msg": "Failed to delete organization" }`, http.StatusInternalServerError)
 		}
 
 		// delete notification topic
 		err = utils.DeleteNotificationTopic(id)
 		if err != nil {
-			e.Logger.Error("failed to delete topic: ", err.Error())
+			e.Logger.Error("Failed to delete topic: ", err.Error())
 		}
 		rw.WriteHeader(http.StatusOK)
 	}
@@ -322,17 +340,22 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// decode request
-		var req models.OrganizationApplication
+		var req models.OrganizationApplicationDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
+			e.Logger.Error(fmt.Sprintf("Failed to decode request: %s", err.Error()))
+			http.Error(rw, "Failed to decode request", http.StatusBadRequest)
 			return
 		}
 
 		// check for an existing application
-		var application models.OrganizationApplication
-		err = e.Database.OrgApplicationCol.FindOne(context.Background(), bson.M{"club_id": req.ClubID, "organization_id": req.OrganizationID}).Decode(&application)
+		var application models.OrganizationApplicationDao
+		err = e.Database.OrgApplicationCol.FindOne(context.Background(),
+			bson.M{
+				"club_id":         req.ClubID,
+				"organization_id": req.OrganizationID,
+			},
+		).Decode(&application)
 		if err == nil {
 			rw.WriteHeader(http.StatusOK)
 			json.NewEncoder(rw).Encode(application)
@@ -340,13 +363,12 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 		}
 
 		// insert application into database
-		req.ID = primitive.NewObjectID()
-		req.Status = "pending"
-		req.CreatedAt = time.Now().Unix()
-		err = e.InsertApplication(context.Background(), &req)
+		status := "pending"
+		req.Status = &status
+		id, err := e.InsertApplication(context.Background(), &req)
 		if err != nil {
-			e.Logger.Error(err.Error())
-			http.Error(rw, `{ "msg": "failed to create application" }`, http.StatusInternalServerError)
+			e.Logger.Error(fmt.Sprintf("Failed to create application: %s", err.Error()))
+			http.Error(rw, `{ "msg": "Failed to create application" }`, http.StatusInternalServerError)
 			return
 		}
 
@@ -359,7 +381,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 		utils.SendNotificationToTopic(&note)
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(req)
+		json.NewEncoder(rw).Encode(models.CreateResponse{ID: id.Hex()})
 	}
 }
 
@@ -377,16 +399,10 @@ func (e *Service) GetApplication() http.HandlerFunc {
 		}
 		oid, _ := primitive.ObjectIDFromHex(vars["id"])
 
-		var application models.OrganizationApplication
-		err := e.FindApplication(context.Background(), bson.M{"_id": oid}, &application)
-		if err != nil {
-			http.Error(rw, `{ "msg": "failed to get application" }`, http.StatusNotFound)
-			return
-		}
-
-		// if we don't get anything
-		if application.Status == "" {
-			http.Error(rw, `{ "msg": "failed to find organization application" }`, http.StatusNotFound)
+		application, err := aggregations.AggregateOrganizationApplication(&oid, e.Database)
+		if err != nil || application.Status == "" {
+			e.Logger.Error(fmt.Sprintf("Failed to find organization application ID: %s", oid.Hex()))
+			http.Error(rw, `{ "msg": "Failed to find organization application" }`, http.StatusNotFound)
 			return
 		}
 
@@ -405,37 +421,32 @@ func (e *Service) GetApplications() http.HandlerFunc {
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": "bad id found in request" }`))
+			http.Error(rw, `{ "msg": "No/Bad id found in request" }`, http.StatusBadRequest)
 			return
 		}
-
 		oid, _ := primitive.ObjectIDFromHex(id)
 
-		var applications []models.OrganizationApplication
-		err := e.FindApplications(context.Background(), bson.M{"organization_id": oid, "status": "pending"}, &applications)
+		// status of applications
+		status := r.URL.Query().Get("status")
+		if status == "" {
+			status = "pending"
+		}
+
+		applications, err := aggregations.AggregateOrganizationApplications(&oid, "pending", e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
+				e.Logger.Error("No Organization applications found")
 				rw.WriteHeader(http.StatusNoContent)
 				return
 			}
-		}
-
-		if len(applications) == 0 {
-			rw.WriteHeader(http.StatusNoContent)
+			e.Logger.Error(fmt.Sprintf("Failed to find organization applications: %s", err.Error()))
+			http.Error(rw, `{ "msg": "Failed to find organization applications" "}`, http.StatusInternalServerError)
 			return
 		}
 
-		// fetch club data for each application
-		for i := range applications {
-			var club models.Club
-			err = e.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": applications[i].ClubID}).Decode(&club)
-			if err != nil {
-				e.Logger.Error(err.Error())
-			}
-			applications[i].Data = &models.OrganizationApplicationData{
-				Club: &club,
-			}
+		if len(*applications) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
+			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -458,11 +469,11 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 		}
 		oid, _ := primitive.ObjectIDFromHex(id)
 
-		var req models.OrganizationApplication
+		var req models.OrganizationApplicationDao
 		json.NewDecoder(r.Body).Decode(&req)
 
 		// update the club's parent id
-		if req.Status == "accepted" {
+		if *req.Status == "accepted" {
 			filter := bson.M{
 				"_id": req.ClubID,
 			}
@@ -477,13 +488,12 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 
 		err := e.UpdateAnApplication(context.Background(), bson.M{"_id": oid}, bson.M{"$set": bson.M{"status": req.Status}}, &req)
 		if err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to update application: %s", err.Error()))
 			http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
-			e.Logger.Error(err.Error())
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(req)
 	}
 }
 
@@ -496,6 +506,7 @@ func (e *Service) DeleteApplication() http.HandlerFunc {
 		// grab id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
+			e.Logger.Error("No/Bad application ID in request")
 			http.Error(rw, `{ "msg": "bad application id" }`, http.StatusBadRequest)
 			return
 		}
@@ -503,6 +514,7 @@ func (e *Service) DeleteApplication() http.HandlerFunc {
 
 		err := e.DeleteAnApplication(context.Background(), bson.M{"_id": oid})
 		if err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to delete application ID: %s", err.Error()))
 			http.Error(rw, `{"msg": "failed to delete application"}`, http.StatusInternalServerError)
 			return
 		}

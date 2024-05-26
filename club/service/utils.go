@@ -41,7 +41,7 @@ func AggregateClub(id *primitive.ObjectID, database *database.Database) (*models
 		},
 	}
 
-	membersPiepline := bson.M{
+	membersPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "members.uuid",
@@ -50,7 +50,7 @@ func AggregateClub(id *primitive.ObjectID, database *database.Database) (*models
 		},
 	}
 
-	addMembersPiepline := bson.M{
+	addMembersPipeline := bson.M{
 		"$addFields": bson.M{
 			"members": bson.M{
 				"$map": bson.M{
@@ -129,7 +129,7 @@ func AggregateClub(id *primitive.ObjectID, database *database.Database) (*models
 		},
 	}
 
-	projectPiepline := bson.M{
+	projectPipeline := bson.M{
 		"$project": bson.M{
 			"users":                             0,
 			"managers":                          0,
@@ -155,10 +155,10 @@ func AggregateClub(id *primitive.ObjectID, database *database.Database) (*models
 		idPipeline,
 		parentPipeline,
 		addParentPipeline,
-		membersPiepline,
-		addMembersPiepline,
+		membersPipeline,
+		addMembersPipeline,
 		managersPipeline, addManagersPipeline,
-		projectPiepline,
+		projectPipeline,
 	}
 
 	cur, err := database.ClubCol.Aggregate(ctx, pipeline)
@@ -203,7 +203,7 @@ func AggregateClubs(filter interface{}, database *database.Database) (*[]models.
 		},
 	}
 
-	membersPiepline := bson.M{
+	membersPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "members.uuid",
@@ -212,7 +212,7 @@ func AggregateClubs(filter interface{}, database *database.Database) (*[]models.
 		},
 	}
 
-	addMembersPiepline := bson.M{
+	addMembersPipeline := bson.M{
 		"$addFields": bson.M{
 			"members": bson.M{
 				"$map": bson.M{
@@ -291,7 +291,7 @@ func AggregateClubs(filter interface{}, database *database.Database) (*[]models.
 		},
 	}
 
-	projectPiepline := bson.M{
+	projectPipeline := bson.M{
 		"$project": bson.M{
 			"users":                             0,
 			"managers":                          0,
@@ -317,10 +317,10 @@ func AggregateClubs(filter interface{}, database *database.Database) (*[]models.
 		filter,
 		parentPipeline,
 		addParentPipeline,
-		membersPiepline,
-		addMembersPiepline,
+		membersPipeline,
+		addMembersPipeline,
 		managersPipeline, addManagersPipeline,
-		projectPiepline,
+		projectPipeline,
 	}
 
 	cur, err := database.ClubCol.Aggregate(ctx, pipeline)

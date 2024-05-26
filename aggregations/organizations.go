@@ -118,7 +118,7 @@ func AggregateOrganizations(filter interface{}, database *database.Database) (*[
 
 	ctx := context.Background()
 
-	membersPiepline := bson.M{
+	membersPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "members.uuid",
@@ -127,7 +127,7 @@ func AggregateOrganizations(filter interface{}, database *database.Database) (*[
 		},
 	}
 
-	addMembersPiepline := bson.M{
+	addMembersPipeline := bson.M{
 		"$addFields": bson.M{
 			"members": bson.M{
 				"$map": bson.M{
@@ -171,7 +171,7 @@ func AggregateOrganizations(filter interface{}, database *database.Database) (*[
 		},
 	}
 
-	projectPiepline := bson.M{
+	projectPipeline := bson.M{
 		"$project": bson.M{
 			"users":                      0,
 			"members.uuid":               0,
@@ -187,10 +187,10 @@ func AggregateOrganizations(filter interface{}, database *database.Database) (*[
 
 	pipeline := bson.A{
 		filter,
-		membersPiepline,
-		addMembersPiepline,
+		membersPipeline,
+		addMembersPipeline,
 		childrenPipeline,
-		projectPiepline,
+		projectPipeline,
 	}
 
 	cur, err := database.OrgCol.Aggregate(ctx, pipeline)
@@ -206,6 +206,133 @@ func AggregateOrganizations(filter interface{}, database *database.Database) (*[
 			database.Logger.Error("failed to decode event", err)
 		}
 		response = append(response, org)
+	}
+
+	return &response, nil
+}
+
+func AggregateOrganizationApplication(id *primitive.ObjectID, database *database.Database) (*models.OrganizationApplication, error) {
+
+	ctx := context.Background()
+
+	matchPipeline := bson.M{
+		"$match": bson.M{
+			"_id": id,
+		},
+	}
+
+	lookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "clubs",
+			"localField":   "club_id",
+			"foreignField": "_id",
+			"as":           "result",
+		},
+	}
+
+	movePipeline := bson.M{
+		"$addFields": bson.M{
+			"club": bson.M{
+				"$arrayElemAt": bson.A{
+					"$result",
+					0,
+				},
+			},
+		},
+	}
+
+	cleanupPipeline := bson.M{
+		"$project": bson.M{
+			"result":          0,
+			"club_id":         0,
+			"organization_id": 0,
+		},
+	}
+
+	pipeline := bson.A{
+		matchPipeline,
+		lookupPipeline,
+		movePipeline,
+		cleanupPipeline,
+	}
+
+	cur, err := database.OrgApplicationCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	var application models.OrganizationApplication
+	if cur.Next(ctx) {
+		err = cur.Decode(&application)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, mongo.ErrNoDocuments
+	}
+
+	return &application, nil
+}
+
+func AggregateOrganizationApplications(organizationID *primitive.ObjectID, status string, database *database.Database) (*[]models.OrganizationApplication, error) {
+
+	ctx := context.Background()
+
+	matchPipeline := bson.M{
+		"$match": bson.M{
+			"organization_id": organizationID,
+			"status":          status,
+		},
+	}
+
+	lookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "clubs",
+			"localField":   "club_id",
+			"foreignField": "_id",
+			"as":           "result",
+		},
+	}
+
+	movePipeline := bson.M{
+		"$addFields": bson.M{
+			"club": bson.M{
+				"$arrayElemAt": bson.A{
+					"$result",
+					0,
+				},
+			},
+		},
+	}
+
+	cleanupPipeline := bson.M{
+		"$project": bson.M{
+			"result":          0,
+			"club_id":         0,
+			"organization_id": 0,
+		},
+	}
+
+	pipeline := bson.A{
+		matchPipeline,
+		lookupPipeline,
+		movePipeline,
+		cleanupPipeline,
+	}
+
+	cur, err := database.OrgApplicationCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []models.OrganizationApplication
+	for cur.Next(context.TODO()) {
+		var application models.OrganizationApplication
+		err := cur.Decode(&application)
+		if err != nil {
+			database.Logger.Error("failed to decode event", err)
+		}
+		response = append(response, application)
 	}
 
 	return &response, nil

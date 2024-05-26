@@ -95,6 +95,14 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/olympsis/models v0.0.0-20240515134819-f64f31787f65 h1:MECyhgaGMxMMCpFCxXKa6d/pUu9oWlu/0Sk8QMinzU0=
 github.com/olympsis/models v0.0.0-20240515134819-f64f31787f65/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
+github.com/olympsis/models v0.0.0-20240524044246-2b4f90edccb1 h1:FfNcEJdplP186zgcDlQD0n+16QL+9NrVL9/5lUOAZC8=
+github.com/olympsis/models v0.0.0-20240524044246-2b4f90edccb1/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
+github.com/olympsis/models v0.0.0-20240525030655-854099f9f4b0 h1:MjbmlaB6763qB4TqEQqHW8UlRFDOLC3zkLfKc/1i38M=
+github.com/olympsis/models v0.0.0-20240525030655-854099f9f4b0/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
+github.com/olympsis/models v0.0.0-20240526031652-8d948ff06f81 h1:1e1rfXeODxz75UvtLZSLRMbnvP20eejrYMA9GCOAndU=
+github.com/olympsis/models v0.0.0-20240526031652-8d948ff06f81/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
+github.com/olympsis/models v0.0.0-20240526040931-15a3d672d360 h1:YKXUDe0FCjy8V4epiC+Xn4NJlilywGI42Lhl+ykkI04=
+github.com/olympsis/models v0.0.0-20240526040931-15a3d672d360/go.mod h1:RdLl22yR3NJjSzUO74fttsd2SEsAU4611p1OQdHwiNY=
 github.com/olympsis/search v0.0.0-20240511191753-822dd74a022b h1:CgO5tDicPwCtq+lwx+7Wj/+lNmfw151YsJWDBlB2KSI=
 github.com/olympsis/search v0.0.0-20240511191753-822dd74a022b/go.mod h1:eQc/5lEK1jvQqu6hUqkWV5TuHfwlYZ4SefV97RJAi9k=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
