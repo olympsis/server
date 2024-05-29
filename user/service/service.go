@@ -186,6 +186,9 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		if req.AcceptedEULA != nil {
 			changes["accepted_eula"] = req.AcceptedEULA
 		}
+		if req.HasOnboarded != nil {
+			changes["has_onboarded"] = req.HasOnboarded
+		}
 		if req.Hometown != nil {
 			changes["hometown"] = req.Hometown
 		}

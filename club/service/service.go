@@ -159,6 +159,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 			JoinedAt: timeStamp,
 		}
 		members := []models.MemberDao{member}
+		verification := false
 
 		club := models.ClubDao{
 			Name:        req.Name,
@@ -173,7 +174,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 			Members:     &members,
 			BlackList:   req.BlackList,
 			Rules:       req.Rules,
-			IsVerified:  req.IsVerified,
+			IsVerified:  &verification,
 			CreatedAt:   &timeStamp,
 		}
 
