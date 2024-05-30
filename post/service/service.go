@@ -3,13 +3,15 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/utils"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -22,8 +24,8 @@ Create new Post service struct
 
   - Create and Returns a pointer to a new post service struct
 */
-func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
+func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
 }
 
 /*
@@ -42,6 +44,8 @@ Get Posts (GET)
 */
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		uuid := r.Header.Get("UUID")
 
 		// grab query parameters
 		group := r.URL.Query().Get("groupID")
@@ -66,28 +70,70 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			ids = append(ids, parentID)
 		}
 
-		// run aggregation pipeline
-		posts, err := FindPosts(ids, p.Database, 100)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusNoContent)
-				return
-			} else {
-				p.Logger.Error("failed to get posts: ", err.Error())
-				http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
+		var wg sync.WaitGroup
+		var user *models.UserData
+		var posts *[]models.Post
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			user, err = utils.FindUser(uuid, p.Database)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// run aggregation pipeline
+			posts, err = FindPosts(ids, p.Database, 100)
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
+					return
+				} else {
+					p.Logger.Error("failed to get posts: ", err.Error())
+					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
+					return
+				}
 			}
-		}
+		}()
+
+		wg.Wait()
+
 		if posts == nil || len(*posts) == 0 {
-			http.Error(rw, `{ "msg": "no posts content not found" }`, http.StatusNoContent)
+			http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
 			return
 		}
 
-		resp := models.PostsResponse{
-			TotalPosts: len(*posts),
-			Posts:      *posts,
+		if user == nil {
+			http.Error(rw, `{ "msg": "user not found!" }`, http.StatusInternalServerError)
+			return
 		}
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
+
+		if user.BlockedUsers != nil {
+			_posts := removePostsByPosterUUIDs(posts, user.BlockedUsers)
+
+			if _posts == nil || len(*_posts) == 0 {
+				http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
+				return
+			}
+
+			resp := models.PostsResponse{
+				TotalPosts: len(*_posts),
+				Posts:      *_posts,
+			}
+
+			rw.WriteHeader(http.StatusOK)
+			json.NewEncoder(rw).Encode(resp)
+
+		} else {
+			resp := models.PostsResponse{
+				TotalPosts: len(*posts),
+				Posts:      *posts,
+			}
+
+			rw.WriteHeader(http.StatusOK)
+			json.NewEncoder(rw).Encode(resp)
+		}
 	}
 }
 
@@ -164,7 +210,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			return
 		}
 
-		// add aditional data to post model
+		// add additional data to post model
 		id := primitive.NewObjectID()
 		timeStamp := time.Now().Unix()
 		req.CreatedAt = &timeStamp
@@ -176,8 +222,9 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			EventID:      req.EventID,
 			Body:         req.Body,
 			Images:       req.Images,
-			CreatedAt:    &timeStamp,
+			IsSensitive:  req.IsSensitive,
 			ExternalLink: req.ExternalLink,
+			CreatedAt:    &timeStamp,
 		}
 
 		// create post in database
@@ -189,12 +236,16 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		// create post notif topic
-		p.NotifService.CreateTopic(post.ID.Hex())
+
+		err = utils.CreateNotificationTopic(post.ID.Hex())
+		if err != nil {
+			p.Logger.Error("failed to create topic: " + err.Error())
+		}
 
 		if *req.Type == "announcement" {
 
 			// grab org data
-			var org models.Organization
+			var org models.OrganizationDao
 			filter := bson.M{"_id": post.GroupID}
 			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
 			if err != nil {
@@ -203,12 +254,17 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				return
 			}
 
-			for i := 0; i < len(org.Members); i++ {
-				p.NotifService.AddTokenToTopic(post.ID.Hex(), org.Members[i].UUID)
+			members := *org.Members
+
+			for i := 0; i < len(members); i++ {
+				err = utils.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
+				if err != nil {
+					p.Logger.Error("failed to create topic: " + err.Error())
+				}
 			}
 
 			// find child clubs
-			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": org.ID})
+			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": post.GroupID})
 			if err != nil {
 				p.Logger.Error("No children found")
 				rw.WriteHeader(http.StatusCreated)
@@ -224,12 +280,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				}
 
 				// send notification to club members
-				note := notif.Notification{
-					Title: org.Name,
+				note := models.Notification{
+					Title: *org.Name,
 					Body:  "New announcement!",
 					Topic: club.ID.Hex(),
+					Data:  post,
 				}
-				p.NotifService.SendNotificationToTopic(&note)
+
+				utils.SendNotificationToTopic(&note)
 			}
 
 		} else if *req.Type == "post" {
@@ -255,12 +313,13 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			}
 
 			// send notification to club members
-			note := notif.Notification{
+			note := models.Notification{
 				Title: club.Name,
 				Body:  user.Username + " created a post!",
 				Topic: club.ID.Hex(),
+				Data:  post,
 			}
-			p.NotifService.SendNotificationToTopic(&note)
+			utils.SendNotificationToTopic(&note)
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -277,7 +336,7 @@ Update Post (POST)
 
   - Grab request body
 
-  - updated post data in databse
+  - updated post data in database
 
 Returns:
 
@@ -321,6 +380,9 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		}
 		if req.ExternalLink != nil {
 			change["external_link"] = req.ExternalLink
+		}
+		if req.IsSensitive != nil {
+			change["is_sensitive"] = req.IsSensitive
 		}
 
 		// update post
@@ -377,7 +439,11 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		// delete notif topic
-		p.NotifService.DeleteTopic(id)
+		err = utils.DeleteNotificationTopic(id)
+		if err != nil {
+			p.Logger.Error("failed to delete topic: ", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -399,6 +465,10 @@ Returns:
 */
 func (p *Service) AddLike() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// grab uuid of the user who made this request
+		uuid := r.Header.Get("UUID")
+
 		// grab id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
@@ -407,29 +477,32 @@ func (p *Service) AddLike() http.HandlerFunc {
 			return
 		}
 
-		var req models.Like
-		// decode request
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			p.Logger.Error("failed to decode post: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to decode post" }`, http.StatusBadRequest)
-			return
+		like := models.Like{
+			ID:        primitive.NewObjectID(),
+			UUID:      uuid,
+			CreatedAt: time.Now().Unix(),
 		}
-		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
 
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		change := bson.M{"$push": bson.M{"likes": req}}
+		filter := bson.M{"_id": oid, "likes.uuid": bson.M{"$ne": uuid}}
+		change := bson.M{
+			"$push": bson.M{
+				"likes": like,
+			},
+		}
 
-		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
-		if err != nil {
+		resp, err := p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
+		if err != nil { // unexpected error
 			p.Logger.Error("failed to add like: ", err.Error())
 			http.Error(rw, `{ "msg" : "failed to add like" }`, http.StatusInternalServerError)
 			return
+		} else if resp.ModifiedCount != 1 { // the like already exits
+			rw.WriteHeader(http.StatusOK)
+			return
+		} else { // newly created like
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
 		}
-
-		rw.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -495,6 +568,10 @@ Returns:
 */
 func (p *Service) AddComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// grab uuid of the user who made this request
+		uuid := r.Header.Get("UUID")
+
 		// grab id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
@@ -503,7 +580,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req models.Comment
+		var req models.CommentDao
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
@@ -511,8 +588,13 @@ func (p *Service) AddComment() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "failed to decode comments" }`, http.StatusBadRequest)
 			return
 		}
-		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
+
+		newID := primitive.NewObjectID()
+		timestamp := time.Now().Unix()
+
+		req.ID = &newID
+		req.UUID = &uuid
+		req.CreatedAt = &timestamp
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
@@ -521,11 +603,12 @@ func (p *Service) AddComment() http.HandlerFunc {
 		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
 		if err != nil {
 			p.Logger.Error("failed to update post: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to update post" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "failed to update post" }`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, req.ID.Hex())))
 	}
 }
 
@@ -573,4 +656,25 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 
 		rw.WriteHeader(http.StatusOK)
 	}
+}
+
+func removePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Post {
+	var result []models.Post
+	if len(*posts) > 0 {
+		for _, post := range *posts {
+			found := false
+			for _, uuid := range uuids {
+				if post.Poster != nil {
+					if post.Poster.UUID == uuid {
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				result = append(result, post)
+			}
+		}
+	}
+	return &result
 }

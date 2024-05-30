@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"strings"
@@ -11,7 +13,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -23,15 +24,14 @@ type Service struct {
 	Database      *database.Database
 	Logger        *logrus.Logger
 	Router        *mux.Router
-	NotifService  *notif.Service
 	SearchService *search.Service
 }
 
 /*
 Create new Club service struct
 */
-func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, NotifService: n, SearchService: sh}
+func NewClubService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
+	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
 }
 
 // Fetches all of the clubs in a given location
@@ -41,12 +41,15 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 		city := r.URL.Query().Get("city")
 		state := r.URL.Query().Get("state")
 		country := r.URL.Query().Get("country")
+		sports := r.URL.Query().Get("sports")
 		if country == "" {
 			http.Error(rw, `{ "msg": "you need at least a country to query with" }`, http.StatusBadRequest)
 			return
 		}
 
 		filter := bson.M{}
+
+		// Location Query
 		if state == "" {
 			filter["country"] = country
 		} else if city != "" {
@@ -58,79 +61,39 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 			filter["state"] = state
 		}
 
+		// Sports Query
+		if sports != "" {
+			splicedSports := strings.Split(sports, ",")
+			filter["sports"] = bson.M{
+				"$in": splicedSports,
+			}
+		}
+
 		// get all of the clubs data
-		clubs, err := s.GetClubsAndMetadata(filter)
+		clubs, err := aggregations.AggregateClubs(bson.M{"$match": filter}, s.Database)
 		if err != nil {
 			s.Logger.Error("failed to find clubs: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find clubs" }`, http.StatusInternalServerError)
 		}
 
 		// no content
-		if len(clubs) == 0 {
-			rw.WriteHeader(http.StatusNoContent)
+		if len(*clubs) == 0 {
 			http.Error(rw, `{ "msg": "no clubs found" }`, http.StatusNoContent)
 			return
 		}
 
 		resp := models.ClubsResponse{
-			TotalClubs: len(clubs),
-			Clubs:      clubs,
+			TotalClubs: len(*clubs),
+			Clubs:      *clubs,
 		}
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
 }
 
-// Fetches all of the clubs data for the given ids
-func (s *Service) GetClubsList() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		// grab user club id's
-		ids := r.URL.Query().Get("clubs")
-		splicedIDs := strings.Split(ids, ",")
-		var objectIDs []primitive.ObjectID
-		for i := range splicedIDs {
-			oid, err := primitive.ObjectIDFromHex(splicedIDs[i])
-			if err == nil {
-				objectIDs = append(objectIDs, oid)
-			}
-		}
-
-		// filter for database
-		filter := bson.M{
-			"_id": bson.M{
-				"$in": objectIDs,
-			},
-		}
-
-		// get all of the clubs and their metadata {members info, parent info etc...}
-		clubs, err := s.GetClubsAndMetadata(filter)
-		if err != nil {
-			s.Logger.Error("failed to get clubs: ", err.Error())
-			http.Error(w, `{ "msg": "failed to get clubs" }`, http.StatusInternalServerError)
-			return
-		}
-
-		// no content
-		if len(clubs) == 0 {
-			http.Error(w, `{ "msg": "no clubs found" }`, http.StatusNoContent)
-			return
-		}
-
-		resp := models.ClubsResponse{
-			TotalClubs: len(clubs),
-			Clubs:      clubs,
-		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(resp)
-	}
-}
-
 // Get the data of a club
 func (c *Service) GetClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
-		uuid := r.Header.Get("UUID")
 
 		vars := mux.Vars(r)
 		id := vars["id"]
@@ -149,8 +112,7 @@ func (c *Service) GetClub() http.HandlerFunc {
 		defer ctx()
 
 		// find club data in database
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
-		club, err := c.GetClubAndMetadata(filter)
+		club, err := aggregations.AggregateClub(&oid, c.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
@@ -168,25 +130,8 @@ func (c *Service) GetClub() http.HandlerFunc {
 			return
 		}
 
-		// check if user is an admin
-		var token string
-		for i := 0; i < len(club.Members); i++ {
-			if club.Members[i].UUID == uuid {
-				if club.Members[i].Role != "member" {
-					token, err = utils.GenerateClubToken(club.ID.Hex(), club.Members[i].Role, uuid)
-					if err != nil {
-						c.Logger.Error(err)
-					}
-				}
-			}
-		}
-
-		resp := models.ClubResponse{
-			Token: token,
-			Club:  club,
-		}
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
+		json.NewEncoder(rw).Encode(club)
 
 	}
 }
@@ -198,100 +143,90 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req models.Club
+		var req models.ClubDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			c.Logger.Error("failed to decode request ", err.Error())
-			http.Error(rw, "failed to decode request", http.StatusBadRequest)
+			c.Logger.Error("Failed to decode request ", err.Error())
+			http.Error(rw, "Failed to decode request", http.StatusBadRequest)
 			return
 		}
 
 		timeStamp := time.Now().Unix()
-		member := models.Member{
+		member := models.MemberDao{
 			ID:       primitive.NewObjectID(),
 			UUID:     uuid,
 			Role:     "owner",
 			JoinedAt: timeStamp,
 		}
+		members := []models.MemberDao{member}
+		verification := false
 
-		club := models.Club{
-			ID:          primitive.NewObjectID(),
+		club := models.ClubDao{
 			Name:        req.Name,
 			Description: req.Description,
-			Visibility:  req.Visibility,
-			Sport:       req.Sport,
+			Sports:      req.Sports,
 			City:        req.City,
 			State:       req.State,
 			Country:     req.Country,
-			ImageURL:    req.ImageURL,
-			Members:     []models.Member{member},
+			Logo:        req.Logo,
+			Banner:      req.Banner,
+			Visibility:  req.Visibility,
+			Members:     &members,
+			BlackList:   req.BlackList,
 			Rules:       req.Rules,
-			CreatedAt:   timeStamp,
+			IsVerified:  &verification,
+			CreatedAt:   &timeStamp,
 		}
 
 		// create club in database
-		err = c.InsertClub(context.TODO(), &club)
+		id, err := c.InsertClub(context.TODO(), &club)
 		if err != nil {
-			c.Logger.Error("failed to create club: ", err.Error())
-			http.Error(rw, "failed to create club", http.StatusInternalServerError)
+			c.Logger.Error("Failed to create club: ", err.Error())
+			http.Error(rw, "Failed to create club", http.StatusInternalServerError)
 			return
 		}
 
 		// update user id to contain the new club
 		filter := bson.M{"uuid": uuid}
-		update := bson.M{"$push": bson.M{"clubs": club.ID}}
+		update := bson.M{"$push": bson.M{"clubs": id}}
 		_, err = c.Database.UserCol.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
-			c.Logger.Error("failed to update user: ", err.Error())
-		}
-
-		// generate admin token
-		token, err := utils.GenerateClubToken(club.ID.Hex(), "owner", uuid)
-		if err != nil {
-			c.Logger.Error("failed to create club", err.Error())
-			http.Error(rw, "failed to create club", http.StatusInternalServerError)
-			return
+			c.Logger.Error(fmt.Sprintf("Failed to update user: %s", err.Error()))
 		}
 
 		// create notification topics
-		clubTopic := club.ID.Hex()
-		clubAdminTopic := club.ID.Hex() + "_admin"
+		clubTopic := id.Hex()
+		clubAdminTopic := id.Hex() + "_admin"
 
 		// create topics and subscribe owner to it
-		err = c.NotifService.CreateTopic(clubTopic)
+		err = utils.CreateNotificationTopic(clubTopic)
 		if err != nil {
-			c.Logger.Error("failed to create club topic: ", err.Error())
-		}
-		err = c.NotifService.CreateTopic(clubAdminTopic)
-		if err != nil {
-			c.Logger.Error("failed to create club admin topic: ", err.Error())
+			c.Logger.Error("Failed to create club topic: ", err.Error())
 		}
 
-		err = c.NotifService.AddTokenToTopic(clubTopic, uuid)
+		err = utils.CreateNotificationTopic(clubAdminTopic)
 		if err != nil {
-			c.Logger.Error("failed to add token to club topic: ", err.Error())
-		}
-		err = c.NotifService.AddTokenToTopic(clubAdminTopic, uuid)
-		if err != nil {
-			c.Logger.Error("failed to add token club admin topic: ", err.Error())
+			c.Logger.Error("Failed to create club admin topic: ", err.Error())
 		}
 
-		resp := models.CreateClubResponse{
-			Token: token,
-			Club:  club,
+		err = utils.AddTokenToTopic(clubTopic, uuid)
+		if err != nil {
+			c.Logger.Error("Failed to add token to club topic: ", err.Error())
 		}
+
+		err = utils.AddTokenToTopic(clubAdminTopic, uuid)
+		if err != nil {
+			c.Logger.Error("Failed to add token club admin topic: ", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(resp)
+		json.NewEncoder(rw).Encode(models.CreateResponse{ID: id.Hex()})
 	}
 }
 
 // Updates club data
 func (c *Service) ModifyClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// id := r.Header.Get("clubID") // idk if i should take the id this way
-		// uuid := r.Header.Get("UUID")
-		// role := r.Header.Get("clubRole")
 
 		// Grab club id from path and validate it
 		id := mux.Vars(r)["id"]
@@ -301,13 +236,13 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 			return
 		}
 
-		var req models.Club
+		var req models.ClubDao
 
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			c.Logger.Error("failed to decode body: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to decode body" }`, http.StatusBadRequest)
+			c.Logger.Error("Failed to decode body: ", err.Error())
+			http.Error(rw, `{ "msg": "Failed to decode body" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -318,28 +253,37 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		update := bson.M{"$set": change}
 
 		// Changes map
-		if req.Name != "" {
+		if req.Name != nil {
 			change["name"] = req.Name
 		}
-		if req.Description != "" {
+		if req.Description != nil {
 			change["description"] = req.Description
 		}
-		if req.Sport != "" {
-			change["sport"] = req.Sport
+		if req.Sports != nil {
+			change["sports"] = req.Sports
 		}
-		if req.City != "" {
+		if req.City != nil {
 			change["city"] = req.City
 		}
-		if req.State != "" {
+		if req.State != nil {
 			change["state"] = req.State
 		}
-		if req.Country != "" {
+		if req.Country != nil {
 			change["country"] = req.Country
 		}
-		if req.ImageURL != "" {
-			change["image_url"] = req.ImageURL
+		if req.Logo != nil {
+			change["logo"] = req.Logo
 		}
-		if len(req.Rules) > 0 {
+		if req.Banner != nil {
+			change["banner"] = req.Banner
+		}
+		if req.Visibility != nil {
+			change["visibility"] = req.Visibility
+		}
+		if req.BlackList != nil && len(*req.BlackList) > 0 {
+			change["blacklist"] = req.BlackList
+		}
+		if req.Rules != nil && len(*req.Rules) > 0 {
 			change["rules"] = req.Rules
 		}
 
@@ -347,28 +291,17 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		err = c.UpdateClub(context.Background(), filter, update)
 		if err != nil {
 			c.Logger.Error("Failed to update club: ", err.Error())
-			http.Error(rw, `{ "msg": "internal server error" }`, http.StatusInternalServerError)
-			return
-		}
-
-		club, err := c.GetClubAndMetadata(filter)
-		if err != nil {
-			c.Logger.Error("Failed to get club: ", err.Error())
-			http.Error(rw, `{ "msg": "internal server error" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "Failed to update club" }`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(club)
 	}
 }
 
 // Deletes a club
 func (c *Service) DeleteClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// uuid := r.Header.Get("UUID")
-		// role := r.Header.Get("clubRole")
 
 		// Grab club id from path and validate it
 		id := mux.Vars(r)["id"]
@@ -381,14 +314,13 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		// convert club id to oid
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			c.Logger.Debug("Failed to convert club id: ", err.Error())
+			c.Logger.Error("Failed to convert club id: ", err.Error())
 			http.Error(rw, `{ "msg": "bad club id" }`, http.StatusBadRequest)
 			return
 		}
 
 		// check if club exists
-		var club models.Club
-		err = c.FindClub(context.TODO(), bson.M{"_id": oid}, &club)
+		club, err := c.FindClub(context.TODO(), bson.M{"_id": oid})
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				c.Logger.Error("club not found: ", err.Error())
@@ -398,14 +330,24 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		}
 
 		// delete topics
-		clubTopic := club.ID.Hex()
-		clubAdminTopic := club.ID.Hex() + "_admin"
-		c.NotifService.DeleteTopic(clubTopic)
-		c.NotifService.DeleteTopic(clubAdminTopic)
+		clubTopic := id
+		clubAdminTopic := id + "_admin"
+
+		err = utils.DeleteNotificationTopic(clubTopic)
+		if err != nil {
+			c.Logger.Error("failed to delete topic", err.Error())
+		}
+
+		err = utils.DeleteNotificationTopic(clubAdminTopic)
+		if err != nil {
+			c.Logger.Error("failed to delete topic", err.Error())
+		}
+
+		members := *club.Members
 
 		// delete club from users data
-		for i := range club.Members {
-			filter := bson.M{"uuid": club.Members[i].UUID}
+		for i := range members {
+			filter := bson.M{"uuid": members[i].UUID}
 			update := bson.M{"$pull": bson.M{"clubs": oid}}
 			c.Database.UserCol.UpdateOne(context.Background(), filter, update)
 		}
@@ -473,7 +415,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		json.NewDecoder(r.Body).Decode(&req)
 
 		// fetch club data to get member position in array
-		var club models.Club
+		var club models.ClubDao
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -485,17 +427,18 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 
 		// fetch user index in club data
 		index := 0
-		for i := 0; i < len(club.Members); i++ {
-			if club.Members[i].ID == memOID {
+		members := *club.Members
+		for i := 0; i < len(members); i++ {
+			if members[i].ID == memOID {
 				index = i
 			}
 		}
 
-		member := models.Member{
+		member := models.MemberDao{
 			ID:       memOID,
-			UUID:     club.Members[index].UUID,
+			UUID:     members[index].UUID,
 			Role:     req.Role,
-			JoinedAt: club.Members[index].JoinedAt,
+			JoinedAt: members[index].JoinedAt,
 		}
 
 		// remove member and add new member with new rank
@@ -533,16 +476,20 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// if user was member then add them to the admin topic
-		if club.Members[index].Role == "member" {
-			c.NotifService.AddTokenToTopic(club.ID.Hex()+"_admin", usr.UUID)
+		if members[index].Role == "member" {
+			err = utils.AddTokenToTopic(id+"_admin", usr.UUID)
+			if err != nil {
+				c.Logger.Error("failed to add token to topic: ", err.Error())
+			}
 		}
 
 		// notify user that they had their rank changed
-		notification := notif.Notification{
-			Title: club.Name,
+		notification := models.Notification{
+			Title: *club.Name,
 			Body:  text,
 		}
-		c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
+
+		utils.SendNotificationToToken(usr.DeviceToken, &notification)
 
 		// fetch updated club data
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
@@ -611,7 +558,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 
 		// fetch club
 		filter := bson.M{"_id": oid}
-		var club models.Club
+		var club models.ClubDao
 		err = c.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -624,14 +571,15 @@ func (c *Service) KickMember() http.HandlerFunc {
 
 		// fetch user index in club data
 		index := 0
-		for i := 0; i < len(club.Members); i++ {
-			if club.Members[i].ID == memOID {
+		members := *club.Members
+		for i := 0; i < len(members); i++ {
+			if members[i].ID == memOID {
 				index = i
 			}
 		}
 
 		// remove club from user data
-		filter = bson.M{"uuid": club.Members[index].UUID}
+		filter = bson.M{"uuid": members[index].UUID}
 		update := bson.M{"$pull": bson.M{"clubs": oid}}
 		_, err = c.Database.UserCol.UpdateOne(context.Background(), filter, update)
 		if err != nil {
@@ -641,7 +589,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// fetch user token
-		usr, err := c.SearchService.SearchUserByUUID(club.Members[index].UUID)
+		usr, err := c.SearchService.SearchUserByUUID(members[index].UUID)
 		if err != nil {
 			c.Logger.Error(err.Error())
 		}
@@ -657,13 +605,21 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// notify user then remove them from the topics
-		notification := notif.Notification{
-			Title: club.Name,
-			Body:  "You've been kicked out of " + club.Name,
+		notification := models.Notification{
+			Title: *club.Name,
+			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
 		}
-		c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), usr.UUID)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", usr.UUID)
+
+		utils.SendNotificationToToken(usr.DeviceToken, &notification)
+		err = utils.RemoveTokenFromTopic(id, usr.UUID)
+		if err != nil {
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
+		}
+
+		err = utils.RemoveTokenFromTopic(id+"_admin", usr.UUID)
+		if err != nil {
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
+		}
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -732,409 +688,14 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 		}
 
 		// remove from topics
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex(), uuid)
-		c.NotifService.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`OK`))
-	}
-}
-
-/* APPLICATIONS */
-
-/*
-Get Club Applications(GET)
-
-  - Fetches and returns a list of club applications
-
-  - Grabs club id from path
-
-  - Must be club Admin
-
-Returns:
-
-	Http handler
-		- Writes applications back to client
-*/
-func (c *Service) GetApplications() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
-			return
-		}
-
-		// convert club id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
+		err = utils.RemoveTokenFromTopic(club.ID.Hex(), uuid)
 		if err != nil {
-			c.Logger.Debug(err.Error())
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
-		_, ctx := context.WithTimeout(context.Background(), 30*time.Second)
-		defer ctx()
-
-		filter := bson.M{"club_id": oid}
-		var apps []models.ClubApplication
-		cur, err := c.Database.ClubApplicationCol.Find(context.TODO(), filter)
-
+		err = utils.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusNoContent)
-				return
-			}
-		}
-
-		for cur.Next(context.TODO()) {
-			var app models.ClubApplication
-			err := cur.Decode(&app)
-			if err != nil {
-				c.Logger.Error(err)
-			}
-			user, err := c.SearchService.SearchUserByUUID(app.UUID)
-			if err != nil {
-				c.Logger.Error("failed to get user data: " + err.Error())
-			}
-			app.Data = &user
-			apps = append(apps, app)
-		}
-
-		// just in case mongo doesnt throw an error
-		if len(apps) == 0 {
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		resp := models.ClubApplicationsResponse{
-			TotalApplications: len(apps),
-			Applications:      apps,
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
-	}
-}
-
-/*
-Create a Club Application(POST)
-
-  - Creates a club applications
-
-  - Grabs club id from path
-
-  - creates club application
-
-Returns:
-
-	Http handler
-		- Writes back application object to user
-*/
-func (c *Service) CreateApplication() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		uuid := r.Header.Get("UUID")
-
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
-			return
-		}
-
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "failed to convert club id", http.StatusBadRequest)
-			return
-		}
-
-		// check if an application already exists
-		var _app models.ClubApplication
-		filter := bson.M{"uuid": uuid, "club_id": oid}
-		err = c.Database.ClubApplicationCol.FindOne(context.Background(), filter).Decode(&_app)
-		if err != nil {
-			if err != mongo.ErrNoDocuments {
-				c.Logger.Error(err.Error())
-				http.Error(rw, "failed to check application", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		timeStamp := time.Now().Unix()
-		app := models.ClubApplication{
-			ID:        primitive.NewObjectID(),
-			UUID:      uuid,
-			ClubID:    oid,
-			Status:    "pending",
-			CreatedAt: timeStamp,
-		}
-
-		// create club application in database
-		_, err = c.Database.ClubApplicationCol.InsertOne(context.Background(), app)
-		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "failed to create application", http.StatusInternalServerError)
-			return
-		}
-
-		// notify admins
-		note := notif.Notification{
-			Title: "New Club Application",
-			Body:  "You have a new club application",
-			Topic: app.ClubID.Hex() + "_admin",
-		}
-		err = c.NotifService.SendNotificationToTopic(&note)
-		if err != nil {
-			c.Logger.Error(err.Error())
-		}
-
-		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(app)
-	}
-}
-
-/*
-Update a Club Applications(PUT)
-
-  - Updates a club applications
-
-  - Grabs club id from path
-
-  - Grabs application id from path
-
-  - Update the satus of the specific application
-
-  - Must be club Admin
-
-Returns:
-
-	Http handler
-		- Writes ok back to user
-*/
-func (c *Service) UpdateApplication() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
-			return
-		}
-
-		// grab club id from path
-		vars := mux.Vars(r)
-		// if there is no application id
-		if len(vars["applicationID"]) == 0 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
-		// if we get an invalid application id
-		if len(vars["applicationID"]) < 24 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
-		var req models.ApplicationUpdateRequest
-		// decode request
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-			return
-		}
-
-		// convert club id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		// convert application id to oid
-		aid := vars["applicationID"]
-		aoid, err := primitive.ObjectIDFromHex(aid)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		// if the admin accepts the application
-		if req.Status == "accepted" {
-
-			// check if application exists
-			var app models.ClubApplication
-			filter := bson.M{"_id": aoid}
-			err = c.Database.ClubApplicationCol.FindOne(context.TODO(), filter).Decode(&app)
-			if err != nil {
-				c.Logger.Error(err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-				return
-			}
-
-			// if someone else already accepted it we dont want to cause issues in user data where there are duplicated club id's
-			if app.Status == "pending" {
-
-				// update club application in database
-				filter := bson.M{"_id": aoid}
-				change := bson.M{"$set": bson.M{"status": req.Status}}
-				_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
-				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-					return
-				}
-
-				// add club id to user data
-				filter = bson.M{"uuid": app.UUID}
-				change = bson.M{"$push": bson.M{"clubs": oid}}
-				_, err = c.Database.UserCol.UpdateOne(context.TODO(), filter, change)
-				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-					return
-				}
-
-				member := models.Member{ // member object to put in club
-					ID:       primitive.NewObjectID(), // unique member identifier
-					UUID:     app.UUID,                // user uuid
-					Role:     "member",                // user role
-					JoinedAt: time.Now().Unix(),       // joined date
-				}
-
-				// update club information by adding member in the list
-				filter = bson.M{"_id": oid}
-				change = bson.M{"$push": bson.M{"members": member}}
-				_, err = c.Database.ClubCol.UpdateOne(context.TODO(), filter, change)
-				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-					return
-				}
-
-				// find club info
-				var club models.Club
-				err = c.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
-				if err != nil {
-					c.Logger.Error(err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-					return
-				}
-
-				// find user device token
-				usr, err := c.SearchService.SearchUserByUUID(member.UUID)
-				if err != nil {
-					c.Logger.Error("failed to get user data: " + err.Error())
-				}
-
-				// notify user they were accepted to the club
-				notification := notif.Notification{
-					Title: "Club Application",
-					Body:  club.Name + " accepted your application.",
-				}
-				c.NotifService.AddTokenToTopic(club.ID.Hex(), usr.UUID)
-				c.NotifService.SendNotificationToToken(&notification, usr.DeviceToken)
-
-				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusOK)
-				return
-			}
-
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusOK)
-			return
-		} else {
-			// update club application in database
-			filter := bson.M{"_id": aoid}
-			change := bson.M{"$set": bson.M{"status": req.Status}}
-			_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
-			if err != nil {
-				c.Logger.Error(err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
-				return
-			}
-			rw.WriteHeader(http.StatusOK)
-			return
-		}
-	}
-}
-
-/*
-Delete a Club Applications(DELETE)
-
-  - removes a club application
-
-  - Grabs club id from path
-
-  - Grabs application id from path
-
-  - delete club application
-
-Returns:
-
-	Http handler
-		- Writes ok back to user
-*/
-func (c *Service) DeleteApplication() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		// Check & Validate Auth Token
-		uuid := r.Header.Get("UUID")
-
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
-			return
-		}
-		// grab application id from path
-		vars := mux.Vars(r)
-
-		// if there is no application id
-		if len(vars["applicationId"]) == 0 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
-		// if we get an invalid application id
-		if len(vars["applicationId"]) < 24 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
-		// convert club id to oid
-		appID := vars["application_id"]
-		appOID, err := primitive.ObjectIDFromHex(appID)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		clubID := vars["id"]
-		clubOID, err := primitive.ObjectIDFromHex(clubID)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		filter := bson.M{"_id": appOID, "uuid": uuid, "club_id": clubOID}
-
-		// delete club application from database
-		_, err = c.Database.ClubApplicationCol.DeleteOne(context.TODO(), filter)
-		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "failed to delete club application", http.StatusInternalServerError)
-			return
+			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
 		rw.Header().Set("Content-Type", "application/json")

@@ -25,7 +25,7 @@ func (s *FieldAPI) Ready() {
 	*/
 
 	// get fields
-	s.Router.Handle("/fields",
+	s.Router.Handle("/v1/fields",
 		middleware.Chain(
 			s.Service.GetFields(),
 			middleware.Logging(),
@@ -33,7 +33,7 @@ func (s *FieldAPI) Ready() {
 	).Methods("GET")
 
 	// get a field
-	s.Router.Handle("/fields/{id}",
+	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
 			s.Service.GetAField(),
 			middleware.Logging(),
@@ -41,7 +41,7 @@ func (s *FieldAPI) Ready() {
 	).Methods("GET")
 
 	// create field
-	s.Router.Handle("/fields",
+	s.Router.Handle("/v1/fields",
 		middleware.Chain(
 			s.Service.InsertAField(),
 			middleware.Logging(),
@@ -49,7 +49,7 @@ func (s *FieldAPI) Ready() {
 	).Methods("POST")
 
 	// update a field
-	s.Router.Handle("/fields/{id}",
+	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
 			s.Service.UpdateAField(),
 			middleware.Logging(),
@@ -57,7 +57,7 @@ func (s *FieldAPI) Ready() {
 	).Methods("PUT")
 
 	// delete a field
-	s.Router.Handle("/fields/{id}",
+	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
 			s.Service.DeleteAField(),
 			middleware.Logging(),

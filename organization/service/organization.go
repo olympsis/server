@@ -4,19 +4,27 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Insert a new organization into the database
-func (s *Service) InsertAnOrganization(ctx context.Context, event *models.Organization) error {
-	s.Database.OrgCol.InsertOne(ctx, event)
-	return nil
+func (s *Service) InsertAnOrganization(ctx context.Context, event *models.OrganizationDao) (*primitive.ObjectID, error) {
+	resp, err := s.Database.OrgCol.InsertOne(ctx, event)
+	if err != nil {
+		return nil, err
+	}
+	id := resp.InsertedID.(primitive.ObjectID)
+	return &id, nil
 }
 
 // Get an organization from database
-func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}, organization *models.Organization) error {
-
-	s.Database.OrgCol.FindOne(ctx, filter).Decode(&organization)
-	return nil
+func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}) (*models.OrganizationDao, error) {
+	var org models.OrganizationDao
+	err := s.Database.OrgCol.FindOne(ctx, filter).Decode(&org)
+	if err != nil {
+		return nil, err
+	}
+	return &org, nil
 }
 
 // Get organizations from database
@@ -39,15 +47,9 @@ func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, org
 }
 
 // Update an organization in database
-func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, update interface{}, organization *models.Organization) error {
+func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, update interface{}) error {
 	// update user
 	_, err := s.Database.OrgCol.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	// find and return updated user
-	err = s.FindAnOrganization(ctx, filter, organization)
 	if err != nil {
 		return err
 	}

@@ -4,16 +4,21 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Insert a new organization application into the database
-func (s *Service) InsertApplication(ctx context.Context, event *models.OrganizationApplication) error {
-	s.Database.OrgApplicationCol.InsertOne(ctx, event)
-	return nil
+func (s *Service) InsertApplication(ctx context.Context, event *models.OrganizationApplicationDao) (*primitive.ObjectID, error) {
+	res, err := s.Database.OrgApplicationCol.InsertOne(ctx, event)
+	if err != nil {
+		return nil, err
+	}
+	id := res.InsertedID.(primitive.ObjectID)
+	return &id, nil
 }
 
 // Get an organization application from database
-func (s *Service) FindApplication(ctx context.Context, filter interface{}, organization *models.OrganizationApplication) error {
+func (s *Service) FindApplication(ctx context.Context, filter interface{}, organization *models.OrganizationApplicationDao) error {
 	s.Database.OrgApplicationCol.FindOne(ctx, filter).Decode(&organization)
 	return nil
 }
@@ -38,7 +43,7 @@ func (s *Service) FindApplications(ctx context.Context, filter interface{}, orga
 }
 
 // Update an organization application in database
-func (s *Service) UpdateAnApplication(ctx context.Context, filter interface{}, update interface{}, invitation *models.OrganizationApplication) error {
+func (s *Service) UpdateAnApplication(ctx context.Context, filter interface{}, update interface{}, invitation *models.OrganizationApplicationDao) error {
 
 	// update application
 	_, err := s.Database.OrgApplicationCol.UpdateOne(ctx, filter, update)

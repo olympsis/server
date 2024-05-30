@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -17,7 +16,6 @@ type Service struct {
 	Logger        *logrus.Logger
 	Router        *mux.Router
 	SearchService *search.Service
-	NotifService  *notif.Service
 }
 
 // Insert one post into database

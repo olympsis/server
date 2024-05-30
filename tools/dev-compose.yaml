@@ -1,0 +1,48 @@
+version: "3.0"
+
+name: olympsis-dev
+
+volumes:
+  db-data:
+
+services:
+  server:
+    build: ../.
+    container_name: server
+    restart: always
+    ports:
+     - 80:80
+    volumes:
+      - db-data:/server
+    environment:
+      MODE: DEVELOPMENT
+      DB_USR: admin
+      DB_PASS: olympsis
+      DB_ADDR: master:27017
+      NOTIF_DB_ADDR: notif:27017
+    depends_on:
+      - master-db
+      - notif-db
+      
+
+  master-db:
+    container_name: master
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: olympsis
+    volumes:
+      - db-data:/master
+      - ./master-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+
+  notif-db:
+    container_name: notif
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: olympsis
+    volumes:
+      - db-data:/notif
+      - ./notif-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro

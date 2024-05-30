@@ -5,8 +5,8 @@ import (
 	"olympsis-server/middleware"
 	"olympsis-server/user/service"
 
+	"firebase.google.com/go/v4/auth"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,27 +16,27 @@ type UserAPI struct {
 	Service *service.Service
 }
 
-func NewUserAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *UserAPI {
-	return &UserAPI{Logger: l, Router: r, Service: service.NewUserService(l, r, d, n)}
+func NewUserAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *UserAPI {
+	return &UserAPI{Logger: l, Router: r, Service: service.NewUserService(l, r, d)}
 }
 
-func (u *UserAPI) Ready() {
+func (u *UserAPI) Ready(firebase *auth.Client) {
 
 	/*
 		ROUTES
 	*/
 
 	// search username availability
-	u.Router.Handle("/users/check-in",
+	u.Router.Handle("/v1/users/check-in",
 		middleware.Chain(
 			u.Service.CheckIn(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// search username availability
-	u.Router.Handle("/users/username",
+	u.Router.Handle("/v1/users/username",
 		middleware.Chain(
 			u.Service.CheckUsername(),
 			middleware.Logging(),
@@ -44,56 +44,56 @@ func (u *UserAPI) Ready() {
 	).Methods("GET")
 
 	// get user data
-	u.Router.Handle("/users/user",
+	u.Router.Handle("/v1/users/user",
 		middleware.Chain(
 			u.Service.GetUserData(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// create user data
-	u.Router.Handle("/users",
+	u.Router.Handle("/v1/users",
 		middleware.Chain(
 			u.Service.CreateUserData(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
 	// update user data
-	u.Router.Handle("/users/user",
+	u.Router.Handle("/v1/users/user",
 		middleware.Chain(
 			u.Service.UpdateUserData(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
 	// find organizations invite
-	u.Router.Handle("/users/invitations/organizations",
+	u.Router.Handle("/v1/users/invitations/organizations",
 		middleware.Chain(
 			u.Service.GetOrganizationInvitations(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// search users by username
-	u.Router.Handle("/users/search/username",
+	u.Router.Handle("/v1/users/search/username",
 		middleware.Chain(
 			u.Service.SearchUsersByUserName(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// search user by uuid
-	u.Router.Handle("/users/search/uuid",
+	u.Router.Handle("/v1/users/search/uuid",
 		middleware.Chain(
 			u.Service.SearchUserByUUID(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 }

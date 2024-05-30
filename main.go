@@ -10,17 +10,19 @@ import (
 	"olympsis-server/field"
 	"olympsis-server/organization"
 	"olympsis-server/post"
-	"olympsis-server/storage"
+	"olympsis-server/report"
 	"olympsis-server/user"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	firebase "firebase.google.com/go/v4"
+
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/option"
 )
 
 func main() {
@@ -34,36 +36,39 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
-	// notifications service
-	k := os.Getenv("KEYID")
-	t := os.Getenv("TEAMID")
-	f := "./files/AuthKey_JN25FUC9X2.p8"
-	n := notif.NewNotificationService(l, d.NotifCol, d.UserCol)
-	err := n.CreateNewClient(k, t, f)
+	opt := option.WithCredentialsFile("./files/firebase-credentials.json")
+	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
-		panic(err.Error())
+		l.Fatalf("error starting firebase app: %s\n", err)
+		os.Exit(1)
+	}
+
+	client, err := app.Auth(context.TODO())
+	if err != nil {
+		l.Fatalf("error getting Auth client: %v\n", err)
+		os.Exit(1)
 	}
 
 	// search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
-	authAPI := auth.NewAuthAPI(l, r, d)
-	userAPI := user.NewUserAPI(l, r, d, n)
+	authAPI := auth.NewAuthAPI(l, r, d, client)
+	userAPI := user.NewUserAPI(l, r, d)
 	fieldAPI := field.NewFieldAPI(l, r, d)
-	clubAPI := club.NewClubAPI(l, r, d, n, sh)
-	postAPI := post.NewPostAPI(l, r, d, n, sh)
-	eventAPI := event.NewEventAPI(l, r, d, n, sh)
-	storageAPI := storage.NewStorageAPI(l, r, d)
-	organizationAPI := organization.NewOrganizationAPI(l, r, d, n, sh)
+	clubAPI := club.NewClubAPI(l, r, d, sh)
+	postAPI := post.NewPostAPI(l, r, d, sh)
+	eventAPI := event.NewEventAPI(l, r, d)
+	organizationAPI := organization.NewOrganizationAPI(l, r, d, sh)
+	reportAPI := report.NewReportAPI(l, r, d)
 
-	authAPI.Ready()
-	userAPI.Ready()
+	authAPI.Ready(client)
+	userAPI.Ready(client)
 	fieldAPI.Ready()
-	clubAPI.Ready()
-	postAPI.Ready()
-	eventAPI.Ready()
-	storageAPI.Ready()
-	organizationAPI.Ready()
+	clubAPI.Ready(client)
+	postAPI.Ready(client)
+	eventAPI.Ready(client)
+	organizationAPI.Ready(client)
+	reportAPI.Setup(client)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -95,7 +100,7 @@ func main() {
 
 	sig := <-sigs
 
-	l.Printf("Recieved Termination(%s), graceful shutdown \n", sig)
+	l.Printf("Received Termination(%s), graceful shutdown \n", sig)
 
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
 

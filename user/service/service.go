@@ -3,17 +3,15 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"olympsis-server/batch"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
-	"olympsis-server/utils"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/notif"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,26 +20,9 @@ import (
 )
 
 /*
-Authentication Service
-- reference object for auth service
-*/
-type Service struct {
-	// database
-	Database *database.Database
-
-	// logrus logger to Log information about service and errors
-	Log *logrus.Logger
-
-	Notif *notif.Service
-
-	// mux Router to complete http requests
-	Router *mux.Router
-}
-
-/*
 Creates New Auth Service
 
-  - Creates new instace of auth service object
+  - Creates new instance of auth service object
 
 Args:
 
@@ -52,8 +33,8 @@ Returns:
 
 	*AuthenticationService - pointer referencing to new instance of service object
 */
-func NewUserService(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service) *Service {
-	return &Service{Log: l, Router: r, Database: d, Notif: n}
+func NewUserService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
+	return &Service{Log: l, Router: r, Database: d}
 }
 
 /*
@@ -103,19 +84,19 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 /*
 Create User Data (PUT)
 
-  - Creates new user for playfest (on sign up)
+  - Creates new user for olympsis (on sign up)
 
   - Grab request body
 
-  - Create User data in user databse
+  - Create User data in user database
 
 Returns:
 
 	Http handler
 		- Writes token back to client
 */
-func (u *Service) CreateUserData() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
+func (s *Service) CreateUserData() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
 
@@ -123,8 +104,8 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 		var req models.User
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			s.Log.Error(fmt.Sprintf("Failed to decode request: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -137,15 +118,22 @@ func (u *Service) CreateUserData() http.HandlerFunc {
 		}
 
 		// insert auth user in database
-		err = u.InsertUser(context.Background(), &user)
+		err = s.InsertUser(context.Background(), &user)
 		if err != nil {
-			u.Log.Error(err.Error())
-			http.Error(rw, "Failed to Insert User", http.StatusInternalServerError)
+			s.Log.Error(fmt.Sprintf("Failed to insert user into database: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to insert user"}`, http.StatusInternalServerError)
 			return
 		}
 
-		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(user)
+		usr, err := aggregations.AggregateUser(&uuid, s.Database)
+		if err != nil {
+			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to find user data"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(usr)
 	}
 }
 
@@ -161,8 +149,8 @@ Returns:
 	Http handler
 		- Writes token back to client
 */
-func (u *Service) UpdateUserData() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
+func (s *Service) UpdateUserData() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
 
@@ -170,8 +158,9 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 		var req models.User
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			u.Log.Debug(err.Error())
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			s.Log.Error(fmt.Sprintf("Failed to decode request: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
+			return
 		}
 
 		filter := bson.M{"uuid": uuid}
@@ -194,16 +183,40 @@ func (u *Service) UpdateUserData() http.HandlerFunc {
 		if req.Visibility != "" {
 			changes["visibility"] = req.Visibility
 		}
+		if req.AcceptedEULA != nil {
+			changes["accepted_eula"] = req.AcceptedEULA
+		}
+		if req.HasOnboarded != nil {
+			changes["has_onboarded"] = req.HasOnboarded
+		}
+		if req.Hometown != nil {
+			changes["hometown"] = req.Hometown
+		}
+		if req.LastLocation != nil {
+			changes["last_location"] = req.LastLocation
+		}
+		if req.BlockedUsers != nil {
+			changes["blocked_users"] = req.BlockedUsers
+		}
 
 		update := bson.M{"$set": changes}
 
-		err = u.UpdateUser(context.Background(), filter, update, &req)
+		err = s.UpdateUser(context.Background(), filter, update, &req)
 		if err != nil {
-			u.Log.Debug(err)
+			s.Log.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to update user data" }`, http.StatusInternalServerError)
+			return
 		}
 
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(req)
+		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		if err != nil {
+			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -219,25 +232,21 @@ Returns:
 	Http handler
 		- Writes user data back to client
 */
-func (u *Service) GetUserData() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
+func (s *Service) GetUserData() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
 
-		// find user data in database
-		var user models.User
-		filter := bson.M{"uuid": uuid}
-		err := u.FindUser(context.Background(), filter, &user)
-
-		// username is a temp fix because empty users are not throwing an error
-		if err != nil || user.UserName == "" {
-			http.Error(rw, "user data not found", http.StatusNotFound)
+		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		if err != nil || user.Username == "" {
+			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusNotFound)
 			return
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(user)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -371,8 +380,8 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
-				users[i].FirstName = auth.FirstName
-				users[i].LastName = auth.LastName
+				users[i].FirstName = *auth.FirstName
+				users[i].LastName = *auth.LastName
 			}
 		}
 
@@ -422,8 +431,8 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 			UUID:        user.UUID,
 			Bio:         user.Bio,
 			Username:    user.UserName,
-			FirstName:   auth.FirstName,
-			LastName:    auth.LastName,
+			FirstName:   *auth.FirstName,
+			LastName:    *auth.LastName,
 			ImageURL:    user.ImageURL,
 			Visibility:  user.Visibility,
 			DeviceToken: user.DeviceToken,
@@ -444,150 +453,65 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var wg sync.WaitGroup
-		var auth models.AuthUser
-		var meta models.User
-		var clubs []models.Club
-		var orgs []models.Organization
-
 		uuid := r.Header.Get("UUID")
-		provider := r.Header.Get("Token-Provider")
-		ctx := context.Background()
-		filter := bson.M{"uuid": uuid}
-		tokenExpiry, _ := strconv.ParseInt(r.Header.Get("Token-Expiry"), 10, 64)
+		response := models.CheckIn{}
 
-		// check to see if their token is close to expiry
-		var newToken *string
-		if tokenExpiry == 0 {
-			t, _ := utils.GenerateAuthToken(uuid, provider)
-			newToken = &t
-
-			// update tokens
-			update := bson.M{"$set": bson.M{"token": newToken}}
-			_, err := s.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
-			if err != nil {
-				s.Log.Error(err.Error())
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		} else {
-			if tokenExpiry < time.Now().Add(15*24*time.Hour).Unix() {
-				t, _ := utils.GenerateAuthToken(uuid, provider)
-				newToken = &t
-
-				// update tokens
-				update := bson.M{"$set": bson.M{"token": newToken}}
-				_, err := s.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
-				if err != nil {
-					s.Log.Error(err.Error())
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-			}
-		}
-
-		// fetch auth data
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Database.AuthCol.FindOne(ctx, filter).Decode(&auth)
-			if err != nil {
-				s.Log.Error("failed to fetch user auth data: ", err.Error())
-			}
-		}()
-
-		// fetch user meta data
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.FindUser(ctx, filter, &meta)
-			if err != nil {
-				s.Log.Error("failed to fetch user metad data: ", err.Error())
-			}
-		}()
-
-		wg.Wait()
-
-		// get clubs if they exist
-		if len(meta.Clubs) > 0 {
-			var clubIds []primitive.ObjectID
-			for i := range meta.Clubs {
-				id, _ := primitive.ObjectIDFromHex(meta.Clubs[i])
-				clubIds = append(clubIds, id)
-			}
-			filter := bson.M{
-				"_id": bson.M{
-					"$in": clubIds,
-				},
-			}
-			clubs, _ = batch.ProcessBatchedClubData(filter, s.Database)
-		}
-
-		// get organizations if they exist
-		if len(meta.Organizations) > 0 {
-			for i := range meta.Organizations {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					var org models.Organization
-					oid, err := primitive.ObjectIDFromHex(meta.Organizations[i])
-					if err != nil {
-						s.Log.Error("failed to convert hex id to object id: ", err.Error())
-					} else {
-						err = s.Database.OrgCol.FindOne(ctx, bson.M{"_id": oid}).Decode(&org)
-						if err != nil {
-							s.Log.Error("failed to find organization: ", err.Error())
-						} else {
-							orgs = append(orgs, org)
-						}
-					}
-				}(i)
-			}
-		}
-
-		wg.Wait()
-
-		var invitations []models.Invitation
-		cursor, err := s.Database.OrgInvitationCol.Find(ctx, bson.M{"recipient": uuid})
+		// find user data
+		user, err := aggregations.AggregateUser(&uuid, s.Database)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				s.Log.Error("no invitations found")
-			}
-			s.Log.Error("failed to find invitations: ", err.Error())
-		} else {
-			for cursor.Next(ctx) {
-				var invite models.Invitation
-				err := cursor.Decode(&invite)
-				if err != nil {
-					s.Log.Error("failed to decode invite: ", err.Error())
-				} else {
-					invitations = append(invitations, invite)
+			s.Log.Error(fmt.Sprintf("Failed to check user in: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to check user in" }`, http.StatusInternalServerError)
+			return
+		}
+		if user == nil {
+			s.Log.Error("Failed to get user. user object is nill")
+			http.Error(w, `{ "msg": "failed to get user" }`, http.StatusNotFound)
+			return
+		}
+		response.User = *user
+		var wg sync.WaitGroup
+
+		if user.Clubs != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				filter := bson.M{
+					"$match": bson.M{
+						"_id": bson.M{
+							"$in": user.Clubs,
+						},
+					},
 				}
-			}
+				clubs, err := aggregations.AggregateClubs(filter, s.Database)
+				if err != nil {
+					s.Log.Error("failed to check user in: ", err.Error())
+				}
+				response.Clubs = clubs
+			}()
 		}
 
-		user := models.UserData{
-			UUID:          uuid,
-			Username:      meta.UserName,
-			FirstName:     auth.FirstName,
-			LastName:      auth.LastName,
-			ImageURL:      meta.ImageURL,
-			Visibility:    meta.Visibility,
-			Bio:           meta.Bio,
-			Clubs:         meta.Clubs,
-			Organizations: meta.Organizations,
-			Sports:        meta.Sports,
+		if user.Organizations != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				filter := bson.M{
+					"$match": bson.M{
+						"_id": bson.M{
+							"$in": user.Organizations,
+						},
+					},
+				}
+				orgs, err := aggregations.AggregateOrganizations(filter, s.Database)
+				if err != nil {
+					s.Log.Error("failed to check user in: ", err.Error())
+				}
+				response.Organizations = orgs
+			}()
 		}
 
-		check := models.CheckIn{
-			User:          user,
-			Clubs:         &clubs,
-			Organizations: &orgs,
-			Invitations:   &invitations,
-			Token:         newToken,
-		}
+		wg.Wait()
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(check)
+		json.NewEncoder(w).Encode(response)
 	}
 }

@@ -5,97 +5,87 @@ import (
 	"olympsis-server/event/service"
 	"olympsis-server/middleware"
 
+	"firebase.google.com/go/v4/auth"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/notif"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
 type EventAPI struct {
-	Logger  *logrus.Logger
-	Router  *mux.Router
-	Service *service.Service
+	Logger  *logrus.Logger   // logger for logging errors
+	Router  *mux.Router      // router for handling requests
+	Service *service.Service // service for handing requests to
 }
 
-func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database, n *notif.Service, sh *search.Service) *EventAPI {
-	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d, n, sh)}
+func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *EventAPI {
+	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d)}
 }
 
-func (e *EventAPI) Ready() {
+func (e *EventAPI) Ready(firebase *auth.Client) {
 
 	/*
 		EVENTS
 	*/
 
 	// get events
-	e.Router.Handle("/events/location",
+	e.Router.Handle("/v1/events/location",
 		middleware.Chain(
 			e.Service.Location(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// get events
-	e.Router.Handle("/events",
+	e.Router.Handle("/v1/events",
 		middleware.Chain(
 			e.Service.GetEventsByLocation(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("GET")
-
-	// get events by club
-	e.Router.Handle("/events/club/{id}",
-		middleware.Chain(
-			e.Service.GetEventsByClub(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// get events by field
-	e.Router.Handle("/events/field/{id}",
+	e.Router.Handle("/v1/events/field/{id}",
 		middleware.Chain(
 			e.Service.GetEventsByField(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// get an event
-	e.Router.Handle("/events/{id}",
+	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
 			e.Service.GetEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("GET")
 
 	// create an event
-	e.Router.Handle("/events",
+	e.Router.Handle("/v1/events",
 		middleware.Chain(
 			e.Service.CreateEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
 	// update an event
-	e.Router.Handle("/events/{id}",
+	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
 			e.Service.UpdateAnEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("PUT")
 
 	// delete an event
-	e.Router.Handle("/events/{id}",
+	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
 			e.Service.DeleteAnEvent(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -104,20 +94,20 @@ func (e *EventAPI) Ready() {
 	*/
 
 	// add a participant
-	e.Router.Handle("/events/{id}/participants",
+	e.Router.Handle("/v1/events/{id}/participants",
 		middleware.Chain(
 			e.Service.AddParticipant(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
 	// remove a participant
-	e.Router.Handle("/events/{id}/participants/{participantID}",
+	e.Router.Handle("/v1/events/{id}/participants/{participantID}",
 		middleware.Chain(
 			e.Service.RemoveParticipant(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE")
 
@@ -125,39 +115,21 @@ func (e *EventAPI) Ready() {
 		EVENT NOTIFICATIONS
 	*/
 
-	// subscribe to event notifications
-	e.Router.Handle("/events/{id}/subscribe",
-		middleware.Chain(
-			e.Service.SubscribeToEvent(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("POST")
-
-	// unsubscribe from event notifications
-	e.Router.Handle("/events/{id}/unsubscribe",
-		middleware.Chain(
-			e.Service.UnsubscribeFromEvent(),
-			middleware.Logging(),
-			middleware.UserMiddleware(),
-		),
-	).Methods("POST")
-
 	// notify participants
-	e.Router.Handle("/events/{id}/notify/participants",
+	e.Router.Handle("/v1/events/{id}/notify/participants",
 		middleware.Chain(
 			e.Service.NotifyParticipants(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 
 	// notify club members
-	e.Router.Handle("/events/{id}/notify/clbu",
+	e.Router.Handle("/v1/events/{id}/notify/club",
 		middleware.Chain(
 			e.Service.NotifyClubMembers(),
 			middleware.Logging(),
-			middleware.UserMiddleware(),
+			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST")
 }
