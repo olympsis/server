@@ -27,7 +27,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// get clubs
-	s.Router.Handle("/clubs",
+	s.Router.Handle("/v1/clubs",
 		middleware.Chain(
 			s.Service.GetClubsByLocation(),
 			middleware.Logging(),
@@ -36,7 +36,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get a club
-	s.Router.Handle("/clubs/{id}",
+	s.Router.Handle("/v1/clubs/{id}",
 		middleware.Chain(
 			s.Service.GetClub(),
 			middleware.Logging(),
@@ -45,7 +45,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// update a club - requires admin token
-	s.Router.Handle("/clubs/{id}",
+	s.Router.Handle("/v1/clubs/{id}",
 		middleware.Chain(
 			s.Service.ModifyClub(),
 			middleware.Logging(),
@@ -54,7 +54,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// create a club
-	s.Router.Handle("/clubs",
+	s.Router.Handle("/v1/clubs",
 		middleware.Chain(
 			s.Service.CreateClub(),
 			middleware.Logging(),
@@ -63,7 +63,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// delete a club - requires admin token
-	s.Router.Handle("/clubs/{id}",
+	s.Router.Handle("/v1/clubs/{id}",
 		middleware.Chain(
 			s.Service.DeleteClub(),
 			middleware.Logging(),
@@ -72,7 +72,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("DELETE")
 
 	// leave a club
-	s.Router.Handle("/clubs/{id}/leave",
+	s.Router.Handle("/v1/clubs/{id}/leave",
 		middleware.Chain(
 			s.Service.LeaveClub(),
 			middleware.Logging(),
@@ -85,7 +85,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// get club application - requires admin token
-	s.Router.Handle("/clubs/{id}/applications",
+	s.Router.Handle("/v1/clubs/{id}/applications",
 		middleware.Chain(
 			s.Service.GetApplications(),
 			middleware.Logging(),
@@ -94,7 +94,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create club application
-	s.Router.Handle("/clubs/{id}/applications",
+	s.Router.Handle("/v1/clubs/{id}/applications",
 		middleware.Chain(
 			s.Service.CreateApplication(),
 			middleware.Logging(),
@@ -103,7 +103,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// update club application - requires admin token
-	s.Router.Handle("/clubs/{id}/applications/{applicationID}",
+	s.Router.Handle("/v1/clubs/{id}/applications/{applicationID}",
 		middleware.Chain(
 			s.Service.UpdateApplication(),
 			middleware.Logging(),
@@ -113,7 +113,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete application
-	s.Router.Handle("/clubs/{id}/applications/{applicationID}",
+	s.Router.Handle("/v1/clubs/{id}/applications/{applicationID}",
 		middleware.Chain(
 			s.Service.DeleteApplication(),
 			middleware.Logging(),
@@ -126,7 +126,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// change member rank
-	s.Router.Handle("/clubs/{id}/members/{memberID}/rank",
+	s.Router.Handle("/v1/clubs/{id}/members/{memberID}/rank",
 		middleware.Chain(
 			s.Service.ChangeMemberRank(),
 			middleware.Logging(),
@@ -135,7 +135,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// kick member from club
-	s.Router.Handle("/clubs/{id}/members/{memberID}/kick",
+	s.Router.Handle("/v1/clubs/{id}/members/{memberID}/kick",
 		middleware.Chain(
 			s.Service.KickMember(),
 			middleware.Logging(),
@@ -144,7 +144,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// leave club
-	s.Router.Handle("/clubs/{id}/members",
+	s.Router.Handle("/v1/clubs/{id}/members",
 		middleware.Chain(
 			s.Service.LeaveClub(),
 			middleware.Logging(),
@@ -156,7 +156,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 		Club Post
 	*/
 
-	s.Router.Handle("/clubs/{id}/post/{postID}",
+	s.Router.Handle("/v1/clubs/{id}/post/{postID}",
 		middleware.Chain(
 			s.Service.PinClubPost(),
 			middleware.Logging(),
@@ -164,7 +164,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("PUT")
 
-	s.Router.Handle("/clubs/{id}/post",
+	s.Router.Handle("/v1/clubs/{id}/post",
 		middleware.Chain(
 			s.Service.UnpinClubPost(),
 			middleware.Logging(),

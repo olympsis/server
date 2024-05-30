@@ -31,7 +31,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	*/
 
 	// get bug reports
-	e.Router.Handle("/report/bugs",
+	e.Router.Handle("/v1/report/bugs",
 		middleware.Chain(
 			e.Service.ReadBugReports(),
 			middleware.Logging(),
@@ -40,7 +40,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create a bug report
-	e.Router.Handle("/report/bugs",
+	e.Router.Handle("/v1/report/bugs",
 		middleware.Chain(
 			e.Service.CreateBugReport(),
 			middleware.Logging(),
@@ -49,7 +49,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("POST")
 
 	// change a bug report
-	e.Router.Handle("/report/bugs/{id}",
+	e.Router.Handle("/v1/report/bugs/{id}",
 		middleware.Chain(
 			e.Service.UpdateBugReport(),
 			middleware.Logging(),
@@ -58,7 +58,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete a bug report
-	e.Router.Handle("/report/bugs/{id}",
+	e.Router.Handle("/v1/report/bugs/{id}",
 		middleware.Chain(
 			e.Service.DeleteBugReport(),
 			middleware.Logging(),
@@ -71,7 +71,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	*/
 
 	// get post reports
-	e.Router.Handle("/report/posts",
+	e.Router.Handle("/v1/report/posts",
 		middleware.Chain(
 			e.Service.ReadPostReports(),
 			middleware.Logging(),
@@ -80,7 +80,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create a post report
-	e.Router.Handle("/report/posts",
+	e.Router.Handle("/v1/report/posts",
 		middleware.Chain(
 			e.Service.CreatePostReport(),
 			middleware.Logging(),
@@ -89,7 +89,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("POST")
 
 	// change a post report
-	e.Router.Handle("/report/posts/{id}",
+	e.Router.Handle("/v1/report/posts/{id}",
 		middleware.Chain(
 			e.Service.UpdatePostReport(),
 			middleware.Logging(),
@@ -98,7 +98,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete a post report
-	e.Router.Handle("/report/posts/{id}",
+	e.Router.Handle("/v1/report/posts/{id}",
 		middleware.Chain(
 			e.Service.DeletePostReport(),
 			middleware.Logging(),
@@ -111,7 +111,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	*/
 
 	// get post reports
-	e.Router.Handle("/report/members",
+	e.Router.Handle("/v1/report/members",
 		middleware.Chain(
 			e.Service.ReadMemberReports(),
 			middleware.Logging(),
@@ -120,7 +120,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create a post report
-	e.Router.Handle("/report/members",
+	e.Router.Handle("/v1/report/members",
 		middleware.Chain(
 			e.Service.CreateMemberReport(),
 			middleware.Logging(),
@@ -129,7 +129,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("POST")
 
 	// change a post report
-	e.Router.Handle("/report/members/{id}",
+	e.Router.Handle("/v1/report/members/{id}",
 		middleware.Chain(
 			e.Service.UpdateMemberReport(),
 			middleware.Logging(),
@@ -138,7 +138,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete a post report
-	e.Router.Handle("/report/members/{id}",
+	e.Router.Handle("/v1/report/members/{id}",
 		middleware.Chain(
 			e.Service.DeleteMemberReport(),
 			middleware.Logging(),
@@ -151,7 +151,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	*/
 
 	// get bug reports
-	e.Router.Handle("/report/fields",
+	e.Router.Handle("/v1/report/fields",
 		middleware.Chain(
 			e.Service.ReadFieldReports(),
 			middleware.Logging(),
@@ -160,7 +160,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create a bug report
-	e.Router.Handle("/report/fields",
+	e.Router.Handle("/v1/report/fields",
 		middleware.Chain(
 			e.Service.CreateFieldReport(),
 			middleware.Logging(),
@@ -169,7 +169,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("POST")
 
 	// change a bug report
-	e.Router.Handle("/report/fields/{id}",
+	e.Router.Handle("/v1/report/fields/{id}",
 		middleware.Chain(
 			e.Service.UpdateFieldReport(),
 			middleware.Logging(),
@@ -178,7 +178,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete a bug report
-	e.Router.Handle("/report/fields/{id}",
+	e.Router.Handle("/v1/report/fields/{id}",
 		middleware.Chain(
 			e.Service.DeleteFieldReport(),
 			middleware.Logging(),
@@ -191,7 +191,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	*/
 
 	// get bug reports
-	e.Router.Handle("/report/events",
+	e.Router.Handle("/v1/report/events",
 		middleware.Chain(
 			e.Service.ReadEventReports(),
 			middleware.Logging(),
@@ -200,7 +200,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create a bug report
-	e.Router.Handle("/report/events",
+	e.Router.Handle("/v1/report/events",
 		middleware.Chain(
 			e.Service.CreateEventReport(),
 			middleware.Logging(),
@@ -209,7 +209,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("POST")
 
 	// change a bug report
-	e.Router.Handle("/report/events/{id}",
+	e.Router.Handle("/v1/report/events/{id}",
 		middleware.Chain(
 			e.Service.UpdateEventReport(),
 			middleware.Logging(),
@@ -218,7 +218,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete a bug report
-	e.Router.Handle("/report/events/{id}",
+	e.Router.Handle("/v1/report/events/{id}",
 		middleware.Chain(
 			e.Service.DeleteEventReport(),
 			middleware.Logging(),

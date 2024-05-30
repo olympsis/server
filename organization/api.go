@@ -28,7 +28,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// create an organization
-	e.Router.Handle("/organizations",
+	e.Router.Handle("/v1/organizations",
 		middleware.Chain(
 			e.Service.CreateOrganization(),
 			middleware.Logging(),
@@ -37,7 +37,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// get organizations
-	e.Router.Handle("/organizations",
+	e.Router.Handle("/v1/organizations",
 		middleware.Chain(
 			e.Service.GetOrganizations(),
 			middleware.Logging(),
@@ -46,7 +46,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get an organization
-	e.Router.Handle("/organizations/{id}",
+	e.Router.Handle("/v1/organizations/{id}",
 		middleware.Chain(
 			e.Service.GetOrganization(),
 			middleware.Logging(),
@@ -55,7 +55,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// update an organization
-	e.Router.Handle("/organizations/{id}",
+	e.Router.Handle("/v1/organizations/{id}",
 		middleware.Chain(
 			e.Service.UpdateOrganization(),
 			middleware.Logging(),
@@ -64,7 +64,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete an organization
-	e.Router.Handle("/organizations/{id}",
+	e.Router.Handle("/v1/organizations/{id}",
 		middleware.Chain(
 			e.Service.DeleteOrganization(),
 			middleware.Logging(),
@@ -76,7 +76,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 		APPLICATION
 	*/
 	// create an application
-	e.Router.Handle("/organizations/applications",
+	e.Router.Handle("/v1/organizations/applications",
 		middleware.Chain(
 			e.Service.CreateApplication(),
 			middleware.Logging(),
@@ -85,7 +85,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// get applications
-	e.Router.Handle("/organizations/{id}/applications",
+	e.Router.Handle("/v1/organizations/{id}/applications",
 		middleware.Chain(
 			e.Service.GetApplications(),
 			middleware.Logging(),
@@ -94,7 +94,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get an application
-	e.Router.Handle("/organizations/applications/{id}",
+	e.Router.Handle("/v1/organizations/applications/{id}",
 		middleware.Chain(
 			e.Service.GetApplication(),
 			middleware.Logging(),
@@ -103,7 +103,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// update an application
-	e.Router.Handle("/organizations/applications/{id}",
+	e.Router.Handle("/v1/organizations/applications/{id}",
 		middleware.Chain(
 			e.Service.UpdateApplication(),
 			middleware.Logging(),
@@ -112,7 +112,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete an application
-	e.Router.Handle("/organizations/applications/{id}",
+	e.Router.Handle("/v1/organizations/applications/{id}",
 		middleware.Chain(
 			e.Service.DeleteApplication(),
 			middleware.Logging(),
@@ -124,7 +124,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 		INVITATION
 	*/
 	// create an invitation
-	e.Router.Handle("/organizations/invitations",
+	e.Router.Handle("/v1/organizations/invitations",
 		middleware.Chain(
 			e.Service.CreateInvitation(),
 			middleware.Logging(),
@@ -133,7 +133,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// get invitations
-	e.Router.Handle("/organizations/{id}/invitations",
+	e.Router.Handle("/v1/organizations/{id}/invitations",
 		middleware.Chain(
 			e.Service.GetInvitations(),
 			middleware.Logging(),
@@ -142,7 +142,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get an invitation
-	e.Router.Handle("/organizations/invitations/{id}",
+	e.Router.Handle("/v1/organizations/invitations/{id}",
 		middleware.Chain(
 			e.Service.GetInvitation(),
 			middleware.Logging(),
@@ -151,7 +151,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// update an invitation
-	e.Router.Handle("/organizations/invitations/{id}",
+	e.Router.Handle("/v1/organizations/invitations/{id}",
 		middleware.Chain(
 			e.Service.UpdateInvitation(),
 			middleware.Logging(),
@@ -160,7 +160,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete an invitation
-	e.Router.Handle("/organizations/invitations/{id}",
+	e.Router.Handle("/v1/organizations/invitations/{id}",
 		middleware.Chain(
 			e.Service.DeleteInvitation(),
 			middleware.Logging(),
@@ -172,7 +172,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 		Club Post
 	*/
 
-	e.Router.Handle("/organizations/{id}/post/{postID}",
+	e.Router.Handle("/v1/organizations/{id}/post/{postID}",
 		middleware.Chain(
 			e.Service.PinOrgPost(),
 			middleware.Logging(),
@@ -180,7 +180,7 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("PUT")
 
-	e.Router.Handle("/organizations/{id}/post",
+	e.Router.Handle("/v1/organizations/{id}/post",
 		middleware.Chain(
 			e.Service.UnpinOrgPost(),
 			middleware.Logging(),

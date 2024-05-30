@@ -27,35 +27,35 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// get posts
-	p.Router.Handle("/posts", middleware.Chain(
+	p.Router.Handle("/v1/posts", middleware.Chain(
 		p.Service.GetPosts(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
 	)).Methods("GET")
 
 	// get a post
-	p.Router.Handle("/posts/{id}", middleware.Chain(
+	p.Router.Handle("/v1/posts/{id}", middleware.Chain(
 		p.Service.GetPost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
 	)).Methods("GET")
 
 	// create a post
-	p.Router.Handle("/posts", middleware.Chain(
+	p.Router.Handle("/v1/posts", middleware.Chain(
 		p.Service.CreatePost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
 	)).Methods("POST")
 
 	// update a post
-	p.Router.Handle("/posts/{id}", middleware.Chain(
+	p.Router.Handle("/v1/posts/{id}", middleware.Chain(
 		p.Service.ModifyPost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
 	)).Methods("PUT")
 
 	// delete a post
-	p.Router.Handle("/posts/{id}", middleware.Chain(
+	p.Router.Handle("/v1/posts/{id}", middleware.Chain(
 		p.Service.DeletePost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
@@ -66,7 +66,7 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// add a like
-	p.Router.Handle("/posts/{id}/likes",
+	p.Router.Handle("/v1/posts/{id}/likes",
 		middleware.Chain(
 			p.Service.AddLike(),
 			middleware.Logging(),
@@ -75,7 +75,7 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// remove a like
-	p.Router.Handle("/posts/{id}/likes/{likeID}",
+	p.Router.Handle("/v1/posts/{id}/likes/{likeID}",
 		middleware.Chain(
 			p.Service.RemoveLike(),
 			middleware.Logging(),
@@ -88,7 +88,7 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// add a comment
-	p.Router.Handle("/posts/{id}/comments",
+	p.Router.Handle("/v1/posts/{id}/comments",
 		middleware.Chain(
 			p.Service.AddComment(),
 			middleware.Logging(),
@@ -97,7 +97,7 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// remove a comment
-	p.Router.Handle("/posts/{id}/comments/{commentID}",
+	p.Router.Handle("/v1/posts/{id}/comments/{commentID}",
 		middleware.Chain(
 			p.Service.RemoveComment(),
 			middleware.Logging(),

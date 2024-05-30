@@ -27,7 +27,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// get events
-	e.Router.Handle("/events/location",
+	e.Router.Handle("/v1/events/location",
 		middleware.Chain(
 			e.Service.Location(),
 			middleware.Logging(),
@@ -36,7 +36,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get events
-	e.Router.Handle("/events",
+	e.Router.Handle("/v1/events",
 		middleware.Chain(
 			e.Service.GetEventsByLocation(),
 			middleware.Logging(),
@@ -45,7 +45,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get events by field
-	e.Router.Handle("/events/field/{id}",
+	e.Router.Handle("/v1/events/field/{id}",
 		middleware.Chain(
 			e.Service.GetEventsByField(),
 			middleware.Logging(),
@@ -54,7 +54,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// get an event
-	e.Router.Handle("/events/{id}",
+	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
 			e.Service.GetEvent(),
 			middleware.Logging(),
@@ -63,7 +63,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("GET")
 
 	// create an event
-	e.Router.Handle("/events",
+	e.Router.Handle("/v1/events",
 		middleware.Chain(
 			e.Service.CreateEvent(),
 			middleware.Logging(),
@@ -72,7 +72,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// update an event
-	e.Router.Handle("/events/{id}",
+	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
 			e.Service.UpdateAnEvent(),
 			middleware.Logging(),
@@ -81,7 +81,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("PUT")
 
 	// delete an event
-	e.Router.Handle("/events/{id}",
+	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
 			e.Service.DeleteAnEvent(),
 			middleware.Logging(),
@@ -94,7 +94,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// add a participant
-	e.Router.Handle("/events/{id}/participants",
+	e.Router.Handle("/v1/events/{id}/participants",
 		middleware.Chain(
 			e.Service.AddParticipant(),
 			middleware.Logging(),
@@ -103,7 +103,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// remove a participant
-	e.Router.Handle("/events/{id}/participants/{participantID}",
+	e.Router.Handle("/v1/events/{id}/participants/{participantID}",
 		middleware.Chain(
 			e.Service.RemoveParticipant(),
 			middleware.Logging(),
@@ -116,7 +116,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	*/
 
 	// notify participants
-	e.Router.Handle("/events/{id}/notify/participants",
+	e.Router.Handle("/v1/events/{id}/notify/participants",
 		middleware.Chain(
 			e.Service.NotifyParticipants(),
 			middleware.Logging(),
@@ -125,7 +125,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("POST")
 
 	// notify club members
-	e.Router.Handle("/events/{id}/notify/club",
+	e.Router.Handle("/v1/events/{id}/notify/club",
 		middleware.Chain(
 			e.Service.NotifyClubMembers(),
 			middleware.Logging(),
