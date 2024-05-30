@@ -110,11 +110,12 @@ func (s *Service) CreateUserData() http.HandlerFunc {
 		}
 
 		user := models.User{
-			ID:         primitive.NewObjectID(),
-			UUID:       uuid,
-			UserName:   req.UserName,
-			Sports:     req.Sports,
-			Visibility: "public",
+			ID:           primitive.NewObjectID(),
+			UUID:         uuid,
+			UserName:     req.UserName,
+			Sports:       req.Sports,
+			Visibility:   "public",
+			HasOnboarded: req.HasOnboarded,
 		}
 
 		// insert auth user in database
