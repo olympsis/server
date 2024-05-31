@@ -364,7 +364,10 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 
 		// insert application into database
 		status := "pending"
+		timestamp := time.Now().Unix()
 		req.Status = &status
+		req.CreatedAt = &timestamp
+
 		id, err := e.InsertApplication(context.Background(), &req)
 		if err != nil {
 			e.Logger.Error(fmt.Sprintf("Failed to create application: %s", err.Error()))
