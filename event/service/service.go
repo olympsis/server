@@ -69,7 +69,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			Type:            req.Type,
 			Poster:          &uuid,
 			Organizers:      req.Organizers,
-			Field:           req.Field,
+			Venue:           req.Venue,
 			ImageURL:        req.ImageURL,
 			Title:           req.Title,
 			Body:            req.Body,
@@ -205,7 +205,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		fieldsIDs := []primitive.ObjectID{}
 		for cursor.Next(context.TODO()) {
 			// decode field
-			var field models.Field
+			var field models.Venue
 			err := cursor.Decode(&field)
 			if err != nil {
 				e.Logger.Error("failed to decode field", err.Error())
@@ -656,7 +656,7 @@ func (e *Service) Location() http.HandlerFunc {
 
 		uuid := r.Header.Get("UUID")
 		fields := utils.NewSafeFields()
-		fieldsArr := []models.Field{}
+		fieldsArr := []models.Venue{}
 
 		// fetch the nearby fields
 		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
@@ -674,7 +674,7 @@ func (e *Service) Location() http.HandlerFunc {
 		var fieldsIDs []primitive.ObjectID
 		for cursor.Next(context.TODO()) {
 			// decode field
-			var field models.Field
+			var field models.Venue
 			err := cursor.Decode(&field)
 			if err != nil {
 				e.Logger.Error(err.Error())
@@ -696,7 +696,7 @@ func (e *Service) Location() http.HandlerFunc {
 			return
 		}
 		resp := models.LocationResponse{
-			Fields: &fieldsArr,
+			Venues: &fieldsArr,
 			Events: events,
 		}
 

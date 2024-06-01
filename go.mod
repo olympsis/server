@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/storage v1.41.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20240529222414-4c4d8728cc19
+	github.com/olympsis/models v0.0.0-20240601202047-d7ea33bf5fde
 	github.com/olympsis/search v0.0.0-20240511191753-822dd74a022b
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.182.0
@@ -16,7 +16,7 @@ require (
 
 require (
 	cloud.google.com/go v0.114.0 // indirect
-	cloud.google.com/go/auth v0.5.0 // indirect
+	cloud.google.com/go/auth v0.5.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/firestore v1.15.0 // indirect
@@ -62,7 +62,7 @@ require (
 )
 
 require (
-	firebase.google.com/go/v4 v4.14.0
+	firebase.google.com/go/v4 v4.14.1
 	go.mongodb.org/mongo-driver v1.15.0
 )
 

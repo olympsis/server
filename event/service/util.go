@@ -203,13 +203,13 @@ func FindEvents(uuid string, sports []string, fieldIDs []primitive.ObjectID, loc
 		"$match": bson.M{
 			"$or": bson.A{
 				bson.M{
-					"field._id": bson.M{
+					"venue._id": bson.M{
 						"$exists": true,
 						"$in":     fieldIDs,
 					},
 				},
 				bson.M{
-					"field.location": bson.M{
+					"venue.location": bson.M{
 						"$geoWithin": bson.M{
 							"$center": bson.A{
 								location.Coordinates,
@@ -472,7 +472,7 @@ func FindEventsByField(id primitive.ObjectID, limit int, database *database.Data
 	// filter out all docs by our ID
 	idPipeline := bson.M{
 		"$match": bson.M{
-			"field._id": id,
+			"venue._id": id,
 		},
 	}
 

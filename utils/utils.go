@@ -203,21 +203,21 @@ func (m *SafeUsers) FindUser(uuid string) *models.UserData {
 
 type SafeFields struct {
 	mu     sync.Mutex
-	fields map[primitive.ObjectID]*models.Field
+	fields map[primitive.ObjectID]*models.Venue
 }
 
 func NewSafeFields() *SafeFields {
 	return &SafeFields{
 		mu:     sync.Mutex{},
-		fields: make(map[primitive.ObjectID]*models.Field),
+		fields: make(map[primitive.ObjectID]*models.Venue),
 	}
 }
-func (m *SafeFields) AddField(field *models.Field) {
+func (m *SafeFields) AddField(field *models.Venue) {
 	m.mu.Lock()
 	m.fields[field.ID] = field
 	m.mu.Unlock()
 }
-func (m *SafeFields) FindField(id primitive.ObjectID) *models.Field {
+func (m *SafeFields) FindField(id primitive.ObjectID) *models.Venue {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.fields[id]

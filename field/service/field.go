@@ -7,19 +7,19 @@ import (
 )
 
 // Insert new user into database
-func (f *Service) InsertField(ctx context.Context, field *models.Field) error {
+func (f *Service) InsertField(ctx context.Context, field *models.Venue) error {
 	f.Database.FieldCol.InsertOne(ctx, field)
 	return nil
 }
 
 // Get user from database
-func (f *Service) FindField(ctx context.Context, filter interface{}, field *models.Field) error {
+func (f *Service) FindField(ctx context.Context, filter interface{}, field *models.Venue) error {
 	f.Database.FieldCol.FindOne(ctx, filter).Decode(&field)
 	return nil
 }
 
 // get users from database
-func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]models.Field) error {
+func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]models.Venue) error {
 
 	cursor, err := f.Database.FieldCol.Find(ctx, filter)
 	if err != nil {
@@ -27,7 +27,7 @@ func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]
 	}
 
 	for cursor.Next(context.TODO()) {
-		var user models.Field
+		var user models.Venue
 		err := cursor.Decode(&user)
 		if err != nil {
 			return err
@@ -38,7 +38,7 @@ func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]
 }
 
 // update user in database
-func (f *Service) UpdateField(ctx context.Context, filter interface{}, update interface{}, field *models.Field) error {
+func (f *Service) UpdateField(ctx context.Context, filter interface{}, update interface{}, field *models.Venue) error {
 	// update user
 	_, err := f.Database.FieldCol.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -55,7 +55,7 @@ func (f *Service) UpdateField(ctx context.Context, filter interface{}, update in
 }
 
 // update users in database
-func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update interface{}, fields *[]models.Field) error {
+func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update interface{}, fields *[]models.Venue) error {
 	// update users
 	_, err := f.Database.FieldCol.UpdateMany(ctx, filter, update)
 	if err != nil {
@@ -69,7 +69,7 @@ func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update i
 	}
 
 	for cursor.Next(context.TODO()) {
-		var user models.Field
+		var user models.Venue
 		err := cursor.Decode(&user)
 		if err != nil {
 			return err
