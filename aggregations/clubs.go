@@ -460,7 +460,7 @@ func AggregateClubApplications(clubId *primitive.ObjectID, status string, databa
 	metaLookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "uuid",
+			"localField":   "applicant",
 			"foreignField": "uuid",
 			"as":           "meta",
 		},
@@ -469,7 +469,7 @@ func AggregateClubApplications(clubId *primitive.ObjectID, status string, databa
 	authLookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "auth",
-			"localField":   "uuid",
+			"localField":   "applicant",
 			"foreignField": "uuid",
 			"as":           "auth",
 		},
@@ -510,17 +510,13 @@ func AggregateClubApplications(clubId *primitive.ObjectID, status string, databa
 
 	cleanUp := bson.M{
 		"$project": bson.M{
-			"meta":    0,
-			"auth":    0,
-			"uuid":    0,
-			"club_id": 0,
-			"user": bson.M{
-				"_id":          0,
-				"email":        0,
-				"token":        0,
-				"access_token": 0,
-				"provider":     0,
-			},
+			"meta":            0,
+			"auth":            0,
+			"uuid":            0,
+			"club_id":         0,
+			"applicant._id":   0,
+			"applicant.email": 0,
+			"applicant.token": 0,
 		},
 	}
 
