@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
 	"olympsis-server/utils"
 	"strconv"
@@ -69,7 +70,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			Type:            req.Type,
 			Poster:          &uuid,
 			Organizers:      req.Organizers,
-			Venue:           req.Venue,
+			Venues:          req.Venues,
 			ImageURL:        req.ImageURL,
 			Title:           req.Title,
 			Body:            req.Body,
@@ -134,7 +135,7 @@ func (e *Service) GetEvent() http.HandlerFunc {
 
 		oid, _ := primitive.ObjectIDFromHex(id)
 
-		event, err := FindEvent(oid, e.Database)
+		event, err := aggregations.AggregateEvent(oid, e.Database)
 		if err != nil {
 			e.Logger.Error("failed to find event", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
@@ -214,7 +215,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		// find the events
-		events, err := FindEvents(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
+		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
 		if err != nil { // unexpected error
 			e.Logger.Error("failed to find events", err.Error())
 			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
@@ -251,7 +252,7 @@ func (e *Service) GetEventsByField() http.HandlerFunc {
 			return
 		}
 		oid, _ := primitive.ObjectIDFromHex(id)
-		events, err := FindEventsByField(oid, 100, e.Database)
+		events, err := aggregations.AggregateEventsByField(oid, 100, e.Database)
 		if err != nil {
 			e.Logger.Error("failed to find events", err.Error())
 			http.Error(rw, `{ "msg": "failed to find events"}`, http.StatusInternalServerError)
@@ -689,7 +690,7 @@ func (e *Service) Location() http.HandlerFunc {
 			return
 		}
 
-		events, err := FindEvents(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
+		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
 		if err != nil {
 			e.Logger.Error("failed to find events", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
