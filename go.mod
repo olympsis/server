@@ -9,7 +9,6 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
 	github.com/olympsis/models v0.0.0-20240610012805-07159eda24f6
-	github.com/olympsis/search v0.0.0-20240511191753-822dd74a022b
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.183.0
 )
@@ -36,6 +35,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.12.4 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/olympsis/search v0.0.0-20240610041606-a591b8bcff1c
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
