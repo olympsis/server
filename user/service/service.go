@@ -178,8 +178,8 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		if len(req.Sports) > 0 {
 			changes["sports"] = req.Sports
 		}
-		if req.DeviceToken != "" {
-			changes["device_token"] = req.DeviceToken
+		if req.DeviceTokens != nil {
+			changes["device_tokens"] = req.DeviceTokens
 		}
 		if req.Visibility != "" {
 			changes["visibility"] = req.Visibility
@@ -364,7 +364,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			data.Username = meta.UserName
 			data.ImageURL = meta.ImageURL
 			data.Visibility = meta.Visibility
-			data.DeviceToken = meta.DeviceToken
+			data.DeviceTokens = meta.DeviceTokens
 
 			if data.Visibility == "public" {
 				data.Clubs = meta.Clubs
@@ -429,14 +429,14 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 		// create user data object
 		userData := models.UserData{
-			UUID:        user.UUID,
-			Bio:         user.Bio,
-			Username:    user.UserName,
-			FirstName:   *auth.FirstName,
-			LastName:    *auth.LastName,
-			ImageURL:    user.ImageURL,
-			Visibility:  user.Visibility,
-			DeviceToken: user.DeviceToken,
+			UUID:         user.UUID,
+			Bio:          user.Bio,
+			Username:     user.UserName,
+			FirstName:    *auth.FirstName,
+			LastName:     *auth.LastName,
+			ImageURL:     user.ImageURL,
+			Visibility:   user.Visibility,
+			DeviceTokens: user.DeviceTokens,
 		}
 
 		// if user visibility is public display this data if not then dont

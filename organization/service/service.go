@@ -597,7 +597,11 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 			Data:  org,
 		}
 
-		utils.SendNotificationToToken(user.DeviceToken, &note)
+		for i := range *user.DeviceTokens {
+			tokens := *user.DeviceTokens
+			token := tokens[i]
+			utils.SendNotificationToToken(token, &note)
+		}
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(req)

@@ -489,7 +489,11 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			Body:  text,
 		}
 
-		utils.SendNotificationToToken(usr.DeviceToken, &notification)
+		for i := range *usr.DeviceTokens {
+			tokens := *usr.DeviceTokens
+			token := tokens[i]
+			utils.SendNotificationToToken(token, &notification)
+		}
 
 		// fetch updated club data
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
@@ -610,7 +614,11 @@ func (c *Service) KickMember() http.HandlerFunc {
 			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
 		}
 
-		utils.SendNotificationToToken(usr.DeviceToken, &notification)
+		for i := range *usr.DeviceTokens {
+			tokens := *usr.DeviceTokens
+			token := tokens[i]
+			utils.SendNotificationToToken(token, &notification)
+		}
 		err = utils.RemoveTokenFromTopic(id, usr.UUID)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())

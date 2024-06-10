@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/storage v1.41.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20240607053831-a97a8d94eb70
+	github.com/olympsis/models v0.0.0-20240610012805-07159eda24f6
 	github.com/olympsis/search v0.0.0-20240511191753-822dd74a022b
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.183.0

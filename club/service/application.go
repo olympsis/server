@@ -317,9 +317,13 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 					c.Logger.Error("failed add token to topic: ", err.Error())
 				}
 
-				err = utils.SendNotificationToToken(usr.DeviceToken, &notification)
-				if err != nil {
-					c.Logger.Error("failed send notification to token: ", err.Error())
+				for i := range *usr.DeviceTokens {
+					tokens := *usr.DeviceTokens
+					token := tokens[i]
+					err = utils.SendNotificationToToken(token, &notification)
+					if err != nil {
+						c.Logger.Error("failed send notification to token: ", err.Error())
+					}
 				}
 
 				rw.WriteHeader(http.StatusOK)
