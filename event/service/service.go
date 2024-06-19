@@ -215,7 +215,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 		}
 
 		// find the events
-		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
+		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, 0, e.Database)
 		if err != nil { // unexpected error
 			e.Logger.Error("failed to find events", err.Error())
 			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
@@ -690,7 +690,7 @@ func (e *Service) Location() http.HandlerFunc {
 			return
 		}
 
-		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, e.Database)
+		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, 0, e.Database)
 		if err != nil {
 			e.Logger.Error("failed to find events", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)

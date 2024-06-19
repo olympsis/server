@@ -193,7 +193,7 @@ func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models
 /*
 Find events data by location
 */
-func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitive.ObjectID, location models.GeoJSON, radius int, limit int, database *database.Database) (*[]models.Event, error) {
+func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitive.ObjectID, location models.GeoJSON, radius int, limit int, skip int, database *database.Database) (*[]models.Event, error) {
 
 	ctx := context.Background()
 	// match events by the field ids and a geo location if they have one
@@ -207,7 +207,7 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 					},
 				},
 				bson.M{
-					"venues.location": bson.M{
+					"venues.location.coordinates": bson.M{
 						"$geoWithin": bson.M{
 							"$center": bson.A{
 								location.Coordinates,
@@ -259,6 +259,15 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		},
 	}
 
+	clubsPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "clubs",
+			"localField":   "organizers._id",
+			"foreignField": "_id",
+			"as":           "clubs",
+		},
+	}
+
 	// only events that are public, or that the user is a club member of or is a participant of
 	visibilityPipeline := bson.M{
 		"$match": bson.M{
@@ -278,16 +287,13 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		},
 	}
 
-	// sort the documents by the start time
-	sortPipeline := bson.M{
-		"$sort": bson.M{
-			"start_time": -1,
-		},
-	}
-
 	// limit documents returned
 	limitPipeline := bson.M{
 		"$limit": limit,
+	}
+
+	skipPipeline := bson.M{
+		"$skip": skip,
 	}
 
 	// find the poster data
@@ -380,16 +386,6 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		},
 	}
 
-	// find clubs data
-	clubsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "clubs",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "clubs",
-		},
-	}
-
 	// find organizations data
 	orgsPipeline := bson.M{
 		"$lookup": bson.M{
@@ -400,7 +396,7 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		},
 	}
 
-	// remove unecessary data
+	// remove unnecessary data
 	projectPipeline := bson.M{
 		"$project": bson.M{
 			"_poster":                         0,
@@ -428,7 +424,10 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		filterPipeline,
 		sportsPipeline,
 		timePipeline,
-		sortPipeline,
+		limitPipeline,
+		clubsPipeline,
+		skipPipeline,
+		visibilityPipeline,
 		posterPipeline,
 		addPosterPipeline,
 		participantsPipeline,
