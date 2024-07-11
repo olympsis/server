@@ -276,7 +276,7 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 					"visibility": "public",
 				},
 				bson.M{
-					"visibility":         "club",
+					"visibility":         "group",
 					"clubs.members.uuid": uuid,
 				},
 				bson.M{ // private events that the user joined
