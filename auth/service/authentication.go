@@ -127,7 +127,26 @@ func (a *Service) Login() http.HandlerFunc {
 			return
 		}
 
-		user, err := aggregations.AggregateUser(&token.UID, a.Database)
+		uuid := token.UID
+		email := token.Claims["email"].(string)
+		first := "First"
+		last := "Last"
+
+		// weird case where auth user might not be created
+		_, err = a.FindUser(context.TODO(), bson.M{"uuid": uuid})
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				u := models.AuthUser{
+					UUID:      &uuid,
+					Email:     &email,
+					FirstName: &first,
+					LastName:  &last,
+				}
+				a.InsertUser(context.TODO(), &u)
+			}
+		}
+
+		user, err := aggregations.AggregateUser(&uuid, a.Database)
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
@@ -155,8 +174,15 @@ func (a *Service) Delete() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 		filter := bson.M{"uuid": uuid}
 
+		// DELETE USER FROM FIREBASE
+		err := a.Client.DeleteUser(context.TODO(), uuid)
+		if err != nil {
+			a.Log.Error(fmt.Sprintf("Failed to delete user data from firebase: %s\n", err.Error()))
+			http.Error(rw, `{ "msg": "Failed to delete user" }`, http.StatusInternalServerError)
+		}
+
 		// DELETE USER FROM DATABASE
-		err := a.DeleteUser(context.Background(), filter)
+		err = a.DeleteUser(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
