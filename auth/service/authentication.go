@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/auth"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -84,6 +86,28 @@ func (a *Service) Register() http.HandlerFunc {
 			return
 		}
 
+		// User Metadata
+		tempUsername := "olympsis-user-" + uuid.NewString()
+		hasOnboarded := false
+		acceptedEULA := false
+		visibility := "public"
+		meta := models.User{
+			ID:           primitive.NewObjectID(),
+			UUID:         token.UID,
+			UserName:     tempUsername,
+			Visibility:   visibility,
+			HasOnboarded: &hasOnboarded,
+			AcceptedEULA: &acceptedEULA,
+		}
+
+		// Insert metadata into database
+		_, err = a.Database.UserCol.InsertOne(ctx, meta)
+		if err != nil {
+			a.Log.Error(fmt.Sprintf("Failed to insert user into the database: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to add user to the database" }`, http.StatusInternalServerError)
+			return
+		}
+
 		response := models.AuthResponse{
 			UUID:      user.UUID,
 			FirstName: user.FirstName,
@@ -128,23 +152,6 @@ func (a *Service) Login() http.HandlerFunc {
 		}
 
 		uuid := token.UID
-		email := token.Claims["email"].(string)
-		first := "First"
-		last := "Last"
-
-		// weird case where auth user might not be created
-		_, err = a.FindUser(context.TODO(), bson.M{"uuid": uuid})
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				u := models.AuthUser{
-					UUID:      &uuid,
-					Email:     &email,
-					FirstName: &first,
-					LastName:  &last,
-				}
-				a.InsertUser(context.TODO(), &u)
-			}
-		}
 
 		user, err := aggregations.AggregateUser(&uuid, a.Database)
 		if err != nil {
@@ -174,15 +181,8 @@ func (a *Service) Delete() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 		filter := bson.M{"uuid": uuid}
 
-		// DELETE USER FROM FIREBASE
-		err := a.Client.DeleteUser(context.TODO(), uuid)
-		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to delete user data from firebase: %s\n", err.Error()))
-			http.Error(rw, `{ "msg": "Failed to delete user" }`, http.StatusInternalServerError)
-		}
-
 		// DELETE USER FROM DATABASE
-		err = a.DeleteUser(context.Background(), filter)
+		err := a.DeleteUser(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
