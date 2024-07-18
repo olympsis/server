@@ -123,9 +123,13 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		err = c.Database.ClubApplicationCol.FindOne(context.Background(), filter).Decode(&_app)
 		if err != nil {
 			if err != mongo.ErrNoDocuments {
-				c.Logger.Error(err.Error())
+				c.Logger.Error("Failed to check for application: " + err.Error())
 				http.Error(rw, "failed to check application", http.StatusInternalServerError)
 				return
+			} else {
+				c.Logger.Info("Club Application already exists")
+				rw.WriteHeader(http.StatusCreated)
+				json.NewEncoder(rw).Encode(_app)
 			}
 		}
 

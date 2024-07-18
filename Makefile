@@ -1,4 +1,4 @@
-VERSION := v0.6.3
+VERSION := v0.6.4
 PROJECT_ID := olympsis-408521
 LOCATION := us-central1-docker.pkg.dev
 SERVICE_NAME := server
