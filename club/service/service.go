@@ -614,11 +614,14 @@ func (c *Service) KickMember() http.HandlerFunc {
 			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
 		}
 
-		for i := range *usr.DeviceTokens {
-			tokens := *usr.DeviceTokens
-			token := tokens[i]
-			utils.SendNotificationToToken(token, &notification)
+		if usr.DeviceTokens != nil {
+			for i := range *usr.DeviceTokens {
+				tokens := *usr.DeviceTokens
+				token := tokens[i]
+				utils.SendNotificationToToken(token, &notification)
+			}
 		}
+
 		err = utils.RemoveTokenFromTopic(id, usr.UUID)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
