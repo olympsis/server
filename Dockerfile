@@ -7,10 +7,10 @@ RUN go mod download
 ENV PORT=80
 ENV MODE=PRODUCTION
 
-ENV DB_USR=admin
-ENV DB_PASS=vM9pPgfHeZDxgBDv
+ENV DB_USR=server
+ENV DB_PASS=RvmeTaUvkGs7Vc8e
 ENV DB_NAME=olympsis
-ENV DB_ADDR=database-0.i4q7nvi.mongodb.net
+ENV DB_ADDR=production.mvf7u.mongodb.net
 
 ENV AUTH_COL=auth
 ENV USER_COL=users
