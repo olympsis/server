@@ -36,8 +36,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadBugReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create a bug report
 	e.Router.Handle("/v1/report/bugs",
@@ -45,8 +46,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateBugReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// change a bug report
 	e.Router.Handle("/v1/report/bugs/{id}",
@@ -54,8 +56,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateBugReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete a bug report
 	e.Router.Handle("/v1/report/bugs/{id}",
@@ -63,8 +66,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteBugReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		POST REPORTS
@@ -76,8 +80,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadPostReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create a post report
 	e.Router.Handle("/v1/report/posts",
@@ -85,8 +90,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreatePostReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// change a post report
 	e.Router.Handle("/v1/report/posts/{id}",
@@ -94,8 +100,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdatePostReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete a post report
 	e.Router.Handle("/v1/report/posts/{id}",
@@ -103,8 +110,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeletePostReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		MEMBER REPORTS
@@ -116,8 +124,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadMemberReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create a post report
 	e.Router.Handle("/v1/report/members",
@@ -125,8 +134,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateMemberReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// change a post report
 	e.Router.Handle("/v1/report/members/{id}",
@@ -134,8 +144,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateMemberReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete a post report
 	e.Router.Handle("/v1/report/members/{id}",
@@ -143,8 +154,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteMemberReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		FIELD REPORTS
@@ -156,8 +168,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadFieldReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create a bug report
 	e.Router.Handle("/v1/report/fields",
@@ -165,8 +178,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateFieldReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// change a bug report
 	e.Router.Handle("/v1/report/fields/{id}",
@@ -174,8 +188,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateFieldReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete a bug report
 	e.Router.Handle("/v1/report/fields/{id}",
@@ -183,8 +198,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteFieldReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		EVENT REPORTS
@@ -196,8 +212,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadEventReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create a bug report
 	e.Router.Handle("/v1/report/events",
@@ -205,8 +222,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateEventReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// change a bug report
 	e.Router.Handle("/v1/report/events/{id}",
@@ -214,8 +232,9 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateEventReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete a bug report
 	e.Router.Handle("/v1/report/events/{id}",
@@ -223,6 +242,7 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteEventReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 }
