@@ -32,16 +32,18 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.CheckIn(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// search username availability
 	u.Router.Handle("/v1/users/username",
 		middleware.Chain(
 			u.Service.CheckUsername(),
 			middleware.Logging(),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// get user data
 	u.Router.Handle("/v1/users/user",
@@ -49,8 +51,9 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.GetUserData(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create user data
 	u.Router.Handle("/v1/users",
@@ -58,8 +61,9 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.CreateUserData(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// update user data
 	u.Router.Handle("/v1/users/user",
@@ -67,8 +71,9 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.UpdateUserData(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// find organizations invite
 	u.Router.Handle("/v1/users/invitations/organizations",
@@ -76,8 +81,9 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.GetOrganizationInvitations(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// search users by username
 	u.Router.Handle("/v1/users/search/username",
@@ -85,8 +91,9 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.SearchUsersByUserName(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// search user by uuid
 	u.Router.Handle("/v1/users/search/uuid",
@@ -94,6 +101,7 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			u.Service.SearchUserByUUID(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 }
