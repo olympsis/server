@@ -7,11 +7,11 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
-	"olympsis-server/field"
 	"olympsis-server/organization"
 	"olympsis-server/post"
 	"olympsis-server/report"
 	"olympsis-server/user"
+	"olympsis-server/venue"
 	"os"
 	"os/signal"
 	"syscall"
@@ -54,7 +54,7 @@ func main() {
 
 	authAPI := auth.NewAuthAPI(l, r, d, client)
 	userAPI := user.NewUserAPI(l, r, d)
-	fieldAPI := field.NewFieldAPI(l, r, d)
+	fieldAPI := venue.NewVenueAPI(l, r, d)
 	clubAPI := club.NewClubAPI(l, r, d, sh)
 	postAPI := post.NewPostAPI(l, r, d, sh)
 	eventAPI := event.NewEventAPI(l, r, d)
