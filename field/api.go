@@ -29,38 +29,43 @@ func (s *FieldAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetFields(),
 			middleware.Logging(),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// get a field
 	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
 			s.Service.GetAField(),
 			middleware.Logging(),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create field
 	s.Router.Handle("/v1/fields",
 		middleware.Chain(
 			s.Service.InsertAField(),
 			middleware.Logging(),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// update a field
 	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
 			s.Service.UpdateAField(),
 			middleware.Logging(),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete a field
 	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
 			s.Service.DeleteAField(),
 			middleware.Logging(),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 }
