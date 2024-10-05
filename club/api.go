@@ -32,8 +32,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetClubsByLocation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// get a club
 	s.Router.Handle("/v1/clubs/{id}",
@@ -41,8 +42,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// update a club - requires admin token
 	s.Router.Handle("/v1/clubs/{id}",
@@ -50,8 +52,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.ModifyClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// create a club
 	s.Router.Handle("/v1/clubs",
@@ -59,8 +62,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.CreateClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// delete a club - requires admin token
 	s.Router.Handle("/v1/clubs/{id}",
@@ -68,8 +72,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.DeleteClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	// leave a club
 	s.Router.Handle("/v1/clubs/{id}/leave",
@@ -77,8 +82,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.LeaveClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	/*
 		Club Applications
@@ -90,8 +96,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetApplications(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// create club application
 	s.Router.Handle("/v1/clubs/{id}/applications",
@@ -99,18 +106,19 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.CreateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// update club application - requires admin token
 	s.Router.Handle("/v1/clubs/{id}/applications/{applicationID}",
 		middleware.Chain(
 			s.Service.UpdateApplication(),
 			middleware.Logging(),
-
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete application
 	s.Router.Handle("/v1/clubs/{id}/applications/{applicationID}",
@@ -118,8 +126,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.DeleteApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		Club Members
@@ -131,8 +140,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.ChangeMemberRank(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// kick member from club
 	s.Router.Handle("/v1/clubs/{id}/members/{memberID}/kick",
@@ -140,6 +150,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.KickMember(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
 	).Methods("PUT")
 
@@ -149,8 +160,9 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.LeaveClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	/*
 		Club Post
@@ -161,14 +173,16 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.PinClubPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	s.Router.Handle("/v1/clubs/{id}/post",
 		middleware.Chain(
 			s.Service.UnpinClubPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 }
