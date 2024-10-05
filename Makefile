@@ -30,13 +30,13 @@ build: dep ## Build the binary file
 	go build -v $(PKG) 
 
 docker:
-	docker build . -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
+	docker build . -f Dockerfile.dev -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
 	docker tag $(SERVICE_NAME) $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
 	docker push $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
 
 local:
-	docker build . -t $(SERVICE_NAME)
-	docker run -p 80:80 $(SERVICE_NAME):latest
+	docker build . -f Dockerfile.dev -t $(SERVICE_NAME)
+	docker run -p 443:443 $(SERVICE_NAME):latest
 
 run:
 	go run -x main.go

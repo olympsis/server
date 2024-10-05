@@ -75,6 +75,11 @@ func main() {
 		port = "80"
 	}
 
+	mode := os.Getenv("MODE")
+	if mode == "" {
+		mode = "DEVELOPMENT"
+	}
+
 	// server config
 	s := &http.Server{
 		Addr:         `:` + port,
@@ -87,7 +92,12 @@ func main() {
 	// start server
 	go func() {
 		l.Info(`starting olympsis server at...` + port)
-		err := s.ListenAndServe()
+		var err error
+		if mode == "PRODUCTION" {
+			err = s.ListenAndServe()
+		} else {
+			err = s.ListenAndServeTLS("localhost.crt", "localhost.key")
+		}
 
 		if err != nil {
 			l.Info("error starting server: ", err)

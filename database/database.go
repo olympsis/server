@@ -51,40 +51,40 @@ func (d *Database) EstablishConnection() {
 	/*
 		Connect to Mongo Database
 	*/
-	mode := os.Getenv("MODE")
+	// mode := os.Getenv("MODE")
 	dbUser := os.Getenv("DB_USR")
 	dbPass := os.Getenv("DB_PASS")
 	dbLoc := os.Getenv("DB_ADDR")
 
-	if mode == "PRODUCTION" {
-		opts := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
-		client, err := mongo.Connect(context.Background(), opts)
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
-		err = client.Ping(context.Background(), readpref.Primary())
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
-		d.Client = client
-
-	} else {
-
-		opts := options.Client().ApplyURI(`mongodb://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
-		client, err := mongo.Connect(context.Background(), opts)
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
-		err = client.Ping(context.Background(), readpref.Primary())
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
-
-		d.Client = client
+	// if mode == "PRODUCTION" {
+	opts := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
+	client, err := mongo.Connect(context.Background(), opts)
+	if err != nil {
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 	}
+
+	err = client.Ping(context.Background(), readpref.Primary())
+	if err != nil {
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	}
+
+	d.Client = client
+
+	// } else {
+
+	// 	opts := options.Client().ApplyURI(`mongodb://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
+	// 	client, err := mongo.Connect(context.Background(), opts)
+	// 	if err != nil {
+	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	// 	}
+
+	// 	err = client.Ping(context.Background(), readpref.Primary())
+	// 	if err != nil {
+	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	// 	}
+
+	// 	d.Client = client
+	// }
 
 	d.LinkCollections()
 	d.Logger.Info("Database connection successful.")
