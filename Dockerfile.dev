@@ -5,6 +5,10 @@ COPY ./ ./
 COPY /tools/localhost.crt /app/localhost.crt
 COPY /tools/localhost.key /app/localhost.key
 
+# RUN --mount=type=secret,id=crt,target=/root/app/localhost.key \
+#     --mount=type=secret,id=key,target=/root/app/localhost.key \
+#     go build -o /docker
+
 RUN go build -o /docker
 RUN go mod download
 
@@ -14,7 +18,7 @@ ENV MODE=DEVELOPMENT
 ENV DB_USR=server
 ENV DB_PASS=RvmeTaUvkGs7Vc8e
 ENV DB_NAME=olympsis
-ENV DB_ADDR=production.mvf7u.mongodb.net
+ENV DB_ADDR=production.md0v8.mongodb.net
 
 ENV AUTH_COL=auth
 ENV USER_COL=users

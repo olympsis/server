@@ -1,4 +1,4 @@
-VERSION := v0.6.4
+VERSION := v0.6.5
 PROJECT_ID := olympsis-408521
 LOCATION := us-central1-docker.pkg.dev
 SERVICE_NAME := server
@@ -35,7 +35,7 @@ docker:
 	docker push $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
 
 local:
-	docker build . -f Dockerfile.dev -t $(SERVICE_NAME)
+	docker build -f Dockerfile.dev --secret id=crt,src=./tools/localhost.crt --secret id=key,src=./tools/localhost.key . -t $(SERVICE_NAME)
 	docker run -p 443:443 $(SERVICE_NAME):latest
 
 run:

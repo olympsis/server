@@ -10,7 +10,7 @@ ENV MODE=PRODUCTION
 ENV DB_USR=server
 ENV DB_PASS=RvmeTaUvkGs7Vc8e
 ENV DB_NAME=olympsis
-ENV DB_ADDR=production.mvf7u.mongodb.net
+ENV DB_ADDR=production.md0v8.mongodb.net
 
 ENV AUTH_COL=auth
 ENV USER_COL=users
