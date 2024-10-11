@@ -47,7 +47,7 @@ set-env:
 	export DB_NAME='olympsis'
 	export DB_ADDR='production.md0v8.mongodb.net'
 
-	export AUTH_COL='auth
+	export AUTH_COL='auth'
 	export USER_COL='users'
 	export CLUB_COL='clubs'
 	export ORG_COL='organizations'
