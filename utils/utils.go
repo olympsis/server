@@ -463,3 +463,10 @@ func FindUser(uuid string, database *database.Database) (*models.UserData, error
 
 	return &data, nil
 }
+
+func HealthCheckHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Service is Healthy")
+		w.WriteHeader(http.StatusOK)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"olympsis-server/post"
 	"olympsis-server/report"
 	"olympsis-server/user"
+	"olympsis-server/utils"
 	"olympsis-server/venue"
 	"os"
 	"os/signal"
@@ -69,6 +70,12 @@ func main() {
 	eventAPI.Ready(client)
 	organizationAPI.Ready(client)
 	reportAPI.Setup(client)
+
+	// Temp Health Check
+	r.Handle(
+		"/v1/health",
+		utils.HealthCheckHandler(),
+	).Methods("GET")
 
 	port := os.Getenv("PORT")
 	if port == "" {
