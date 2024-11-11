@@ -1,11 +1,19 @@
 go build
-chmod +x olympsis-server
+chmod +x ../olympsis-server
+if [ $? -ne 0 ]; then  
+echo "Error: Failed to build new server binary."  
+exit 1
+fi
 
 systemctl stop olympsis-server
 
 rm /sbin/olympsis-server
-mv olympsis-server/sbin
+mv ../olympsis-server/sbin
+if [ $? -ne 0 ]; then  
+echo "Error: Failed to move binary."  
+exit 1
+fi
 
-systemctl deamond-reload
+systemctl daemond-reload
 systemctl enable olympsis-server
 systemctl start olympsis-server
