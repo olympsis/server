@@ -7,5 +7,5 @@ WantedBy=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/olympsis/server
+ExecStart=/usr/sbin/olympsis-server
 Restart=always
