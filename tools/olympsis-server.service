@@ -2,6 +2,9 @@
 Description=Olympsis Server Application
 After=network.target
 
+[Install]
+WantedBy=multi-user.target
+
 [Service]
 Type=simple
 ExecStart=/usr/sbin/olympsis/server

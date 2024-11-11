@@ -14,6 +14,6 @@ echo "Error: Failed to move binary."
 exit 1
 fi
 
-systemctl daemond-reload
+systemctl daemon-reload
 systemctl enable olympsis-server
 systemctl start olympsis-server
