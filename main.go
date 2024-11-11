@@ -37,7 +37,8 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
-	opt := option.WithCredentialsFile("./files/firebase-credentials.json")
+	path := os.Getenv("FIREBASE_CREDENTIALS_PATH")
+	opt := option.WithCredentialsFile(path)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		l.Fatalf("error starting firebase app: %s\n", err)
