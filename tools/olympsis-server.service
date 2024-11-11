@@ -1,0 +1,8 @@
+[Unit]
+Description=Olympsis Server Application
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/olympsis/server
+Restart=always
