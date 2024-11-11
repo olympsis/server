@@ -48,5 +48,9 @@ server-up:
 server-down:
 	docker-compose -f tools/dev-compose.yaml down
 
+update-service:
+	rm olympsis-server
+	./tools/update-service.sh
+
 clean: ## Remove previous build
 	rm -f $(SERVICE_NAME)
