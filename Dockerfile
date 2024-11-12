@@ -35,8 +35,15 @@ ENV FIELD_REPORT_COL=fieldReports
 ENV EVENT_REPORT_COL=eventReports
 ENV MEMBER_REPORT_COL=memberReports
 
+ENV LOCALE_DB=locales
+ENV COUNTRIES_COL=countries
+ENV ADMIN_AREAS_COL=administrativeAreas
+ENV SUB_ADMIN_AREAS_COL=subAdministrativeAreas
+
 ENV NOTIFY=true
 ENV NOTIF_URL=https://notifications-p3dy744wqq-uc.a.run.app
+
+ENV FIREBASE_CREDENTIALS_PATH=./files/firebase-credentials.json
 
 EXPOSE 80
 

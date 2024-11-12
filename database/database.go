@@ -38,6 +38,10 @@ type Database struct {
 	MemberReportCol *mongo.Collection
 	FieldReportCol  *mongo.Collection
 	EventReportCol  *mongo.Collection
+
+	CountriesCol     *mongo.Collection
+	AdminAreasCol    *mongo.Collection
+	SubAdminAreasCol *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {
@@ -115,4 +119,9 @@ func (d *Database) LinkCollections() {
 	d.FieldReportCol = database.Collection(os.Getenv("FIELD_REPORT_COL"))
 	d.EventReportCol = database.Collection(os.Getenv("EVENT_REPORT_COL"))
 	d.MemberReportCol = database.Collection(os.Getenv("MEMBER_REPORT_COL"))
+
+	localeDB := d.Client.Database(os.Getenv("LOCALE_DB"))
+	d.CountriesCol = localeDB.Collection(os.Getenv("COUNTRIES_COL"))
+	d.AdminAreasCol = localeDB.Collection(os.Getenv("ADMIN_AREAS_COL"))
+	d.SubAdminAreasCol = localeDB.Collection(os.Getenv("SUB_ADMIN_AREAS_COL"))
 }

@@ -7,6 +7,7 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
+	"olympsis-server/locales"
 	"olympsis-server/organization"
 	"olympsis-server/post"
 	"olympsis-server/report"
@@ -62,6 +63,7 @@ func main() {
 	eventAPI := event.NewEventAPI(l, r, d)
 	organizationAPI := organization.NewOrganizationAPI(l, r, d, sh)
 	reportAPI := report.NewReportAPI(l, r, d)
+	localeAPI := locales.NewLocaleAPI(l, r, d)
 
 	authAPI.Ready(client)
 	userAPI.Ready(client)
@@ -71,6 +73,7 @@ func main() {
 	eventAPI.Ready(client)
 	organizationAPI.Ready(client)
 	reportAPI.Setup(client)
+	localeAPI.Ready()
 
 	// Temp Health Check
 	r.Handle(
@@ -99,7 +102,7 @@ func main() {
 
 	// start server
 	go func() {
-		l.Info(`starting olympsis server at...` + port)
+		l.Info(`Starting olympsis server at...` + port)
 		var err error
 		if mode == "PRODUCTION" {
 			err = s.ListenAndServe()
@@ -108,7 +111,7 @@ func main() {
 		}
 
 		if err != nil {
-			l.Info("error starting server: ", err)
+			l.Info("Error starting server: ", err)
 			os.Exit(1)
 		}
 	}()
