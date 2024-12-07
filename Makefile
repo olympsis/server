@@ -1,7 +1,7 @@
 VERSION := v0.6.5
 PROJECT_ID := olympsis-408521
 LOCATION := us-central1-docker.pkg.dev
-SERVICE_NAME := server
+SERVICE_NAME := olympsis-server
 REPO_NAME := main
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)

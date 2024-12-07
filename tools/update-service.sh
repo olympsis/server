@@ -5,7 +5,7 @@ echo "Error: Failed to build new server binary."
 exit 1
 fi
 
-systemctl stop olympsis-server
+systemctl restart olympsis-server
 
 rm /sbin/olympsis-server
 mv ../olympsis-server/sbin
@@ -14,6 +14,4 @@ echo "Error: Failed to move binary."
 exit 1
 fi
 
-systemctl daemon-reload
-systemctl enable olympsis-server
-systemctl start olympsis-server
+echo "Update Successful"
