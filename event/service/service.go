@@ -476,10 +476,12 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// if event is full
-		if *event.MaxParticipants != 0 {
-			if len(participants) >= int(*event.MaxParticipants) {
-				http.Error(rw, `{ "msg": "event capacity is full" }`, http.StatusBadRequest)
-				return
+		if event.MaxParticipants != nil {
+			if *event.MaxParticipants != 0 {
+				if len(participants) >= int(*event.MaxParticipants) {
+					http.Error(rw, `{ "msg": "event capacity is full" }`, http.StatusBadRequest)
+					return
+				}
 			}
 		}
 
