@@ -89,7 +89,7 @@ func (a *Service) Register() http.HandlerFunc {
 		// User Metadata
 		tempUsername := "olympsis-user-" + uuid.NewString()
 		hasOnboarded := false
-		acceptedEULA := false
+		acceptedEULA := true
 		visibility := "public"
 		meta := models.User{
 			ID:           primitive.NewObjectID(),
