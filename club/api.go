@@ -41,7 +41,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			s.Service.GetClub(),
 			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
