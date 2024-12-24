@@ -81,11 +81,13 @@ func main() {
 		utils.HealthCheckHandler(),
 	).Methods("GET")
 
+	// Get the port from environment
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "80"
 	}
 
+	// Get the mode from environment
 	mode := os.Getenv("MODE")
 	if mode == "" {
 		mode = "DEVELOPMENT"
@@ -104,10 +106,12 @@ func main() {
 	go func() {
 		l.Info(`Starting olympsis server at...` + port)
 		var err error
-		if mode == "PRODUCTION" {
-			err = s.ListenAndServe()
-		} else {
+
+		httpMode := os.Getenv("HTTP")
+		if httpMode == "SECURE" {
 			err = s.ListenAndServeTLS("localhost.crt", "localhost.key")
+		} else {
+			err = s.ListenAndServe()
 		}
 
 		if err != nil {
@@ -118,13 +122,11 @@ func main() {
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
 	sig := <-sigs
 
 	l.Printf("Received Termination(%s), graceful shutdown \n", sig)
 
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
-
 	defer c()
 
 	s.Shutdown(tc)

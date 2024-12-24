@@ -130,6 +130,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 				c.Logger.Info("Club Application already exists")
 				rw.WriteHeader(http.StatusCreated)
 				json.NewEncoder(rw).Encode(_app)
+				return
 			}
 		}
 
@@ -156,6 +157,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		if err != nil {
 			c.Logger.Error("failed to find club: ", err.Error())
 			http.Error(rw, "failed to create application", http.StatusInternalServerError)
+			return
 		}
 
 		// notify admins

@@ -29,26 +29,32 @@ dep: ## Get the dependencies
 build: dep ## Build the binary file
 	go build -v $(PKG) 
 
-docker:
+run:
+	go run -x main.go
+
+docker-hub: #Publish image to gcp docker-hub
 	docker build . -f Dockerfile.dev -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
 	docker tag $(SERVICE_NAME) $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
 	docker push $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
 
-local:
+server: #Secure server with local CA certificates
+	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)" | xargs -I {} docker rmi {}
 	docker build -f Dockerfile.dev --secret id=crt,src=./tools/localhost.crt --secret id=key,src=./tools/localhost.key . -t $(SERVICE_NAME)
 	docker run -p 443:443 $(SERVICE_NAME):latest
 
-run:
-	go run -x main.go
+unsecure-server: #Un-secure server with http
+	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)-unsecure" | xargs -I {} docker rmi -f {}
+	docker build -f Dockerfile.http.dev . -t $(SERVICE_NAME)-unsecure
+	docker run -p 80:80 $(SERVICE_NAME)-unsecure:latest
 
-server-up:
+env-up: #Runs the docker-compose stack to set up local environment
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-dev-server" | xargs -I {} docker rmi {}
 	docker-compose -f tools/dev-compose.yaml up -d
 
-server-down:
+env-down: #Takes down the docker-compose stack
 	docker-compose -f tools/dev-compose.yaml down
 
-update-service:
+update-service: #Updates the linux service
 	make build && \
 	if [ $$? -ne 0 ]; then \
 		echo "Error: Failed to build new server binary." && \

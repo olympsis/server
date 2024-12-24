@@ -1,12 +1,16 @@
 FROM golang:1.22-bullseye
 WORKDIR /app
+
 COPY ./ ./
+COPY /tools/localhost.crt /app/localhost.crt
+COPY /tools/localhost.key /app/localhost.key
+
 RUN go build -o /docker
 RUN go mod download
 
 ENV PORT=80
 ENV HTTP=UNSECURE
-ENV MODE=PRODUCTION
+ENV MODE=DEVELOPMENT
 
 ENV DB_USR=server
 ENV DB_PASS=RvmeTaUvkGs7Vc8e

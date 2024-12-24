@@ -5,14 +5,11 @@ COPY ./ ./
 COPY /tools/localhost.crt /app/localhost.crt
 COPY /tools/localhost.key /app/localhost.key
 
-# RUN --mount=type=secret,id=crt,target=/root/app/localhost.key \
-#     --mount=type=secret,id=key,target=/root/app/localhost.key \
-#     go build -o /docker
-
 RUN go build -o /docker
 RUN go mod download
 
 ENV PORT=443
+ENV HTTP=SECURE
 ENV MODE=DEVELOPMENT
 
 ENV DB_USR=server
