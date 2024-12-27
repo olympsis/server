@@ -471,6 +471,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		for i := range participants {
 			if participants[i].UUID == uuid {
 				rw.WriteHeader(http.StatusOK)
+				rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, participants[i].ID)))
 				return
 			}
 		}
@@ -512,6 +513,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		utils.AddTokenToTopic(id, uuid)
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "successful" }`))
 	}
 }
 
@@ -549,6 +551,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		// unsubscribe user from notifications
 		utils.RemoveTokenFromTopic(id, uuid)
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "successful" }`))
 	}
 }
 
