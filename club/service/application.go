@@ -425,6 +425,6 @@ func (c *Service) DeleteApplication() http.HandlerFunc {
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`OK`))
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
