@@ -9,7 +9,7 @@ import (
 	"olympsis-server/database"
 	"time"
 
-	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"

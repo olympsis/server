@@ -19,8 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
-
+	firebase "firebase.google.com/go"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
@@ -45,7 +44,6 @@ func main() {
 		l.Fatalf("error starting firebase app: %s\n", err)
 		os.Exit(1)
 	}
-
 	client, err := app.Auth(context.TODO())
 	if err != nil {
 		l.Fatalf("error getting Auth client: %v\n", err)

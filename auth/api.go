@@ -5,7 +5,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/middleware"
 
-	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
