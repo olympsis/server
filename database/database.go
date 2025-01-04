@@ -101,7 +101,7 @@ func (d *Database) LinkCollections() {
 	d.ClubCol = database.Collection(os.Getenv("CLUB_COL"))
 	d.OrgCol = database.Collection(os.Getenv("ORG_COL"))
 	d.EventCol = database.Collection(os.Getenv("EVENT_COL"))
-	d.FieldCol = database.Collection(os.Getenv("FIELD_COL"))
+	d.FieldCol = database.Collection(os.Getenv("VENUE_COL"))
 	d.PostCol = database.Collection(os.Getenv("POST_COL"))
 	d.ClubInvCol = database.Collection(os.Getenv("CLUB_INVITE_COL"))
 	d.CommentsCol = database.Collection(os.Getenv("COMMENTS_COL"))

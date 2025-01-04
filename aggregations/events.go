@@ -190,28 +190,73 @@ func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models
 	return &event, nil
 }
 
-/*
-Find events data by location
-*/
-func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitive.ObjectID, location models.GeoJSON, radius int, limit int, skip int, database *database.Database) (*[]models.Event, error) {
+func AggregateEvents(
+	uuid string,
+	sports []string,
+	location models.GeoJSON,
+	venues []primitive.ObjectID,
+	clubs []primitive.ObjectID,
+	orgs []primitive.ObjectID,
+	radius int,
+	limit int,
+	skip int,
+	status int,
+	database *database.Database,
+) (*[]models.Event, error) {
 
-	ctx := context.Background()
-	// match events by the field ids and a geo location if they have one
+	ctx := context.TODO()
+
+	/**
+	EVENT STATUS PIPELINE
+
+	0 - completed
+	1 - pending/live
+	*/
+	var timePipeline bson.M
+	switch status {
+	case 0:
+		timePipeline = bson.M{
+			"$match": bson.M{
+				"stop_time": bson.M{
+					"$lte": time.Now().Unix(),
+				},
+			},
+		}
+	default:
+		timePipeline = bson.M{
+			"$match": bson.M{
+				"stop_time": bson.M{
+					"$gte": time.Now().Unix(),
+				},
+			},
+		}
+	}
+
+	// venues & sports filter
 	filterPipeline := bson.M{
 		"$match": bson.M{
-			"$or": bson.A{
-				bson.M{
-					"venues._id": bson.M{
-						"$exists": true,
-						"$in":     fieldIDs,
+			"$and": bson.A{
+				bson.M{ // sports filter
+					"sports": bson.M{
+						"$in": sports,
 					},
 				},
-				bson.M{
-					"venues.location.coordinates": bson.M{
-						"$geoWithin": bson.M{
-							"$center": bson.A{
-								location.Coordinates,
-								radius,
+				bson.M{ // venue location
+					"$or": bson.A{
+						bson.M{
+							"venues._id": bson.M{
+								"$exists": true,
+								"$in":     venues,
+							},
+						},
+						bson.M{
+							"venues.location": bson.M{
+								"$geoWithin": bson.M{
+									"$center": bson.A{
+										location.Coordinates,
+										radius,
+									},
+								},
 							},
 						},
 					},
@@ -220,80 +265,44 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		},
 	}
 
-	// filter out events by the sport
-	sportsPipeline := bson.M{
-		"$match": bson.M{
-			"sport": bson.M{
-				"$in": sports,
-			},
-		},
-	}
-
-	// make sure events have not been stopped or have a stop time that was at least 2hrs ago
-	timePipeline := bson.M{
-		"$match": bson.M{
-			"$or": bson.A{
-				bson.M{ // event with stop time
-					"actual_stop_time": bson.M{
-						"$exists": false,
-					},
-					"stop_time": bson.M{
-						"$gte": time.Now().Add(-time.Hour * 2).Unix(),
-					},
-				},
-				bson.M{ //event with no stop time
-					"type": bson.M{
-						"$eq": "pickup",
-					},
-					"actual_stop_time": bson.M{
-						"$exists": false,
-					},
-					"stop_time": bson.M{
-						"$exists": false,
-					},
-					"start_time": bson.M{
-						"$gte": time.Now().Add(-time.Hour * 3).Unix(),
-					},
-				},
-			},
-		},
-	}
-
-	clubsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "clubs",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "clubs",
-		},
-	}
-
 	// only events that are public, or that the user is a club member of or is a participant of
 	visibilityPipeline := bson.M{
 		"$match": bson.M{
 			"$or": bson.A{
-				bson.M{ // events that anyone can see
-					"visibility": "public",
+				// Public events
+				bson.M{
+					"visibility": 0,
+				},
+				// Club/Org member events
+				bson.M{
+					"visibility": 1,
+					"organizers._id": bson.M{
+						"$in": clubs,
+					},
 				},
 				bson.M{
-					"visibility":         "group",
-					"clubs.members.uuid": uuid,
+					"visibility": 1,
+					"organizers._id": bson.M{
+						"$in": orgs,
+					},
 				},
-				bson.M{ // private events that the user joined
-					"visibility":             "private",
-					"participants.user.uuid": uuid,
+				// Private events where user is participant
+				bson.M{
+					"visibility":        2,
+					"participants.uuid": uuid,
 				},
 			},
 		},
+	}
+
+	// skip documents
+	skipPipeline := bson.M{
+		"$skip": skip,
 	}
 
 	// limit documents returned
 	limitPipeline := bson.M{
 		"$limit": limit,
-	}
-
-	skipPipeline := bson.M{
-		"$skip": skip,
 	}
 
 	// find the poster data
@@ -364,38 +373,6 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 		},
 	}
 
-	// find field data
-	fieldPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "fields",
-			"localField":   "field._id",
-			"foreignField": "_id",
-			"as":           "field_data",
-		},
-	}
-
-	// add field data to document correctly
-	addFieldPipeline := bson.M{
-		"$addFields": bson.M{
-			"field_data": bson.M{
-				"$arrayElemAt": bson.A{
-					"$field_data",
-					0,
-				},
-			},
-		},
-	}
-
-	// find organizations data
-	orgsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "organizations",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "organizations",
-		},
-	}
-
 	// remove unnecessary data
 	projectPipeline := bson.M{
 		"$project": bson.M{
@@ -421,23 +398,15 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 
 	// complete pipeline
 	pipeline := bson.A{
-		filterPipeline,
-		sportsPipeline,
 		timePipeline,
-		limitPipeline,
-		clubsPipeline,
-		skipPipeline,
+		filterPipeline,
 		visibilityPipeline,
+		skipPipeline,
+		limitPipeline,
 		posterPipeline,
 		addPosterPipeline,
 		participantsPipeline,
 		addParticipantsPipeline,
-		fieldPipeline,
-		addFieldPipeline,
-		clubsPipeline,
-		orgsPipeline,
-		visibilityPipeline,
-		limitPipeline,
 		projectPipeline,
 	}
 
@@ -445,13 +414,15 @@ func AggregateEventsByLocation(uuid string, sports []string, fieldIDs []primitiv
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
 
-	var response []models.Event
-	for cur.Next(context.TODO()) {
+	response := make([]models.Event, 0, limit)
+	for cur.Next(ctx) {
 		var event models.Event
 		err := cur.Decode(&event)
 		if err != nil {
-			database.Logger.Error("failed to decode event", err)
+			database.Logger.Error("Failed to decode event. Error: ", err.Error())
+			continue
 		}
 		response = append(response, event)
 	}

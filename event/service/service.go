@@ -10,6 +10,7 @@ import (
 	"olympsis-server/utils"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -51,21 +52,23 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		var req models.EventDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			e.Logger.Error("failed to decode request: " + err.Error())
+			e.Logger.Error("Failed to decode request: " + err.Error())
 			http.Error(rw, `{ "msg": "failed to decode event" }`, http.StatusBadRequest)
 			return
 		}
 
 		// create timestamp & participant
+		newID := primitive.NewObjectID()
+		rsvpStatus := int8(1)
 		timestamp := time.Now().Unix()
 		participant := models.ParticipantDao{
-			ID:        primitive.NewObjectID(),
-			UUID:      uuid,
-			Status:    "yes",
+			ID:        &newID,
+			UUID:      &uuid,
+			Status:    &rsvpStatus,
 			CreatedAt: &timestamp,
 		}
 
-		// create event model
+		// create new event model
 		event := models.EventDao{
 			Type:            req.Type,
 			Poster:          &uuid,
@@ -74,7 +77,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			ImageURL:        req.ImageURL,
 			Title:           req.Title,
 			Body:            req.Body,
-			Sport:           req.Sport,
+			Sports:          req.Sports,
 			StartTime:       req.StartTime,
 			StopTime:        req.StopTime,
 			MinParticipants: req.MinParticipants,
@@ -89,28 +92,28 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		// insert event into database
 		id, err := e.InsertEvent(context.Background(), &event)
 		if err != nil {
-			e.Logger.Error("failed to insert event: ", err.Error())
+			e.Logger.Error("Failed to insert event: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to insert event" }`, http.StatusInternalServerError)
 			return
 		}
 
+		// TODO: NOTIFICATION UPDATE
 		// subscribe owner to notifications
-		utils.CreateNotificationTopic(id.Hex())
-		utils.AddTokenToTopic(id.Hex(), uuid)
-
-		organizers := *event.Organizers
+		// utils.CreateNotificationTopic(id.Hex())
+		// utils.AddTokenToTopic(id.Hex(), uuid)
 
 		// notify all of the organizers and their members about this new event
-		for i := range organizers {
-			organizer := organizers[i]
-			note := models.Notification{
-				Title: "New Event Created",
-				Body:  *event.Title,
-				Topic: organizer.ID.Hex(),
-				Data:  fmt.Sprintf(`"id": "%s"`, id.Hex()),
-			}
-			utils.SendNotificationToTopic(&note)
-		}
+		// organizers := *event.Organizers
+		// for i := range organizers {
+		// 	organizer := organizers[i]
+		// 	note := models.Notification{
+		// 		Title: "New Event Created",
+		// 		Body:  *event.Title,
+		// 		Topic: organizer.ID.Hex(),
+		// 		Data:  fmt.Sprintf(`"id": "%s"`, id.Hex()),
+		// 	}
+		// 	utils.SendNotificationToTopic(&note)
+		// }
 
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, id.Hex())))
@@ -137,7 +140,7 @@ func (e *Service) GetEvent() http.HandlerFunc {
 
 		event, err := aggregations.AggregateEvent(oid, e.Database)
 		if err != nil {
-			e.Logger.Error("failed to find event", err.Error())
+			e.Logger.Error("Failed to find event", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 		}
 
@@ -155,69 +158,166 @@ Get Events (GET)
 func (e *Service) GetEventsByLocation() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// query params
-		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
-		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
-		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
-		sports := r.URL.Query().Get("sports")
-		status := r.URL.Query().Get("status")
-
-		// query checking
-		if longitude == 0 || latitude == 0 || radius == 0 || sports == "" || status == "" {
-			http.Error(rw, `{ "msg": "missing query param - long/lat/sports/status" }`, http.StatusBadRequest)
+		// longitude query
+		longitude, err := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
+		if err != nil || longitude == 0 {
+			e.Logger.Error("Failed to decode longitude. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "missing query param - longitude" }`, http.StatusBadRequest)
 			return
 		}
 
-		splicedSports := strings.Split(sports, ",")
+		// latitude query
+		latitude, err := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
+		if err != nil || latitude == 0 {
+			e.Logger.Error("Failed to decode latitude. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "missing query param - latitude" }`, http.StatusBadRequest)
+			return
+		}
 
-		// user location
-		loc := models.GeoJSON{
+		// radius query
+		radius, err := strconv.ParseInt(r.URL.Query().Get("radius"), 0, 32)
+		if (err != nil) || (radius == 0) {
+			e.Logger.Error("Failed to decode location queries. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "missing query param - radius" }`, http.StatusBadRequest)
+			return
+		}
+
+		// sports & status query params
+		sports_query := r.URL.Query().Get("sports")
+		status_query := r.URL.Query().Get("status")
+		if sports_query == "" || status_query == "" {
+			e.Logger.Error("Failed to decode sports & status queries.")
+			http.Error(rw, `{ "msg": "missing query param - sports or status" }`, http.StatusBadRequest)
+			return
+		}
+
+		// pagination query params
+		skip := 0
+		limit := 0
+		skip_query, err := strconv.ParseInt(r.URL.Query().Get("skip"), 0, 16)
+		if err != nil {
+			skip = 0
+		}
+		limit_query, err := strconv.ParseInt(r.URL.Query().Get("limit"), 0, 16)
+		if err != nil || limit_query == 0 {
+			limit = 20
+		}
+
+		// create local data
+		status := 1
+		skip = int(skip_query)
+		limit = int(limit_query)
+		sports := strings.Split(sports_query, ",")
+		location := models.GeoJSON{
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
 
-		uuid := r.Header.Get("UUID")
+		switch status_query {
+		case "completed":
+			status = 0
+		default:
+			status = 1
+		}
 
-		// fields filter
-		filter := bson.M{
-			"location": bson.M{
-				"$near": bson.M{
-					"$geometry":    loc,
-					"$maxDistance": radius,
+		var wg sync.WaitGroup
+		var wgError *error
+		var user *models.UserData
+		var venues []primitive.ObjectID
+
+		// venues go-routine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// documents filter
+			filter := bson.M{
+				"location": bson.M{
+					"$near": bson.M{
+						"$geometry":    location,
+						"$maxDistance": radius,
+					},
 				},
-			},
-			"sports": bson.M{
-				"$in": splicedSports,
-			},
-		}
-		// fetch the nearby fields
-		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{ "msg": "no events found" }`, http.StatusNotFound)
-				return
-			} else {
-				e.Logger.Error("failed to find fields", err.Error())
-				http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
+				"sports": bson.M{
+					"$in": sports,
+				},
 			}
+
+			// fetch the nearby venues
+			ctx := r.Context()
+			cursor, err := e.Database.FieldCol.Find(ctx, filter)
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					wgError = &err
+					venues = []primitive.ObjectID{}
+				} else {
+					wgError = &err
+					venues = []primitive.ObjectID{}
+					e.Logger.Error("Failed to find venues. Error: ", err.Error())
+				}
+			}
+			defer cursor.Close(ctx)
+
+			// decode fields
+			venues = []primitive.ObjectID{}
+			for cursor.Next(ctx) {
+				var venue models.Venue
+				if err := cursor.Decode(&venue); err != nil {
+					e.Logger.Error("Failed to decode field: ", err)
+					continue
+				}
+				venues = append(venues, venue.ID)
+			}
+		}()
+
+		// user data go-routine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// grab user data
+			uuid := r.Header.Get("UUID")
+			user, err = aggregations.AggregateUser(&uuid, e.Database)
+			if err != nil || user == nil {
+				wgError = &err
+				e.Logger.Error("Failed to get user data. Error: ", err.Error())
+				return
+			}
+		}()
+
+		// wait on go-routines & handle error
+		wg.Wait()
+		if wgError != nil {
+			http.Error(rw, `{ "msg": "Failed to get venue data." }`, http.StatusInternalServerError)
+			return
 		}
 
-		// decode fields
-		fieldsIDs := []primitive.ObjectID{}
-		for cursor.Next(context.TODO()) {
-			// decode field
-			var field models.Venue
-			err := cursor.Decode(&field)
-			if err != nil {
-				e.Logger.Error("failed to decode field", err.Error())
-			}
-			fieldsIDs = append(fieldsIDs, field.ID)
+		// clubs & organizations
+		clubs := []primitive.ObjectID{}
+		orgs := []primitive.ObjectID{}
+		if user.Clubs != nil {
+			clubs = append(clubs, *user.Clubs...)
+		}
+		if user.Organizations != nil {
+			orgs = append(orgs, *user.Organizations...)
 		}
 
 		// find the events
-		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, 0, e.Database)
-		if err != nil { // unexpected error
-			e.Logger.Error("failed to find events", err.Error())
+		events, err := aggregations.AggregateEvents(
+			user.UUID,
+			sports,
+			location,
+			venues,
+			clubs,
+			orgs,
+			int(radius),
+			int(limit),
+			int(skip),
+			status,
+			e.Database,
+		)
+		if err != nil || events == nil { // unexpected error
+			e.Logger.Error("Failed to find events. Error: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
 			return
 		}
@@ -225,8 +325,9 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "no events found" }`, http.StatusNoContent)
 			return
 		}
+
 		resp := models.EventsResponse{
-			TotalEvents: len(*events),
+			TotalEvents: int16(len(*events)),
 			Events:      *events,
 		}
 
@@ -254,7 +355,7 @@ func (e *Service) GetEventsByField() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 		events, err := aggregations.AggregateEventsByField(oid, 100, e.Database)
 		if err != nil {
-			e.Logger.Error("failed to find events", err.Error())
+			e.Logger.Error("Failed to find events", err.Error())
 			http.Error(rw, `{ "msg": "failed to find events"}`, http.StatusInternalServerError)
 			return
 		}
@@ -264,7 +365,7 @@ func (e *Service) GetEventsByField() http.HandlerFunc {
 		}
 
 		resp := models.EventsResponse{
-			TotalEvents: len(*events),
+			TotalEvents: int16(len(*events)),
 			Events:      *events,
 		}
 
@@ -315,12 +416,6 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		if req.StartTime != nil {
 			changes["start_time"] = req.StartTime
 		}
-		if req.ActualStartTime != nil {
-			changes["actual_start_time"] = req.ActualStartTime
-		}
-		if req.ActualStopTime != nil {
-			changes["actual_stop_time"] = req.ActualStopTime
-		}
 		if req.Visibility != nil {
 			changes["visibility"] = req.Visibility
 		}
@@ -361,37 +456,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			return
 		}
 
-		// notify participants
-		if req.ActualStartTime != nil {
-			// notify participants that the event is starting
-			note := models.Notification{
-				Title: *event.Title,
-				Body:  "Event is starting!",
-				Topic: id,
-			}
-			utils.SendNotificationToTopic(&note)
-
-		} else if req.ActualStopTime != nil {
-			// notify participants that the event ended
-			note := models.Notification{
-				Title: *event.Title,
-				Body:  "Event ended!",
-				Topic: id,
-			}
-			utils.SendNotificationToTopic(&note)
-			utils.DeleteNotificationTopic(id)
-
-		} else {
-			// notify participants that the details changes
-			note := models.Notification{
-				Title: *event.Title,
-				Body:  "Event details have changed!",
-				Topic: id,
-			}
-			utils.SendNotificationToTopic(&note)
-
-		}
-
+		json.NewEncoder(rw).Encode(event)
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -469,7 +534,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		// check if participant already exists
 		participants := *event.Participants
 		for i := range participants {
-			if participants[i].UUID == uuid {
+			if *participants[i].UUID == uuid {
 				rw.WriteHeader(http.StatusOK)
 				rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, participants[i].ID)))
 				return
@@ -487,9 +552,10 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// participant object
+		newID := primitive.NewObjectID()
 		part := &models.ParticipantDao{
-			ID:        primitive.NewObjectID(),
-			UUID:      uuid,
+			ID:        &newID,
+			UUID:      &uuid,
 			Status:    req.Status,
 			CreatedAt: &timestamp,
 		}
@@ -617,96 +683,192 @@ func (e *Service) NotifyClubMembers() http.HandlerFunc {
 	}
 }
 
+/*
+Location (POST)
+
+	http handler
+	gets all of the events and venues in a location
+*/
 func (e *Service) Location() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// query params
-		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
-		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
-		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
-		limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 2, 64)
-
-		sports := r.URL.Query().Get("sports")
-		status := r.URL.Query().Get("status")
-
-		// query checking
-		if longitude == 0 || latitude == 0 || radius == 0 || sports == "" || status == "" {
-			http.Error(rw, "missing query param - long/lat/sports/status", http.StatusBadRequest)
+		// longitude query
+		longitude, err := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
+		if err != nil || longitude == 0 {
+			e.Logger.Error("Failed to decode longitude. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "missing query param - longitude" }`, http.StatusBadRequest)
 			return
 		}
 
-		if limit == 0 {
-			limit = 100 // max query size for events
+		// latitude query
+		latitude, err := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
+		if err != nil || latitude == 0 {
+			e.Logger.Error("Failed to decode latitude. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "missing query param - latitude" }`, http.StatusBadRequest)
+			return
 		}
 
-		splicedSports := strings.Split(sports, ",")
+		// radius query
+		radius, err := strconv.ParseInt(r.URL.Query().Get("radius"), 0, 32)
+		if (err != nil) || (radius == 0) {
+			e.Logger.Error("Failed to decode location queries. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "missing query param - radius" }`, http.StatusBadRequest)
+			return
+		}
 
-		// user location
-		loc := models.GeoJSON{
+		// sports & status query params
+		sports_query := r.URL.Query().Get("sports")
+		status_query := r.URL.Query().Get("status")
+		if sports_query == "" || status_query == "" {
+			e.Logger.Error("Failed to decode sports & status queries.")
+			http.Error(rw, `{ "msg": "missing query param - sports or status" }`, http.StatusBadRequest)
+			return
+		}
+
+		// pagination query params
+		skip := 0
+		limit := 0
+		skip_query, err := strconv.ParseInt(r.URL.Query().Get("skip"), 0, 16)
+		if err != nil {
+			skip = 0
+		}
+		limit_query, err := strconv.ParseInt(r.URL.Query().Get("limit"), 0, 16)
+		if err != nil || limit_query == 0 {
+			limit = 20
+		}
+
+		// create local data
+		status := 1
+		skip = int(skip_query)
+		limit = int(limit_query)
+		sports := strings.Split(sports_query, ",")
+		location := models.GeoJSON{
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
 		}
 
-		// fields filter
-		filter := bson.M{
-			"location": bson.M{
-				"$nearSphere": bson.M{
-					"$geometry":    loc,
-					"$maxDistance": radius,
+		switch status_query {
+		case "completed":
+			status = 0
+		default:
+			status = 1
+		}
+
+		var wg sync.WaitGroup
+		var wgError *error
+
+		var user models.UserData
+		var venues []models.Venue
+		var venueIDs []primitive.ObjectID
+
+		// venues go-routine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// documents filter
+			filter := bson.M{
+				"location": bson.M{
+					"$near": bson.M{
+						"$geometry":    location,
+						"$maxDistance": radius,
+					},
 				},
-			},
-			"sports": bson.M{
-				"$in": splicedSports,
-			},
-		}
-
-		uuid := r.Header.Get("UUID")
-		fields := utils.NewSafeFields()
-		fieldsArr := []models.Venue{}
-
-		// fetch the nearby fields
-		cursor, err := e.Database.FieldCol.Find(context.Background(), filter)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				e.Logger.Error(err.Error())
-				http.Error(rw, "no events found", http.StatusNotFound)
-				return
-			} else {
-				e.Logger.Error(err.Error())
+				"sports": bson.M{
+					"$in": sports,
+				},
 			}
-		}
 
-		// decode fields
-		var fieldsIDs []primitive.ObjectID
-		for cursor.Next(context.TODO()) {
-			// decode field
-			var field models.Venue
-			err := cursor.Decode(&field)
+			// fetch the nearby venues
+			ctx := r.Context()
+			cursor, err := e.Database.FieldCol.Find(ctx, filter)
 			if err != nil {
-				e.Logger.Error(err.Error())
+				if err == mongo.ErrNoDocuments {
+					wgError = &err
+					venues = []models.Venue{}
+					venueIDs = []primitive.ObjectID{}
+				} else {
+					wgError = &err
+					venues = []models.Venue{}
+					venueIDs = []primitive.ObjectID{}
+					e.Logger.Error("Failed to find venues. Error: ", err.Error())
+				}
 			}
-			fieldsIDs = append(fieldsIDs, field.ID)
-			fields.AddField(&field)
-			fieldsArr = append(fieldsArr, field)
-		}
+			defer cursor.Close(ctx)
 
-		if len(fieldsIDs) == 0 {
-			http.Error(rw, "no events", http.StatusNoContent)
+			// decode fields
+			for cursor.Next(ctx) {
+				var venue models.Venue
+				if err := cursor.Decode(&venue); err != nil {
+					e.Logger.Error("Failed to decode field: Error: ", err)
+					continue
+				}
+				venues = append(venues, venue)
+				venueIDs = append(venueIDs, venue.ID)
+			}
+		}()
+
+		// user data go-routine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// grab user data
+			uuid := r.Header.Get("UUID")
+			user, err := aggregations.AggregateUser(&uuid, e.Database)
+			if err != nil || user == nil {
+				wgError = &err
+				e.Logger.Error("Failed to get user data. Error: ", err.Error())
+				return
+			}
+		}()
+
+		// wait on go-routines
+		wg.Wait()
+		if wgError != nil {
+			http.Error(rw, `{ "msg": "Failed to get venue data." }`, http.StatusInternalServerError)
 			return
 		}
 
-		events, err := aggregations.AggregateEventsByLocation(uuid, splicedSports, fieldsIDs, loc, int(radius), 100, 0, e.Database)
-		if err != nil {
-			e.Logger.Error("failed to find events", err.Error())
-			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+		// clubs & organizations
+		clubs := []primitive.ObjectID{}
+		orgs := []primitive.ObjectID{}
+		if user.Clubs != nil {
+			clubs = append(clubs, *user.Clubs...)
+		}
+		if user.Organizations != nil {
+			orgs = append(orgs, *user.Organizations...)
+		}
+
+		// find the events
+		events, err := aggregations.AggregateEvents(
+			user.UUID,
+			sports,
+			location,
+			venueIDs,
+			clubs,
+			orgs,
+			int(radius),
+			int(limit),
+			int(skip),
+			status,
+			e.Database,
+		)
+		if err != nil || events == nil { // unexpected error
+			e.Logger.Error("Failed to find events. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
 			return
 		}
+		if len(*events) == 0 { // no content error
+			http.Error(rw, `{ "msg": "no events found" }`, http.StatusNoContent)
+			return
+		}
+
 		resp := models.LocationResponse{
-			Venues: &fieldsArr,
+			Venues: &venues,
 			Events: events,
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(resp)
 	}
