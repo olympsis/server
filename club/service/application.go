@@ -298,41 +298,41 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				}
 
 				// find club info
-				club, err := aggregations.AggregateClub(&oid, c.Database)
-				if err != nil {
-					c.Logger.Error("failed to find club: ", err.Error())
-					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
-					return
-				}
+				// club, err := aggregations.AggregateClub(&oid, c.Database)
+				// if err != nil {
+				// 	c.Logger.Error("failed to find club: ", err.Error())
+				// 	http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
+				// 	return
+				// }
 
 				// find user device token
-				usr, err := c.SearchService.SearchUserByUUID(member.UUID)
-				if err != nil {
-					c.Logger.Error("failed to get user data: " + err.Error())
-				}
+				// usr, err := c.SearchService.SearchUserByUUID(member.UUID)
+				// if err != nil {
+				// 	c.Logger.Error("failed to get user data: " + err.Error())
+				// }
 
 				// notify user they were accepted to the club
-				notification := models.Notification{
-					Title: fmt.Sprintf("[%s]Application", club.Name),
-					Body:  club.Name + "Accepted your application!",
-					Data:  club,
-				}
+				// notification := models.Notification{
+				// 	Title: fmt.Sprintf("[%s]Application", club.Name),
+				// 	Body:  club.Name + "Accepted your application!",
+				// 	Data:  club,
+				// }
 
-				err = utils.AddTokenToTopic(club.ID.Hex(), usr.UUID)
-				if err != nil {
-					c.Logger.Error("failed add token to topic: ", err.Error())
-				}
+				// err = utils.AddTokenToTopic(club.ID.Hex(), usr.UUID)
+				// if err != nil {
+				// 	c.Logger.Error("failed add token to topic: ", err.Error())
+				// }
 
-				if usr.DeviceTokens != nil {
-					for i := range *usr.DeviceTokens {
-						tokens := *usr.DeviceTokens
-						token := tokens[i]
-						err = utils.SendNotificationToToken(token, &notification)
-						if err != nil {
-							c.Logger.Error("failed send notification to token: ", err.Error())
-						}
-					}
-				}
+				// if usr.DeviceTokens != nil {
+				// 	for i := range *usr.DeviceTokens {
+				// 		tokens := *usr.DeviceTokens
+				// 		token := tokens[i]
+				// 		err = utils.SendNotificationToToken(token, &notification)
+				// 		if err != nil {
+				// 			c.Logger.Error("failed send notification to token: ", err.Error())
+				// 		}
+				// 	}
+				// }
 
 				rw.WriteHeader(http.StatusOK)
 				return

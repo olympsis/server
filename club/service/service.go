@@ -464,16 +464,16 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			c.Logger.Error("failed to get user data: " + err.Error())
 		}
 
-		text := ""
-		if req.Role == "owner" {
-			text = "You've been promoted to Owner"
-		} else if req.Role == "admin" {
-			text = "You've been promoted to Admin"
-		} else if req.Role == "moderator" {
-			text = "You've been promoted to Moderator"
-		} else {
-			text = "You've been demoted"
-		}
+		// text := ""
+		// if req.Role == "owner" {
+		// 	text = "You've been promoted to Owner"
+		// } else if req.Role == "admin" {
+		// 	text = "You've been promoted to Admin"
+		// } else if req.Role == "moderator" {
+		// 	text = "You've been promoted to Moderator"
+		// } else {
+		// 	text = "You've been demoted"
+		// }
 
 		// if user was member then add them to the admin topic
 		if members[index].Role == "member" {
@@ -484,16 +484,16 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// notify user that they had their rank changed
-		notification := models.Notification{
-			Title: *club.Name,
-			Body:  text,
-		}
+		// notification := models.Notification{
+		// 	Title: *club.Name,
+		// 	Body:  text,
+		// }
 
-		for i := range *usr.DeviceTokens {
-			tokens := *usr.DeviceTokens
-			token := tokens[i]
-			utils.SendNotificationToToken(token, &notification)
-		}
+		// for i := range *usr.DeviceTokens {
+		// 	tokens := *usr.DeviceTokens
+		// 	token := tokens[i]
+		// 	utils.SendNotificationToToken(token, &notification)
+		// }
 
 		// fetch updated club data
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
@@ -609,18 +609,18 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// notify user then remove them from the topics
-		notification := models.Notification{
-			Title: *club.Name,
-			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
-		}
+		// notification := models.Notification{
+		// 	Title: *club.Name,
+		// 	Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
+		// }
 
-		if usr.DeviceTokens != nil {
-			for i := range *usr.DeviceTokens {
-				tokens := *usr.DeviceTokens
-				token := tokens[i]
-				utils.SendNotificationToToken(token, &notification)
-			}
-		}
+		// if usr.DeviceTokens != nil {
+		// 	for i := range *usr.DeviceTokens {
+		// 		tokens := *usr.DeviceTokens
+		// 		token := tokens[i]
+		// 		utils.SendNotificationToToken(token, &notification)
+		// 	}
+		// }
 
 		err = utils.RemoveTokenFromTopic(id, usr.UUID)
 		if err != nil {

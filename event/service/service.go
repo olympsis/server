@@ -541,11 +541,30 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			}
 		}
 
-		// if event is full
+		// if event is full add the user to the wait-list
 		if event.MaxParticipants != nil {
 			if *event.MaxParticipants != 0 {
 				if len(participants) >= int(*event.MaxParticipants) {
-					http.Error(rw, `{ "msg": "event capacity is full" }`, http.StatusBadRequest)
+
+					// participant object
+					newID := primitive.NewObjectID()
+					part := &models.ParticipantDao{
+						ID:        &newID,
+						UUID:      &uuid,
+						Status:    req.Status,
+						CreatedAt: &timestamp,
+					}
+
+					change := bson.M{"$push": bson.M{"wait_list": part}}
+					err = e.UpdateEvent(context.Background(), filter, change)
+					if err != nil {
+						e.Logger.Error("Failed to update event", err.Error())
+						http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
+						return
+					}
+
+					rw.WriteHeader(http.StatusOK)
+					rw.Write([]byte(`{ "msg": "successful" }`))
 					return
 				}
 			}
@@ -562,21 +581,21 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		change := bson.M{"$push": bson.M{"participants": part}}
 		err = e.UpdateEvent(context.Background(), filter, change)
 		if err != nil {
-			e.Logger.Error("failed to update event", err.Error())
-			http.Error(rw, "failed to update event", http.StatusInternalServerError)
+			e.Logger.Error("Failed to update event", err.Error())
+			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
 			return
 		}
 
 		// notify all participants
-		notif := models.Notification{
-			Title: *event.Title,
-			Body:  "New Participant RSVP'd!",
-			Topic: id,
-		}
-		utils.SendNotificationToTopic(&notif)
+		// notif := models.Notification{
+		// 	Title: *event.Title,
+		// 	Body:  "New Participant RSVP'd!",
+		// 	Topic: id,
+		// }
+		// utils.SendNotificationToTopic(&notif)
 
 		// subscribe user to notifications
-		utils.AddTokenToTopic(id, uuid)
+		// utils.AddTokenToTopic(id, uuid)
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "successful" }`))
@@ -604,10 +623,53 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		oid, _ := primitive.ObjectIDFromHex(id)
-		match := bson.M{"_id": oid}
-		change := bson.M{"$pull": bson.M{"participants": bson.M{"uuid": uuid}}}
 
-		err := e.UpdateEvent(context.Background(), match, change)
+		// First, fetch the event to check the wait-list
+		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
+		if err != nil {
+			e.Logger.Error("failed to fetch event: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to fetch event" }`, http.StatusInternalServerError)
+			return
+		}
+
+		// First operation: Remove participant
+		err = e.UpdateEvent(context.Background(),
+			bson.M{"_id": oid},
+			bson.M{"$pull": bson.M{"participants": bson.M{"uuid": uuid}}},
+		)
+		if err != nil {
+			e.Logger.Error("failed to remove participant: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
+			return
+		}
+
+		if event.WaitList != nil && len(*event.WaitList) > 0 {
+			waitList := *event.WaitList
+			firstWaitListed := waitList[0]
+
+			// Second operation: Remove first person from wait-list
+			err = e.UpdateEvent(context.Background(),
+				bson.M{"_id": oid},
+				bson.M{"$pop": bson.M{"wait_list": -1}},
+			)
+			if err != nil {
+				e.Logger.Error("failed to pop from wait-list: ", err.Error())
+				http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
+				return
+			}
+
+			// Third operation: Add wait-listed person to participants
+			err = e.UpdateEvent(context.Background(),
+				bson.M{"_id": oid},
+				bson.M{"$push": bson.M{"participants": firstWaitListed}},
+			)
+			if err != nil {
+				e.Logger.Error("failed to add wait-listed participant: ", err.Error())
+				http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
+				return
+			}
+		}
+
 		if err != nil {
 			e.Logger.Error("failed to update event: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
@@ -857,10 +919,6 @@ func (e *Service) Location() http.HandlerFunc {
 		if err != nil || events == nil { // unexpected error
 			e.Logger.Error("Failed to find events. Error: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
-			return
-		}
-		if len(*events) == 0 { // no content error
-			http.Error(rw, `{ "msg": "no events found" }`, http.StatusNoContent)
 			return
 		}
 

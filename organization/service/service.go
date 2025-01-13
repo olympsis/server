@@ -572,13 +572,13 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 		}
 
 		// fetch user data
-		user, err := e.SearchService.SearchUserByUUID(req.Recipient)
-		if err != nil {
-			e.Logger.Error("Failed to fetch user data: " + err.Error())
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(req)
-			return
-		}
+		// user, err := e.SearchService.SearchUserByUUID(req.Recipient)
+		// if err != nil {
+		// 	e.Logger.Error("Failed to fetch user data: " + err.Error())
+		// 	w.WriteHeader(http.StatusCreated)
+		// 	json.NewEncoder(w).Encode(req)
+		// 	return
+		// }
 
 		// fetch organization data
 		var org models.Organization
@@ -591,17 +591,17 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 		}
 
 		// notify user
-		note := models.Notification{
-			Title: "New Invitation",
-			Body:  "You've been invited to join the " + org.Name + " organization",
-			Data:  org,
-		}
+		// note := models.Notification{
+		// 	Title: "New Invitation",
+		// 	Body:  "You've been invited to join the " + org.Name + " organization",
+		// 	Data:  org,
+		// }
 
-		for i := range *user.DeviceTokens {
-			tokens := *user.DeviceTokens
-			token := tokens[i]
-			utils.SendNotificationToToken(token, &note)
-		}
+		// for i := range *user.DeviceTokens {
+		// 	tokens := *user.DeviceTokens
+		// 	token := tokens[i]
+		// 	utils.SendNotificationToToken(token, &note)
+		// }
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(req)

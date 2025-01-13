@@ -93,6 +93,52 @@ func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models
 		},
 	}
 
+	// New wait_list pipelines
+	waitListPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "wait_list.uuid",
+			"foreignField": "uuid",
+			"as":           "_wait_list",
+		},
+	}
+
+	// Add wait-listed participants data to document
+	addWaitListPipeline := bson.M{
+		"$addFields": bson.M{
+			"wait_list": bson.M{
+				"$map": bson.M{
+					"input": "$wait_list",
+					"as":    "wait_list_participant",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$wait_list_participant",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$_wait_list",
+												"as":    "wl",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$wl.uuid",
+														"$$wait_list_participant.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	// find field data
 	fieldPipeline := bson.M{
 		"$lookup": bson.M{
@@ -165,6 +211,8 @@ func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models
 		addPosterPipeline,
 		participantsPipeline,
 		addParticipantsPipeline,
+		waitListPipeline,
+		addWaitListPipeline,
 		fieldPipeline,
 		addFieldPipeline,
 		clubsPipeline,
@@ -373,6 +421,52 @@ func AggregateEvents(
 		},
 	}
 
+	// New wait_list pipelines
+	waitListPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "wait_list.uuid",
+			"foreignField": "uuid",
+			"as":           "_wait_list",
+		},
+	}
+
+	// Add wait-listed participants data to document
+	addWaitListPipeline := bson.M{
+		"$addFields": bson.M{
+			"wait_list": bson.M{
+				"$map": bson.M{
+					"input": "$wait_list",
+					"as":    "wait_list_participant",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$wait_list_participant",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$_wait_list",
+												"as":    "wl",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$wl.uuid",
+														"$$wait_list_participant.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	// remove unnecessary data
 	projectPipeline := bson.M{
 		"$project": bson.M{
@@ -407,6 +501,8 @@ func AggregateEvents(
 		addPosterPipeline,
 		participantsPipeline,
 		addParticipantsPipeline,
+		waitListPipeline,
+		addWaitListPipeline,
 		projectPipeline,
 	}
 
@@ -512,6 +608,52 @@ func AggregateEventsByField(id primitive.ObjectID, limit int, database *database
 		},
 	}
 
+	// New wait_list pipelines
+	waitListPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "wait_list.uuid",
+			"foreignField": "uuid",
+			"as":           "_wait_list",
+		},
+	}
+
+	// Add wait-listed participants data to document
+	addWaitListPipeline := bson.M{
+		"$addFields": bson.M{
+			"wait_list": bson.M{
+				"$map": bson.M{
+					"input": "$wait_list",
+					"as":    "wait_list_participant",
+					"in": bson.M{
+						"$mergeObjects": bson.A{
+							"$$wait_list_participant",
+							bson.M{
+								"user": bson.M{
+									"$arrayElemAt": bson.A{
+										bson.M{
+											"$filter": bson.M{
+												"input": "$_wait_list",
+												"as":    "wl",
+												"cond": bson.M{
+													"$eq": bson.A{
+														"$$wl.uuid",
+														"$$wait_list_participant.uuid",
+													},
+												},
+											},
+										},
+										0,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	// find field data
 	fieldPipeline := bson.M{
 		"$lookup": bson.M{
@@ -590,6 +732,8 @@ func AggregateEventsByField(id primitive.ObjectID, limit int, database *database
 		addPosterPipeline,
 		participantsPipeline,
 		addParticipantsPipeline,
+		waitListPipeline,
+		addWaitListPipeline,
 		fieldPipeline,
 		addFieldPipeline,
 		clubsPipeline,
