@@ -144,7 +144,6 @@ func (e *Service) GetEvent() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 		}
 
-		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
 	}
 }
