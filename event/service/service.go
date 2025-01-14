@@ -488,6 +488,7 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		// delete notification topic
 		utils.DeleteNotificationTopic(id)
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
