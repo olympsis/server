@@ -99,83 +99,67 @@ Returns:
 func (c *Service) CreateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		ctx := r.Context()
 		uuid := r.Header.Get("UUID")
-		ctx := context.Background()
 
 		// Grab club id from path and validate it
 		id := mux.Vars(r)["id"]
 		valid := utils.ValidateClubID(id)
 		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "invalid club id" }`, http.StatusBadRequest)
 			return
 		}
 
+		// Convert id to object ID
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			c.Logger.Error("failed to convert club id: ", err.Error())
-			http.Error(rw, "failed to convert club id", http.StatusBadRequest)
+			c.Logger.Error("Failed to convert club id: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to convert club id" }`, http.StatusBadRequest)
 			return
 		}
 
 		// check if an application already exists
 		var _app models.ClubApplicationDao
-		filter := bson.M{"uuid": uuid, "club_id": oid}
-		err = c.Database.ClubApplicationCol.FindOne(context.Background(), filter).Decode(&_app)
+		filter := bson.M{"uuid": uuid, "club_id": oid, "status": "pending"}
+		err = c.Database.ClubApplicationCol.FindOne(ctx, filter).Decode(&_app)
 		if err != nil {
-			if err != mongo.ErrNoDocuments {
-				c.Logger.Error("Failed to check for application: " + err.Error())
-				http.Error(rw, "failed to check application", http.StatusInternalServerError)
-				return
-			} else {
-				c.Logger.Info("Club Application already exists")
+			// If we have no existing events create a new one
+			if err == mongo.ErrNoDocuments {
+				timeStamp := time.Now().Unix()
+				status := "pending"
+				app := models.ClubApplicationDao{
+					Applicant: &uuid,
+					ClubID:    &oid,
+					Status:    &status,
+					CreatedAt: &timeStamp,
+				}
+
+				// create club application in database
+				resp, err := c.Database.ClubApplicationCol.InsertOne(ctx, app)
+				if err != nil {
+					c.Logger.Error("failed to create application: ", err.Error())
+					http.Error(rw, `{ "msg": "failed to create application" }`, http.StatusInternalServerError)
+					return
+				}
+
+				response := models.CreateResponse{
+					ID: resp.InsertedID.(primitive.ObjectID).Hex(),
+				}
 				rw.WriteHeader(http.StatusCreated)
-				json.NewEncoder(rw).Encode(_app)
+				json.NewEncoder(rw).Encode(response)
 				return
 			}
-		}
 
-		timeStamp := time.Now().Unix()
-		status := "pending"
-		app := models.ClubApplicationDao{
-			Applicant: &uuid,
-			ClubID:    &oid,
-			Status:    &status,
-			CreatedAt: &timeStamp,
-		}
-
-		// create club application in database
-		resp, err := c.Database.ClubApplicationCol.InsertOne(context.Background(), app)
-		if err != nil {
-			c.Logger.Error("failed to create application: ", err.Error())
-			http.Error(rw, "failed to create application", http.StatusInternalServerError)
+			// Other database errors
+			c.Logger.Error("Failed to check for application: " + err.Error())
+			http.Error(rw, `{ "msg": "failed to check application" }`, http.StatusInternalServerError)
 			return
 		}
 
-		// find club info after successful application creation
-		var club models.Club
-		err = c.Database.ClubCol.FindOne(ctx, bson.M{"_id": oid}).Decode(&club)
-		if err != nil {
-			c.Logger.Error("failed to find club: ", err.Error())
-			http.Error(rw, "failed to create application", http.StatusInternalServerError)
-			return
-		}
-
-		// notify admins
-		note := models.Notification{
-			Title: fmt.Sprintf("[%s]New Application", club.Name),
-			Body:  "You have a new club application",
-			Topic: app.ClubID.Hex() + "_admin",
-		}
-		err = utils.SendNotificationToTopic(&note)
-		if err != nil {
-			c.Logger.Error(fmt.Sprintf("failed to notify %s's admins: %s", club.ID.Hex(), err.Error()))
-		}
-
-		response := models.CreateResponse{
-			ID: resp.InsertedID.(primitive.ObjectID).Hex(),
-		}
+		// We've found a pending application
+		c.Logger.Info("Club Application already exists")
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(response)
+		json.NewEncoder(rw).Encode(_app)
 	}
 }
 
