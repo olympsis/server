@@ -336,6 +336,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			}
 
 			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"msg":"OK"}`))
 			return
 		}
 	}
