@@ -59,7 +59,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		var ids []primitive.ObjectID
 		groupID, err := primitive.ObjectIDFromHex(group)
 		if err != nil {
-			p.Logger.Error("failed to encode group id to object id: ", err.Error())
+			p.Logger.Error("Failed to encode group id to object id: ", err.Error())
 			http.Error(rw, `{ "msg" : "bad group id found in request"}`, http.StatusBadRequest)
 			return
 		} else {
@@ -71,13 +71,13 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		}
 
 		var wg sync.WaitGroup
-		var user *models.UserData
+		var user *models.UserDao
 		var posts *[]models.Post
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			user, err = utils.FindUser(uuid, p.Database)
+			p.Database.UserCol.FindOne(r.Context(), bson.M{"uuid": uuid}).Decode(&user)
 		}()
 
 		wg.Add(1)
@@ -90,7 +90,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 					http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
 					return
 				} else {
-					p.Logger.Error("failed to get posts: ", err.Error())
+					p.Logger.Error("Failed to get posts: ", err.Error())
 					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
 					return
 				}
@@ -110,7 +110,8 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		}
 
 		if user.BlockedUsers != nil {
-			_posts := removePostsByPosterUUIDs(posts, user.BlockedUsers)
+			blockedList := *user.BlockedUsers
+			_posts := removePostsByPosterUUIDs(posts, blockedList)
 
 			if _posts == nil || len(*_posts) == 0 {
 				http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
