@@ -43,24 +43,33 @@ Create Event Data (POST)
 	http handler
 	create an event and add it into the database
 */
+// CreateEvent handles both single and recurring event creation
 func (e *Service) CreateEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
 		uuid := r.Header.Get("UUID")
 
-		// decode request
-		var req models.EventDao
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
+		// Decode request
+		var req models.NewEventDao
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			e.Logger.Error("Failed to decode request: " + err.Error())
 			http.Error(rw, `{ "msg": "failed to decode event" }`, http.StatusBadRequest)
 			return
 		}
 
-		// create timestamp & participant
+		// // Validate the request
+		// if err := req.Validate(); err != nil {
+		//     e.Logger.Error("Invalid request: " + err.Error())
+		//     http.Error(rw, fmt.Sprintf(`{ "msg": "invalid request: %s" }`, err.Error()), http.StatusBadRequest)
+		//     return
+		// }
+
+		timestamp := time.Now().Unix()
+		isRecurring := req.Recurrence != nil
+
+		// Create base event
+		event := req.Event
 		newID := primitive.NewObjectID()
 		rsvpStatus := int8(1)
-		timestamp := time.Now().Unix()
 		participant := models.ParticipantDao{
 			ID:        &newID,
 			UUID:      &uuid,
@@ -68,55 +77,50 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			CreatedAt: &timestamp,
 		}
 
-		// create new event model
-		event := models.EventDao{
-			Type:            req.Type,
-			Poster:          &uuid,
-			Organizers:      req.Organizers,
-			Venues:          req.Venues,
-			ImageURL:        req.ImageURL,
-			Title:           req.Title,
-			Body:            req.Body,
-			Sports:          req.Sports,
-			StartTime:       req.StartTime,
-			StopTime:        req.StopTime,
-			MinParticipants: req.MinParticipants,
-			MaxParticipants: req.MaxParticipants,
-			Participants:    &[]models.ParticipantDao{participant},
-			Level:           req.Level,
-			Visibility:      req.Visibility,
-			ExternalLink:    req.ExternalLink,
-			CreatedAt:       &timestamp,
-		}
+		event.Poster = &uuid
+		event.CreatedAt = &timestamp
+		event.IsRecurring = &isRecurring
+		event.Participants = &[]models.ParticipantDao{participant}
 
-		// insert event into database
-		id, err := e.InsertEvent(context.Background(), &event)
-		if err != nil {
-			e.Logger.Error("Failed to insert event: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to insert event" }`, http.StatusInternalServerError)
+		if !isRecurring {
+			// Handle single event creation
+			id, err := e.InsertEvent(context.Background(), &event)
+			if err != nil {
+				e.Logger.Error("Failed to insert event: ", err.Error())
+				http.Error(rw, `{ "msg": "failed to insert event" }`, http.StatusInternalServerError)
+				return
+			}
+
+			rw.WriteHeader(http.StatusCreated)
+			rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, id.Hex())))
 			return
 		}
 
-		// TODO: NOTIFICATION UPDATE
-		// subscribe owner to notifications
-		// utils.CreateNotificationTopic(id.Hex())
-		// utils.AddTokenToTopic(id.Hex(), uuid)
+		// Handle recurring event creation
+		event.RecurrenceRule = &req.Recurrence.Pattern
+		event.RecurrenceEnd = &req.Recurrence.EndTime
 
-		// notify all of the organizers and their members about this new event
-		// organizers := *event.Organizers
-		// for i := range organizers {
-		// 	organizer := organizers[i]
-		// 	note := models.Notification{
-		// 		Title: "New Event Created",
-		// 		Body:  *event.Title,
-		// 		Topic: organizer.ID.Hex(),
-		// 		Data:  fmt.Sprintf(`"id": "%s"`, id.Hex()),
-		// 	}
-		// 	utils.SendNotificationToTopic(&note)
-		// }
+		// Insert parent event
+		parentID, err := e.InsertEvent(context.Background(), &event)
+		if err != nil {
+			e.Logger.Error("Failed to insert parent event: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to insert parent event" }`, http.StatusInternalServerError)
+			return
+		}
+
+		// Create recurring instances
+		instances := generateEventInstances(&event, req.Recurrence)
+		for _, instance := range instances {
+			instance.ParentEventID = parentID
+			_, err := e.InsertEvent(context.Background(), instance)
+			if err != nil {
+				e.Logger.Error("Failed to insert child event: ", err.Error())
+				continue
+			}
+		}
 
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, id.Hex())))
+		rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, parentID.Hex())))
 	}
 }
 
@@ -381,82 +385,49 @@ Update Event (UPDATE)
 */
 func (e *Service) UpdateAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// grab event id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
-			http.Error(rw, `{ "msg": "no event Id found in request." }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "no event id found in request." }`, http.StatusInternalServerError)
 			return
 		}
 
-		// decode request
+		updateAll := r.URL.Query().Get("updateAll") == "true"
 		var req models.EventDao
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			http.Error(rw, `{ "msg": "failed to decode user" }`, http.StatusBadRequest)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
 
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		changes := bson.M{}
-		updates := bson.M{"$set": changes}
-
-		if req.Title != nil {
-			changes["title"] = req.Title
-		}
-		if req.Body != nil {
-			changes["body"] = req.Body
-		}
-		if req.ImageURL != nil {
-			changes["image_url"] = req.ImageURL
-		}
-		if req.StartTime != nil {
-			changes["start_time"] = req.StartTime
-		}
-		if req.Visibility != nil {
-			changes["visibility"] = req.Visibility
-		}
-
-		if req.MinParticipants != nil {
-			changes["min_participants"] = req.MinParticipants
-		}
-
-		if req.MaxParticipants != nil {
-			changes["max_participants"] = req.MaxParticipants
-		}
-
-		if req.Level != nil {
-			changes["level"] = req.Level
-		}
-
-		if req.ExternalLink != nil {
-			changes["external_link"] = req.ExternalLink
-		}
-
-		if req.StopTime == nil {
-			updates["$unset"] = bson.M{"stop_time": 1}
-		} else {
-			changes["stop_time"] = req.StopTime
-		}
-
-		err = e.UpdateEvent(context.Background(), filter, updates)
-		if err != nil {
-			e.Logger.Error("failed to find event", err.Error())
-			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
-			return
-		}
-
-		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
+		currentEvent, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
 		if err != nil {
 			e.Logger.Error("failed to find event", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 			return
 		}
 
-		json.NewEncoder(rw).Encode(event)
-		rw.WriteHeader(http.StatusOK)
+		changes := buildUpdateChanges(&req)
+		currentTime := time.Now().Unix()
+
+		if updateAll && currentEvent.IsRecurring != nil && *currentEvent.IsRecurring {
+			// Update all future instances
+			filter := buildRecurringUpdateFilter(oid, currentEvent, currentTime)
+			err = e.UpdateEvents(context.Background(), filter, changes)
+		} else {
+			// Update single instance
+			filter := bson.M{"_id": oid}
+			err = e.UpdateEvent(context.Background(), filter, changes)
+		}
+
+		if err != nil {
+			e.Logger.Error("failed to update event(s)", err.Error())
+			http.Error(rw, `{ "msg": "failed to update event(s)" }`, http.StatusInternalServerError)
+			return
+		}
+
+		updatedEvent, _ := e.FindEvent(context.Background(), bson.M{"_id": oid})
+		json.NewEncoder(rw).Encode(updatedEvent)
 	}
 }
 
@@ -468,7 +439,6 @@ Delete Event Data (Delete)
 */
 func (e *Service) DeleteAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// grab id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
@@ -476,16 +446,59 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 			return
 		}
 
+		deleteAll := r.URL.Query().Get("deleteAll") == "true"
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		err := e.DeleteEvent(context.Background(), filter)
+
+		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
 		if err != nil {
-			e.Logger.Error("failed to delete event", err.Error())
-			http.Error(rw, `{ "msg": "failed to delete event" }`, http.StatusInternalServerError)
+			e.Logger.Error("failed to find event", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+			return
 		}
 
-		// delete notification topic
-		utils.DeleteNotificationTopic(id)
+		if deleteAll && event.IsRecurring != nil && *event.IsRecurring {
+			// Delete entire series
+			filter := bson.M{
+				"$or": []bson.M{
+					{"_id": oid},
+					{"parent_event_id": oid},
+					{"parent_event_id": event.ParentEventID},
+				},
+			}
+			err = e.DeleteEvents(context.Background(), filter)
+		} else {
+			// Delete single instance
+			filter := bson.M{"_id": oid}
+			err = e.DeleteEvent(context.Background(), filter)
+
+			// Track deletion in parent if this is part of a series
+			if event.ParentEventID != nil {
+				parentFilter := bson.M{"_id": event.ParentEventID}
+				update := bson.M{
+					"$addToSet": bson.M{
+						"deleted_instances": oid,
+					},
+				}
+				e.UpdateEvent(context.Background(), parentFilter, update)
+			}
+		}
+
+		if err != nil {
+			e.Logger.Error("failed to delete event(s)", err.Error())
+			http.Error(rw, `{ "msg": "failed to delete event(s)" }`, http.StatusInternalServerError)
+			return
+		}
+
+		// Cleanup notifications
+		if deleteAll {
+			if event.ParentEventID != nil {
+				utils.DeleteNotificationTopic(event.ParentEventID.Hex())
+			}
+			utils.DeleteNotificationTopic(id)
+		} else {
+			utils.DeleteNotificationTopic(id)
+		}
+
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
