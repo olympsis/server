@@ -461,13 +461,23 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		}
 
 		if deleteAll && event.IsRecurring != nil && *event.IsRecurring {
-			// Delete entire series
-			filter := bson.M{
-				"$or": []bson.M{
-					{"_id": oid},
-					{"parent_event_id": oid},
-					{"parent_event_id": event.ParentEventID},
-				},
+			var filter bson.M
+			if event.ParentEventID != nil {
+				// This is a child event, delete parent and all siblings
+				filter = bson.M{
+					"$or": []bson.M{
+						{"_id": event.ParentEventID},             // Parent
+						{"parent_event_id": event.ParentEventID}, // All children
+					},
+				}
+			} else {
+				// This is a parent event, delete it and all children
+				filter = bson.M{
+					"$or": []bson.M{
+						{"_id": oid},             // Parent
+						{"parent_event_id": oid}, // Children
+					},
+				}
 			}
 			err = e.DeleteEvents(context.Background(), filter)
 		} else {
