@@ -110,13 +110,17 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 
 		// Create recurring instances
 		instances := generateEventInstances(&event, req.Recurrence)
-		for _, instance := range instances {
-			instance.ParentEventID = parentID
-			_, err := e.InsertEvent(context.Background(), instance)
-			if err != nil {
-				e.Logger.Error("Failed to insert child event: ", err.Error())
-				continue
-			}
+		documents := make([]interface{}, len(instances))
+		for i, instance := range instances {
+			documents[i] = instance
+		}
+
+		// Do bulk insert
+		_, err = e.Database.EventCol.InsertMany(context.Background(), documents)
+		if err != nil {
+			e.Logger.Error("Failed to insert recurring events: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to insert recurring events" }`, http.StatusInternalServerError)
+			return
 		}
 
 		rw.WriteHeader(http.StatusCreated)
