@@ -116,7 +116,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		}
 
 		// Create recurring instances with batch processing
-		instances := generateEventInstancesBatched(&event, req.Recurrence)
+		instances := generateEventInstancesBatched(parentID, &event, req.Recurrence)
 
 		// Process instances in batches of 100
 		batchSize := 100

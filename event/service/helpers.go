@@ -79,7 +79,7 @@ func buildRecurringUpdateFilter(id primitive.ObjectID, event *models.EventDao, c
 }
 
 // Helper function to generate recurring event instances
-func generateEventInstancesBatched(baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []*models.EventDao {
+func generateEventInstancesBatched(baseEventID *primitive.ObjectID, baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []*models.EventDao {
 	var instances []*models.EventDao
 	currentStartTime := *baseEvent.StartTime
 
@@ -98,6 +98,7 @@ func generateEventInstancesBatched(baseEvent *models.EventDao, recurrence *model
 		if currentStartTime != *baseEvent.StartTime {
 			instance := *baseEvent
 			instance.StartTime = &currentStartTime
+			instance.ParentEventID = baseEventID
 
 			// Calculate the new stop time by adding the original duration
 			if baseEvent.StopTime != nil {
