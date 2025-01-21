@@ -46,22 +46,19 @@ Create Event Data (POST)
 // CreateEvent handles both single and recurring event creation
 func (e *Service) CreateEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		// Create a context with 25s timeout (leaving 5s buffer from the 30s server timeout)
+		ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+		defer cancel()
+
 		uuid := r.Header.Get("UUID")
 
-		// Decode request
+		// Decode request with a timeout
 		var req models.NewEventDao
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			e.Logger.Error("Failed to decode request: " + err.Error())
 			http.Error(rw, `{ "msg": "failed to decode event" }`, http.StatusBadRequest)
 			return
 		}
-
-		// // Validate the request
-		// if err := req.Validate(); err != nil {
-		//     e.Logger.Error("Invalid request: " + err.Error())
-		//     http.Error(rw, fmt.Sprintf(`{ "msg": "invalid request: %s" }`, err.Error()), http.StatusBadRequest)
-		//     return
-		// }
 
 		timestamp := time.Now().Unix()
 		isRecurring := req.Recurrence != nil
@@ -83,9 +80,14 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		event.Participants = &[]models.ParticipantDao{participant}
 
 		if !isRecurring {
-			// Handle single event creation
-			id, err := e.InsertEvent(context.Background(), &event)
+			// Handle single event creation with timeout context
+			id, err := e.InsertEvent(ctx, &event)
 			if err != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					e.Logger.Error("Timeout inserting event")
+					http.Error(rw, `{ "msg": "operation timed out" }`, http.StatusGatewayTimeout)
+					return
+				}
 				e.Logger.Error("Failed to insert event: ", err.Error())
 				http.Error(rw, `{ "msg": "failed to insert event" }`, http.StatusInternalServerError)
 				return
@@ -100,27 +102,48 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		event.RecurrenceRule = &req.Recurrence.Pattern
 		event.RecurrenceEnd = &req.Recurrence.EndTime
 
-		// Insert parent event
-		parentID, err := e.InsertEvent(context.Background(), &event)
+		// Insert parent event with timeout context
+		parentID, err := e.InsertEvent(ctx, &event)
 		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				e.Logger.Error("Timeout inserting parent event")
+				http.Error(rw, `{ "msg": "operation timed out" }`, http.StatusGatewayTimeout)
+				return
+			}
 			e.Logger.Error("Failed to insert parent event: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to insert parent event" }`, http.StatusInternalServerError)
 			return
 		}
 
-		// Create recurring instances
-		instances := generateEventInstances(&event, req.Recurrence)
-		documents := make([]interface{}, len(instances))
-		for i, instance := range instances {
-			documents[i] = instance
-		}
+		// Create recurring instances with batch processing
+		instances := generateEventInstancesBatched(&event, req.Recurrence)
 
-		// Do bulk insert
-		_, err = e.Database.EventCol.InsertMany(context.Background(), documents)
-		if err != nil {
-			e.Logger.Error("Failed to insert recurring events: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to insert recurring events" }`, http.StatusInternalServerError)
-			return
+		// Process instances in batches of 100
+		batchSize := 100
+		for i := 0; i < len(instances); i += batchSize {
+			end := i + batchSize
+			if end > len(instances) {
+				end = len(instances)
+			}
+
+			batch := instances[i:end]
+			documents := make([]interface{}, len(batch))
+			for j, instance := range batch {
+				documents[j] = instance
+			}
+
+			// Insert batch with timeout context
+			_, err = e.Database.EventCol.InsertMany(ctx, documents)
+			if err != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					e.Logger.Error("Timeout inserting recurring events batch")
+					http.Error(rw, `{ "msg": "operation timed out" }`, http.StatusGatewayTimeout)
+					return
+				}
+				e.Logger.Error("Failed to insert recurring events: ", err.Error())
+				http.Error(rw, `{ "msg": "failed to insert recurring events" }`, http.StatusInternalServerError)
+				return
+			}
 		}
 
 		rw.WriteHeader(http.StatusCreated)

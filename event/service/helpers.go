@@ -77,23 +77,26 @@ func buildRecurringUpdateFilter(id primitive.ObjectID, event *models.EventDao, c
 }
 
 // Helper function to generate recurring event instances
-func generateEventInstances(baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []*models.EventDao {
+func generateEventInstancesBatched(baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []*models.EventDao {
 	var instances []*models.EventDao
 	currentTime := *baseEvent.StartTime
 
-	for currentTime <= recurrence.EndTime {
-		// Skip the first occurrence as it's the parent event
+	// Add safety limit to prevent infinite loops
+	maxInstances := 365 // Maximum one year of daily events
+	instanceCount := 0
+
+	for currentTime <= recurrence.EndTime && instanceCount < maxInstances {
 		if currentTime != *baseEvent.StartTime {
 			instance := *baseEvent
 			instance.StartTime = &currentTime
 
-			// If StopTime exists, adjust it relative to new start time
 			if baseEvent.StopTime != nil {
 				newStopTime := *baseEvent.StopTime + (currentTime - *baseEvent.StartTime)
 				instance.StopTime = &newStopTime
 			}
 
 			instances = append(instances, &instance)
+			instanceCount++
 		}
 
 		// Calculate next occurrence based on pattern
@@ -103,7 +106,6 @@ func generateEventInstances(baseEvent *models.EventDao, recurrence *models.Recur
 		case "WEEKLY":
 			currentTime += int64(recurrence.Interval * 7 * 24 * 60 * 60)
 		case "MONTHLY":
-			// Approximate month as 30 days
 			currentTime += int64(recurrence.Interval * 30 * 24 * 60 * 60)
 		}
 	}
