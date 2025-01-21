@@ -96,8 +96,13 @@ func generateEventInstancesBatched(baseEventID *primitive.ObjectID, baseEvent *m
 	for currentStartTime <= recurrence.EndTime && instanceCount < maxInstances {
 		// Skip the first occurrence as it's the parent event
 		if currentStartTime != *baseEvent.StartTime {
-			instance := *baseEvent
-			instance.StartTime = &currentStartTime
+			// Create a copy of the base event
+			instance := &models.EventDao{} // Create new instance
+			*instance = *baseEvent         // Copy all fields
+
+			// Create new time value for this instance
+			startTimeCopy := currentStartTime
+			instance.StartTime = &startTimeCopy
 			instance.ParentEventID = baseEventID
 
 			// Calculate the new stop time by adding the original duration
@@ -106,7 +111,7 @@ func generateEventInstancesBatched(baseEventID *primitive.ObjectID, baseEvent *m
 				instance.StopTime = &newStopTime
 			}
 
-			instances = append(instances, &instance)
+			instances = append(instances, instance)
 			instanceCount++
 		}
 
