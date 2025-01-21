@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -79,19 +81,27 @@ func buildRecurringUpdateFilter(id primitive.ObjectID, event *models.EventDao, c
 // Helper function to generate recurring event instances
 func generateEventInstancesBatched(baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []*models.EventDao {
 	var instances []*models.EventDao
-	currentTime := *baseEvent.StartTime
+	currentStartTime := *baseEvent.StartTime
+
+	// Calculate the original duration between start and stop time
+	var eventDuration int64
+	if baseEvent.StopTime != nil {
+		eventDuration = *baseEvent.StopTime - *baseEvent.StartTime
+	}
 
 	// Add safety limit to prevent infinite loops
 	maxInstances := 365 // Maximum one year of daily events
 	instanceCount := 0
 
-	for currentTime <= recurrence.EndTime && instanceCount < maxInstances {
-		if currentTime != *baseEvent.StartTime {
+	for currentStartTime <= recurrence.EndTime && instanceCount < maxInstances {
+		// Skip the first occurrence as it's the parent event
+		if currentStartTime != *baseEvent.StartTime {
 			instance := *baseEvent
-			instance.StartTime = &currentTime
+			instance.StartTime = &currentStartTime
 
+			// Calculate the new stop time by adding the original duration
 			if baseEvent.StopTime != nil {
-				newStopTime := *baseEvent.StopTime + (currentTime - *baseEvent.StartTime)
+				newStopTime := currentStartTime + eventDuration
 				instance.StopTime = &newStopTime
 			}
 
@@ -102,11 +112,26 @@ func generateEventInstancesBatched(baseEvent *models.EventDao, recurrence *model
 		// Calculate next occurrence based on pattern
 		switch *baseEvent.RecurrenceRule {
 		case "DAILY":
-			currentTime += int64(recurrence.Interval * 24 * 60 * 60)
+			// Convert to Time object for more accurate day calculations
+			currentTime := time.Unix(currentStartTime, 0)
+			// Add the specified number of days
+			newTime := currentTime.AddDate(0, 0, recurrence.Interval)
+			// Convert back to Unix timestamp
+			currentStartTime = newTime.Unix()
 		case "WEEKLY":
-			currentTime += int64(recurrence.Interval * 7 * 24 * 60 * 60)
+			// Convert to Time object for more accurate week calculations
+			currentTime := time.Unix(currentStartTime, 0)
+			// Add the specified number of weeks (7 days per week)
+			newTime := currentTime.AddDate(0, 0, 7*recurrence.Interval)
+			// Convert back to Unix timestamp
+			currentStartTime = newTime.Unix()
 		case "MONTHLY":
-			currentTime += int64(recurrence.Interval * 30 * 24 * 60 * 60)
+			// Get the current time as a Time object for more accurate month calculations
+			currentTime := time.Unix(currentStartTime, 0)
+			// Add the specified number of months
+			newTime := currentTime.AddDate(0, recurrence.Interval, 0)
+			// Convert back to Unix timestamp
+			currentStartTime = newTime.Unix()
 		}
 	}
 

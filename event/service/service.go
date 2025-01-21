@@ -466,6 +466,7 @@ Delete Event Data (Delete)
 */
 func (e *Service) DeleteAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
@@ -476,68 +477,121 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		deleteAll := r.URL.Query().Get("deleteAll") == "true"
 		oid, _ := primitive.ObjectIDFromHex(id)
 
-		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
+		// First, log what we're trying to delete
+		e.Logger.Infof("Attempting to delete event %s, deleteAll=%v", id, deleteAll)
+
+		// Find the event we're trying to delete
+		event, err := e.FindEvent(ctx, bson.M{"_id": oid})
 		if err != nil {
 			e.Logger.Error("failed to find event", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
 			return
 		}
 
+		// Log event details
+		e.Logger.Infof("Found event: ID=%s, IsRecurring=%v, ParentEventID=%v",
+			id,
+			event.IsRecurring != nil && *event.IsRecurring,
+			event.ParentEventID)
+
 		if deleteAll && event.IsRecurring != nil && *event.IsRecurring {
 			var filter bson.M
 			if event.ParentEventID != nil {
 				// This is a child event, delete parent and all siblings
+				parentID := event.ParentEventID
+				e.Logger.Infof("Deleting child event and siblings. ParentID=%s", parentID.Hex())
+
 				filter = bson.M{
 					"$or": []bson.M{
-						{"_id": event.ParentEventID},             // Parent
-						{"parent_event_id": event.ParentEventID}, // All children
+						{"_id": parentID},
+						{"parent_event_id": parentID},
 					},
 				}
+
+				// Log how many events we expect to delete
+				count, _ := e.Database.EventCol.CountDocuments(ctx, filter)
+				e.Logger.Infof("Expected to delete %d events for parent %s", count, parentID.Hex())
 			} else {
 				// This is a parent event, delete it and all children
+				e.Logger.Infof("Deleting parent event and all children. ParentID=%s", id)
+
 				filter = bson.M{
 					"$or": []bson.M{
-						{"_id": oid},             // Parent
-						{"parent_event_id": oid}, // Children
+						{"_id": oid},
+						{"parent_event_id": oid},
 					},
 				}
+
+				// Log how many events we expect to delete
+				count, _ := e.Database.EventCol.CountDocuments(ctx, filter)
+				e.Logger.Infof("Expected to delete %d events with parent %s", count, id)
 			}
-			err = e.DeleteEvents(context.Background(), filter)
+
+			// Execute deletion
+			result, err := e.Database.EventCol.DeleteMany(ctx, filter)
+			if err != nil {
+				e.Logger.Error("failed to delete events", err.Error())
+				http.Error(rw, `{ "msg": "failed to delete events" }`, http.StatusInternalServerError)
+				return
+			}
+
+			// Log deletion result
+			e.Logger.Infof("Actually deleted %d documents", result.DeletedCount)
+
+			if result.DeletedCount == 0 {
+				e.Logger.Warn("No documents were deleted with filter:", filter)
+			}
+
 		} else {
 			// Delete single instance
+			e.Logger.Info("Deleting single event instance")
+
 			filter := bson.M{"_id": oid}
-			err = e.DeleteEvent(context.Background(), filter)
+			result, err := e.Database.EventCol.DeleteOne(ctx, filter)
+			if err != nil {
+				e.Logger.Error("failed to delete event", err.Error())
+				http.Error(rw, `{ "msg": "failed to delete event" }`, http.StatusInternalServerError)
+				return
+			}
+
+			e.Logger.Infof("Deleted %d document", result.DeletedCount)
 
 			// Track deletion in parent if this is part of a series
 			if event.ParentEventID != nil {
+				e.Logger.Info("Updating parent event with deleted instance")
+
 				parentFilter := bson.M{"_id": event.ParentEventID}
 				update := bson.M{
 					"$addToSet": bson.M{
 						"deleted_instances": oid,
 					},
 				}
-				e.UpdateEvent(context.Background(), parentFilter, update)
-			}
-		}
 
-		if err != nil {
-			e.Logger.Error("failed to delete event(s)", err.Error())
-			http.Error(rw, `{ "msg": "failed to delete event(s)" }`, http.StatusInternalServerError)
-			return
+				updateResult, err := e.Database.EventCol.UpdateOne(ctx, parentFilter, update)
+				if err != nil {
+					e.Logger.Error("failed to update parent event", err.Error())
+				} else {
+					e.Logger.Infof("Updated %d parent document", updateResult.ModifiedCount)
+				}
+			}
 		}
 
 		// Cleanup notifications
 		if deleteAll {
 			if event.ParentEventID != nil {
+				e.Logger.Info("Deleting parent notification topic:", event.ParentEventID.Hex())
 				utils.DeleteNotificationTopic(event.ParentEventID.Hex())
 			}
+			e.Logger.Info("Deleting event notification topic:", id)
 			utils.DeleteNotificationTopic(id)
 		} else {
+			e.Logger.Info("Deleting single event notification topic:", id)
 			utils.DeleteNotificationTopic(id)
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "OK" }`))
+		response := map[string]string{"msg": "OK"}
+		json.NewEncoder(rw).Encode(response)
 	}
 }
 
