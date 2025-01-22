@@ -499,7 +499,7 @@ func (p *Service) AddLike() http.HandlerFunc {
 			return
 		} else if resp.ModifiedCount != 1 { // the like already exits
 			rw.WriteHeader(http.StatusOK)
-			return
+			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
 		} else { // newly created like
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
@@ -550,6 +550,7 @@ func (p *Service) RemoveLike() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -656,6 +657,8 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
+
 	}
 }
 
