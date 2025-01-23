@@ -446,6 +446,7 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
