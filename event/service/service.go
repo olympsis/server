@@ -352,7 +352,12 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 			return
 		}
 		if len(*events) == 0 { // no content error
-			http.Error(rw, `{ "msg": "no events found" }`, http.StatusNoContent)
+			rw.WriteHeader(http.StatusNoContent)
+			resp := models.EventsResponse{
+				TotalEvents: 0,
+				Events:      []models.Event{},
+			}
+			json.NewEncoder(rw).Encode(resp)
 			return
 		}
 
