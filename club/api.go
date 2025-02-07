@@ -151,7 +151,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// leave club
 	s.Router.Handle("/v1/clubs/{id}/members",
