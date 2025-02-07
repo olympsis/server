@@ -296,6 +296,7 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -362,6 +363,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -632,8 +634,9 @@ func (c *Service) KickMember() http.HandlerFunc {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
+		rw.Header().Set("Content-Type", "application/json")
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -711,7 +714,7 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`OK`))
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -739,6 +742,7 @@ func (s *Service) PinClubPost() http.HandlerFunc {
 		ok := s.PinPost(&id, &postID)
 		if ok {
 			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"msg": "OK"}`))
 			return
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -762,6 +766,7 @@ func (s *Service) UnpinClubPost() http.HandlerFunc {
 		ok := s.UnpinPost(&id)
 		if ok {
 			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"msg": "OK"}`))
 			return
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
