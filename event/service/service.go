@@ -720,18 +720,40 @@ Remove Participant (DELETE)
 */
 func (e *Service) RemoveParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
 		uuid := r.Header.Get("UUID")
+		var participantToRemove string
 
-		// grab id from path
+		// grab ids from path
 		vars := mux.Vars(r)
-		id := vars["id"]
-		if len(id) < 24 {
+		eventID := vars["id"]
+		if len(eventID) < 24 {
 			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
+		// Check if a specific participant ID was provided
+		if participantID, exists := vars["participantID"]; exists && participantID != "" {
+			// Verify that the requestor is the event organizer
+			oid, _ := primitive.ObjectIDFromHex(eventID)
+			event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
+			if err != nil {
+				e.Logger.Error("failed to fetch event: ", err.Error())
+				http.Error(rw, `{ "msg": "failed to fetch event" }`, http.StatusInternalServerError)
+				return
+			}
+
+			// Only event organizer can remove other participants
+			if *event.Poster != uuid {
+				http.Error(rw, `{ "msg": "unauthorized - only event organizer can remove other participants" }`, http.StatusUnauthorized)
+				return
+			}
+			participantToRemove = participantID
+		} else {
+			// If no participant ID provided, remove the current user
+			participantToRemove = uuid
+		}
+
+		oid, _ := primitive.ObjectIDFromHex(eventID)
 
 		// First, fetch the event to check the wait-list
 		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
@@ -744,7 +766,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		// First operation: Remove participant
 		err = e.UpdateEvent(context.Background(),
 			bson.M{"_id": oid},
-			bson.M{"$pull": bson.M{"participants": bson.M{"uuid": uuid}}},
+			bson.M{"$pull": bson.M{"participants": bson.M{"uuid": participantToRemove}}},
 		)
 		if err != nil {
 			e.Logger.Error("failed to remove participant: ", err.Error())
@@ -752,6 +774,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			return
 		}
 
+		// Handle wait-list if someone was successfully removed
 		if event.WaitList != nil && len(*event.WaitList) > 0 {
 			waitList := *event.WaitList
 			firstWaitListed := waitList[0]
@@ -777,18 +800,23 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 				http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
 				return
 			}
+
+			// Notify the promoted participant
+			if event.Title != nil {
+				notif := models.Notification{
+					Title: *event.Title,
+					Body:  "You've been promoted from the wait-list!",
+					Topic: *firstWaitListed.UUID,
+				}
+				utils.SendNotificationToTopic(&notif)
+			}
 		}
 
-		if err != nil {
-			e.Logger.Error("failed to update event: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to update event" }`, http.StatusInternalServerError)
-			return
-		}
+		// unsubscribe removed user from notifications
+		utils.RemoveTokenFromTopic(eventID, participantToRemove)
 
-		// unsubscribe user from notifications
-		utils.RemoveTokenFromTopic(id, uuid)
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "successful" }`))
+		rw.Write([]byte(`{ "msg": "participant successfully removed" }`))
 	}
 }
 
