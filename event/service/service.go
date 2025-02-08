@@ -721,7 +721,6 @@ Remove Participant (DELETE)
 func (e *Service) RemoveParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		uuid := r.Header.Get("UUID")
-		var participantToRemove string
 
 		// grab ids from path
 		vars := mux.Vars(r)
@@ -729,28 +728,6 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		if len(eventID) < 24 {
 			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
-		}
-
-		// Check if a specific participant ID was provided
-		if participantID, exists := vars["participantID"]; exists && participantID != "" {
-			// Verify that the requestor is the event organizer
-			oid, _ := primitive.ObjectIDFromHex(eventID)
-			event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
-			if err != nil {
-				e.Logger.Error("failed to fetch event: ", err.Error())
-				http.Error(rw, `{ "msg": "failed to fetch event" }`, http.StatusInternalServerError)
-				return
-			}
-
-			// Only event organizer can remove other participants
-			if *event.Poster != uuid {
-				http.Error(rw, `{ "msg": "unauthorized - only event organizer can remove other participants" }`, http.StatusUnauthorized)
-				return
-			}
-			participantToRemove = participantID
-		} else {
-			// If no participant ID provided, remove the current user
-			participantToRemove = uuid
 		}
 
 		oid, _ := primitive.ObjectIDFromHex(eventID)
@@ -763,10 +740,27 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			return
 		}
 
+		var pullQuery bson.M
+
+		// Check if a specific participant ID was provided
+		if participantID, exists := vars["participantID"]; exists && participantID != "" {
+			// Verify that the requestor is the event organizer
+			if *event.Poster != uuid {
+				http.Error(rw, `{ "msg": "unauthorized - only event organizer can remove other participants" }`, http.StatusUnauthorized)
+				return
+			}
+			// Remove by participant _id
+			participantOID, _ := primitive.ObjectIDFromHex(participantID)
+			pullQuery = bson.M{"$pull": bson.M{"participants": bson.M{"_id": participantOID}}}
+		} else {
+			// Remove by UUID (user removing themselves)
+			pullQuery = bson.M{"$pull": bson.M{"participants": bson.M{"uuid": uuid}}}
+		}
+
 		// First operation: Remove participant
 		err = e.UpdateEvent(context.Background(),
 			bson.M{"_id": oid},
-			bson.M{"$pull": bson.M{"participants": bson.M{"uuid": participantToRemove}}},
+			pullQuery,
 		)
 		if err != nil {
 			e.Logger.Error("failed to remove participant: ", err.Error())
@@ -813,7 +807,11 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// unsubscribe removed user from notifications
-		utils.RemoveTokenFromTopic(eventID, participantToRemove)
+		if participantID, exists := vars["participantID"]; exists && participantID != "" {
+			utils.RemoveTokenFromTopic(eventID, uuid)
+		} else {
+			utils.RemoveTokenFromTopic(eventID, uuid)
+		}
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "participant successfully removed" }`))
