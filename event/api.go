@@ -120,6 +120,16 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("POST", "OPTIONS")
 
 	// remove a participant
+	e.Router.Handle("/v1/events/{id}/participants",
+		middleware.Chain(
+			e.Service.RemoveParticipant(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("DELETE", "OPTIONS")
+
+	// remove a participant by ID
 	e.Router.Handle("/v1/events/{id}/participants/{participantID}",
 		middleware.Chain(
 			e.Service.RemoveParticipant(),
