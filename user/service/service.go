@@ -156,7 +156,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req models.User
+		var req models.UserDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			s.Log.Error(fmt.Sprintf("Failed to decode request: %s\n", err.Error()))
@@ -166,22 +166,22 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 
 		filter := bson.M{"uuid": uuid}
 		changes := bson.M{}
-		if req.UserName != "" {
+		if req.UserName != nil {
 			changes["username"] = req.UserName
 		}
-		if req.ImageURL != "" {
+		if req.ImageURL != nil {
 			changes["image_url"] = req.ImageURL
 		}
-		if req.Bio != "" {
+		if req.Bio != nil {
 			changes["bio"] = req.Bio
 		}
-		if len(req.Sports) > 0 {
+		if req.Sports != nil && len(*req.Sports) > 0 {
 			changes["sports"] = req.Sports
 		}
 		if req.DeviceTokens != nil {
 			changes["device_tokens"] = req.DeviceTokens
 		}
-		if req.Visibility != "" {
+		if req.Visibility != nil {
 			changes["visibility"] = req.Visibility
 		}
 		if req.AcceptedEULA != nil {
@@ -198,6 +198,12 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		}
 		if req.BlockedUsers != nil {
 			changes["blocked_users"] = req.BlockedUsers
+		}
+		if req.NotificationDevices != nil {
+			changes["notification_devices"] = req.NotificationDevices
+		}
+		if req.NotificationPreference != nil {
+			changes["notification_preference"] = req.NotificationPreference
 		}
 
 		update := bson.M{"$set": changes}
@@ -362,7 +368,9 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			data.Bio = meta.Bio
 			data.UUID = meta.UUID
 			data.Username = meta.UserName
-			data.ImageURL = meta.ImageURL
+			if meta.ImageURL != nil {
+				data.ImageURL = *meta.ImageURL
+			}
 			data.Visibility = meta.Visibility
 			data.DeviceTokens = meta.DeviceTokens
 
@@ -427,6 +435,11 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 			w.WriteHeader(http.StatusNotFound)
 		}
 
+		imageURL := ""
+		if user.ImageURL != nil {
+			imageURL = *user.ImageURL
+		}
+
 		// create user data object
 		userData := models.UserData{
 			UUID:         user.UUID,
@@ -434,12 +447,12 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 			Username:     user.UserName,
 			FirstName:    *auth.FirstName,
 			LastName:     *auth.LastName,
-			ImageURL:     user.ImageURL,
+			ImageURL:     imageURL,
 			Visibility:   user.Visibility,
 			DeviceTokens: user.DeviceTokens,
 		}
 
-		// if user visibility is public display this data if not then dont
+		// if user visibility is public display this data if not then don't
 		if user.Visibility == "public" {
 			userData.Clubs = user.Clubs
 			userData.Sports = user.Sports

@@ -49,6 +49,7 @@ ENV NOTIFY=true
 ENV NOTIF_URL=https://notifications-p3dy744wqq-uc.a.run.app
 
 ENV FIREBASE_CREDENTIALS_PATH=./files/firebase-credentials.json
+ENV MAPKIT_TOKEN=eyJraWQiOiIyWjdRWllUVUNVIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzM5ODQ1NjA1LCJleHAiOjE3NDA0NzAzOTl9.S5Q6n90TN_ImvJYSFi8UlxInw7gOfhlWkO-K_auxdZDx_ymNgcl5j2WnanDOaYQg674tlsnAa7t-tfs_knl7kQ
 
 EXPOSE 80
 

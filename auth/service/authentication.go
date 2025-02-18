@@ -96,8 +96,8 @@ func (a *Service) Register() http.HandlerFunc {
 			UUID:         token.UID,
 			UserName:     tempUsername,
 			Visibility:   visibility,
-			HasOnboarded: &hasOnboarded,
-			AcceptedEULA: &acceptedEULA,
+			HasOnboarded: hasOnboarded,
+			AcceptedEULA: acceptedEULA,
 		}
 
 		// Insert metadata into database

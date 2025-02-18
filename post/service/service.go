@@ -281,14 +281,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				}
 
 				// send notification to club members
-				note := models.Notification{
-					Title: *org.Name,
-					Body:  "New announcement!",
-					Topic: club.ID.Hex(),
-					Data:  post,
-				}
+				// note := models.Notification{
+				// 	Title: *org.Name,
+				// 	Body:  "New announcement!",
+				// 	Topic: club.ID.Hex(),
+				// 	Data:  post,
+				// }
 
-				utils.SendNotificationToTopic(&note)
+				// utils.SendNotificationToTopic(&note)
 			}
 
 		} else if *req.Type == "post" {
@@ -305,22 +305,22 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			}
 
 			// grab user info
-			user, err := p.SearchService.SearchUserByUUID(uuid)
-			if err != nil {
-				p.Logger.Error("failed to fetch user data: ", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
-				return
-			}
+			// user, err := p.SearchService.SearchUserByUUID(uuid)
+			// if err != nil {
+			// 	p.Logger.Error("failed to fetch user data: ", err.Error())
+			// 	rw.WriteHeader(http.StatusCreated)
+			// 	rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+			// 	return
+			// }
 
 			// send notification to club members
-			note := models.Notification{
-				Title: club.Name,
-				Body:  user.Username + " created a post!",
-				Topic: club.ID.Hex(),
-				Data:  post,
-			}
-			utils.SendNotificationToTopic(&note)
+			// note := models.Notification{
+			// 	Title: club.Name,
+			// 	Body:  user.Username + " created a post!",
+			// 	Topic: club.ID.Hex(),
+			// 	Data:  post,
+			// }
+			// utils.SendNotificationToTopic(&note)
 		}
 
 		rw.WriteHeader(http.StatusCreated)

@@ -2,6 +2,7 @@ package aggregations
 
 import (
 	"context"
+	"fmt"
 	"olympsis-server/database"
 	"time"
 
@@ -279,6 +280,11 @@ func AggregateEvents(
 			},
 		}
 	}
+
+	fmt.Print(sports)
+	fmt.Print(venues)
+	fmt.Print(clubs)
+	fmt.Print(orgs)
 
 	// venues & sports filter
 	filterPipeline := bson.M{
