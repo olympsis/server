@@ -164,6 +164,51 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			return
 		}
 
+		// Special handling for notification devices
+		if req.NotificationDevices != nil && len(*req.NotificationDevices) > 0 {
+			// First get the current user to access existing devices
+			filter := bson.M{"uuid": uuid}
+			var currentUser models.User
+			err = s.Database.UserCol.FindOne(context.Background(), filter).Decode(&currentUser)
+			if err != nil {
+				s.Log.Error(fmt.Sprintf("Failed to find user: %s\n", err.Error()))
+				http.Error(w, `{ "msg": "failed to find user" }`, http.StatusInternalServerError)
+				return
+			}
+
+			// Create map of incoming devices by ID for quick lookup
+			incomingDevices := make(map[string]models.NotificationDevice)
+			for _, device := range *req.NotificationDevices {
+				timestamp := time.Now().Unix()
+				device.UpdatedAt = &timestamp
+				incomingDevices[device.DeviceID] = device
+			}
+
+			// Update existing devices or add new ones
+			updatedDevices := []models.NotificationDevice{}
+			if currentUser.NotificationDevices != nil {
+				for _, existingDevice := range *currentUser.NotificationDevices {
+					if updatedDevice, exists := incomingDevices[existingDevice.DeviceID]; exists {
+						// Update existing device
+						updatedDevices = append(updatedDevices, updatedDevice)
+						// Remove from map to track which ones are processed
+						delete(incomingDevices, existingDevice.DeviceID)
+					} else {
+						// Keep unchanged device
+						updatedDevices = append(updatedDevices, existingDevice)
+					}
+				}
+			}
+
+			// Add any remaining new devices
+			for _, device := range incomingDevices {
+				updatedDevices = append(updatedDevices, device)
+			}
+
+			// Update the request with the merged devices
+			req.NotificationDevices = &updatedDevices
+		}
+
 		filter := bson.M{"uuid": uuid}
 		changes := bson.M{}
 		if req.UserName != nil {
