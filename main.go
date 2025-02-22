@@ -7,10 +7,12 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
+	"olympsis-server/health"
 	"olympsis-server/locales"
 	"olympsis-server/organization"
 	"olympsis-server/post"
 	"olympsis-server/report"
+	"olympsis-server/server"
 	"olympsis-server/user"
 	"olympsis-server/utils"
 	"olympsis-server/venue"
@@ -38,7 +40,7 @@ func main() {
 
 	// database
 	d := database.NewDatabase(l)
-	d.EstablishConnection()
+	d.EstablishConnection(&config)
 
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
@@ -55,15 +57,25 @@ func main() {
 	// search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
-	authAPI := auth.NewAuthAPI(l, r, d, client)
-	userAPI := user.NewUserAPI(l, r, d)
-	fieldAPI := venue.NewVenueAPI(l, r, d)
-	clubAPI := club.NewClubAPI(l, r, d, sh)
-	postAPI := post.NewPostAPI(l, r, d, sh)
-	eventAPI := event.NewEventAPI(l, r, d)
-	organizationAPI := organization.NewOrganizationAPI(l, r, d, sh)
-	reportAPI := report.NewReportAPI(l, r, d)
-	localeAPI := locales.NewLocaleAPI(l, r, d)
+	// Pass references to apis
+	serverInterface := &server.ServerInterface{
+		Logger:   l,
+		Router:   r,
+		Database: d,
+
+		Auth:   client,
+		Search: sh,
+	}
+
+	authAPI := auth.NewAuthAPI(serverInterface)
+	userAPI := user.NewUserAPI(serverInterface)
+	fieldAPI := venue.NewVenueAPI(serverInterface)
+	clubAPI := club.NewClubAPI(serverInterface)
+	postAPI := post.NewPostAPI(serverInterface)
+	eventAPI := event.NewEventAPI(serverInterface)
+	orgAPI := organization.NewOrganizationAPI(serverInterface)
+	reportAPI := report.NewReportAPI(serverInterface)
+	localeAPI := locales.NewLocaleAPI(serverInterface)
 
 	authAPI.Ready(client)
 	userAPI.Ready(client)
@@ -71,14 +83,14 @@ func main() {
 	clubAPI.Ready(client)
 	postAPI.Ready(client)
 	eventAPI.Ready(client)
-	organizationAPI.Ready(client)
+	orgAPI.Ready(client)
 	reportAPI.Setup(client)
 	localeAPI.Ready()
 
 	// Temp Health Check
 	r.Handle(
 		"/v1/health",
-		utils.HealthCheckHandler(),
+		health.HealthCheckHandler(),
 	).Methods("GET")
 
 	// server config

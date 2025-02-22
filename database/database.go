@@ -47,14 +47,13 @@ func NewDatabase(l *logrus.Logger) *Database {
 	return &Database{Logger: l}
 }
 
-func (d *Database) EstablishConnection() {
+func (d *Database) EstablishConnection(config *utils.ServerConfig) {
 
 	d.Logger.Info("Connecting to Database...")
 
 	/*
 		Connect to Mongo Database
 	*/
-	config := utils.GetServerConfig()
 	dbConfig := utils.GetDatabaseConfig()
 	collectionConfig := utils.GetCollectionsConfig()
 
@@ -87,11 +86,11 @@ func (d *Database) EstablishConnection() {
 		d.Client = client
 	}
 
-	d.LinkCollections(&dbConfig, &collectionConfig)
+	d.SetUpCollections(&dbConfig, &collectionConfig)
 	d.Logger.Info("Database connection successful")
 }
 
-func (d *Database) LinkCollections(config *utils.DatabaseConfig, collectionConfig *utils.CollectionsConfig) {
+func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConfig *utils.CollectionsConfig) {
 	database := d.Client.Database(config.Name)
 
 	d.AuthCol = database.Collection(collectionConfig.AuthCollection)

@@ -310,9 +310,3 @@ func RemoveTokenFromTopic(topic string, user string) error {
 
 	return nil
 }
-
-func HealthCheckHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Health Check: Service is Healthy!")
-	}
-}

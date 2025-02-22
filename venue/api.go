@@ -1,8 +1,8 @@
 package venue
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/middleware"
+	"olympsis-server/server"
 	"olympsis-server/venue/service"
 
 	"github.com/gorilla/mux"
@@ -15,8 +15,12 @@ type VenueAPI struct {
 	Service *service.Service
 }
 
-func NewVenueAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *VenueAPI {
-	return &VenueAPI{Logger: l, Router: r, Service: service.NewFieldService(l, r, d)}
+func NewVenueAPI(i *server.ServerInterface) *VenueAPI {
+	return &VenueAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewFieldService(i.Logger, i.Router, i.Database),
+	}
 }
 
 func (s *VenueAPI) Ready() {

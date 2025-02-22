@@ -1,13 +1,12 @@
 package organization
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/middleware"
 	"olympsis-server/organization/service"
+	"olympsis-server/server"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,12 @@ type OrganizationAPI struct {
 	Service *service.Service
 }
 
-func NewOrganizationAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *OrganizationAPI {
-	return &OrganizationAPI{Logger: l, Router: r, Service: service.NewOrganizationService(l, r, d, sh)}
+func NewOrganizationAPI(i *server.ServerInterface) *OrganizationAPI {
+	return &OrganizationAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewOrganizationService(i.Logger, i.Router, i.Database, i.Search),
+	}
 }
 
 func (e *OrganizationAPI) Ready(firebase *auth.Client) {

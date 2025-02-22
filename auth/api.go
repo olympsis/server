@@ -2,8 +2,8 @@ package auth
 
 import (
 	"olympsis-server/auth/service"
-	"olympsis-server/database"
 	"olympsis-server/middleware"
+	"olympsis-server/server"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -16,8 +16,8 @@ type AuthAPI struct {
 	Service *service.Service
 }
 
-func NewAuthAPI(l *logrus.Logger, r *mux.Router, d *database.Database, c *auth.Client) *AuthAPI {
-	return &AuthAPI{Logger: l, Router: r, Service: service.NewAuthService(l, r, d, c)}
+func NewAuthAPI(i *server.ServerInterface) *AuthAPI {
+	return &AuthAPI{Logger: i.Logger, Router: i.Router, Service: service.NewAuthService(i.Logger, i.Router, i.Database, i.Auth)}
 }
 
 func (s *AuthAPI) Ready(firebase *auth.Client) {

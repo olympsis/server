@@ -1,8 +1,8 @@
 package user
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/middleware"
+	"olympsis-server/server"
 	"olympsis-server/user/service"
 
 	"firebase.google.com/go/auth"
@@ -16,16 +16,15 @@ type UserAPI struct {
 	Service *service.Service
 }
 
-func NewUserAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *UserAPI {
-	return &UserAPI{Logger: l, Router: r, Service: service.NewUserService(l, r, d)}
+func NewUserAPI(i *server.ServerInterface) *UserAPI {
+	return &UserAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewUserService(i.Logger, i.Router, i.Database),
+	}
 }
 
 func (u *UserAPI) Ready(firebase *auth.Client) {
-
-	/*
-		ROUTES
-	*/
-
 	// search username availability
 	u.Router.Handle("/v1/users/check-in",
 		middleware.Chain(

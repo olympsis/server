@@ -1,9 +1,9 @@
 package event
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/event/service"
 	"olympsis-server/middleware"
+	"olympsis-server/server"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -16,8 +16,12 @@ type EventAPI struct {
 	Service *service.Service // service for handing requests to
 }
 
-func NewEventAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *EventAPI {
-	return &EventAPI{Logger: l, Router: r, Service: service.NewEventService(l, r, d)}
+func NewEventAPI(i *server.ServerInterface) *EventAPI {
+	return &EventAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewEventService(i.Logger, i.Router, i.Database),
+	}
 }
 
 func (e *EventAPI) Ready(firebase *auth.Client) {

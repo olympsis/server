@@ -2,12 +2,11 @@ package club
 
 import (
 	"olympsis-server/club/service"
-	"olympsis-server/database"
 	"olympsis-server/middleware"
+	"olympsis-server/server"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,12 @@ type ClubAPI struct {
 	Service *service.Service
 }
 
-func NewClubAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *ClubAPI {
-	return &ClubAPI{Logger: l, Router: r, Service: service.NewClubService(l, r, d, sh)}
+func NewClubAPI(i *server.ServerInterface) *ClubAPI {
+	return &ClubAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewClubService(i.Logger, i.Router, i.Database, i.Search),
+	}
 }
 
 func (s *ClubAPI) Ready(firebase *auth.Client) {

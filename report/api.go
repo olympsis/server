@@ -1,9 +1,9 @@
 package report
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/middleware"
 	"olympsis-server/report/service"
+	"olympsis-server/server"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -16,11 +16,11 @@ type ReportAPI struct {
 	Service *service.Service // service for handing requests to
 }
 
-func NewReportAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *ReportAPI {
+func NewReportAPI(i *server.ServerInterface) *ReportAPI {
 	return &ReportAPI{
-		Logger:  l,
-		Router:  r,
-		Service: service.NewReportService(d, l, r),
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewReportService(i.Database, i.Logger, i.Router),
 	}
 }
 

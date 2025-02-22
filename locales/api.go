@@ -1,9 +1,9 @@
 package locales
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/locales/service"
 	"olympsis-server/middleware"
+	"olympsis-server/server"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -15,8 +15,12 @@ type LocaleAPI struct {
 	Service *service.Service
 }
 
-func NewLocaleAPI(l *logrus.Logger, r *mux.Router, d *database.Database) *LocaleAPI {
-	return &LocaleAPI{Logger: l, Router: r, Service: service.NewLocaleService(l, r, d)}
+func NewLocaleAPI(i *server.ServerInterface) *LocaleAPI {
+	return &LocaleAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewLocaleService(i.Logger, i.Router, i.Database),
+	}
 }
 
 func (e *LocaleAPI) Ready() {

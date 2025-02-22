@@ -1,13 +1,12 @@
 package post
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/middleware"
 	"olympsis-server/post/service"
+	"olympsis-server/server"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,12 @@ type PostAPI struct {
 	Service *service.Service
 }
 
-func NewPostAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *PostAPI {
-	return &PostAPI{Logger: l, Router: r, Service: service.NewPostService(l, r, d, sh)}
+func NewPostAPI(i *server.ServerInterface) *PostAPI {
+	return &PostAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewPostService(i.Logger, i.Router, i.Database, i.Search),
+	}
 }
 
 func (p *PostAPI) Ready(firebase *auth.Client) {
