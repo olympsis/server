@@ -76,6 +76,7 @@ func main() {
 	orgAPI := organization.NewOrganizationAPI(serverInterface)
 	reportAPI := report.NewReportAPI(serverInterface)
 	localeAPI := locales.NewLocaleAPI(serverInterface)
+	healthAPI := health.NewHealthAPI(serverInterface)
 
 	authAPI.Ready(client)
 	userAPI.Ready(client)
@@ -86,12 +87,7 @@ func main() {
 	orgAPI.Ready(client)
 	reportAPI.Setup(client)
 	localeAPI.Ready()
-
-	// Temp Health Check
-	r.Handle(
-		"/v1/health",
-		health.HealthCheckHandler(),
-	).Methods("GET")
+	healthAPI.Ready()
 
 	// server config
 	s := &http.Server{
