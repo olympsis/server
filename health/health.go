@@ -2,6 +2,7 @@ package health
 
 import (
 	"net/http"
+	"olympsis-server/middleware"
 	"olympsis-server/server"
 
 	"github.com/gorilla/mux"
@@ -23,13 +24,19 @@ func NewHealthAPI(i *server.ServerInterface) *HealthAPI {
 func (h *HealthAPI) Ready() {
 	h.Router.Handle(
 		"/v1/health",
-		HealthCheckHandler(),
-	)
+		middleware.Chain(
+			HealthCheckHandler(),
+			middleware.CORS(),
+		),
+	).Methods("GET OPTIONS")
 
 	h.Router.Handle(
 		"/v1/health/wsg",
-		HandleWhatsGood(),
-	)
+		middleware.Chain(
+			HandleWhatsGood(),
+			middleware.CORS(),
+		),
+	).Methods("GET OPTIONS")
 }
 
 func HealthCheckHandler() http.HandlerFunc {

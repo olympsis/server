@@ -30,6 +30,12 @@ func NewSnapshotService(l *logrus.Logger, r *mux.Router, d *database.Database) *
 func (s *Service) GetMapSnapShot() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		center := r.URL.Query().Get("longitude")
+		if center == "" {
+			http.Error(w, `{ "msg": "center query is required" }`, http.StatusBadRequest)
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
 	}
 }
