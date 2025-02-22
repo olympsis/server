@@ -2,3 +2,6 @@
 /tools/localhost.crt
 /tools/localhost.key
 /tools/olympsis-server.conf
+Dockerfile
+Dockerfile.dev
+Dockerfile.http.dev

@@ -14,6 +14,6 @@ type ServerInterface struct {
 	Router   *mux.Router
 	Database *database.Database
 
-	Auth   *auth.Client
-	Search *search.Service
+	Auth   *auth.Client    // firebase auth
+	Search *search.Service // search service
 }

@@ -9,4 +9,4 @@ WantedBy=multi-user.target
 Type=simple
 Restart=always
 ExecStart=/usr/sbin/olympsis-server
-EnvironmentFile=/etc/olympsis-server/olympsis-server.conf
+EnvironmentFile=/etc/olympsis/server.conf
