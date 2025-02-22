@@ -12,7 +12,7 @@ ENV PORT=443
 ENV HTTP=SECURE
 ENV MODE=DEVELOPMENT
 
-ENV DB_USR=server
+ENV DB_USER=server
 ENV DB_PASS=RvmeTaUvkGs7Vc8e
 ENV DB_NAME=olympsis
 ENV DB_ADDR=production.md0v8.mongodb.net
@@ -25,14 +25,14 @@ ENV EVENT_COL=events
 ENV VENUE_COL=venues
 ENV POST_COL=posts
 ENV CLUB_INVITE_COL=clubInvites
-ENV COMMENTS_COL=comments
+ENV COMMENT_COL=comments
 ENV FRIEND_REQUEST_COL=friendRequests
-ENV CLUB_APPLICATIONS_COL=clubApplications
-ENV ORG_APPLICATIONS_COL=organizationApplications
+ENV CLUB_APPLICATION_COL=clubApplications
+ENV ORG_APPLICATION_COL=organizationApplications
 
-ENV EVENT_INVITATIONS_COL=eventInvitations
-ENV CLUB_INVITATIONS_COL=clubInvitations
-ENV ORG_INVITATIONS_COL=organizationInvitations
+ENV EVENT_INVITATION_COL=eventInvitations
+ENV CLUB_INVITATION_COL=clubInvitations
+ENV ORG_INVITATION_COL=organizationInvitations
 
 ENV BUG_REPORT_COL=bugReports
 ENV POST_REPORT_COL=postReports
@@ -41,14 +41,16 @@ ENV EVENT_REPORT_COL=eventReports
 ENV MEMBER_REPORT_COL=memberReports
 
 ENV LOCALE_DB=locales
-ENV COUNTRIES_COL=countries
-ENV ADMIN_AREAS_COL=administrativeAreas
-ENV SUB_ADMIN_AREAS_COL=subAdministrativeAreas
+ENV COUNTRY_COL=countries
+ENV ADMIN_AREA_COL=administrativeAreas
+ENV SUB_ADMIN_AREA_COL=subAdministrativeAreas
 
 ENV NOTIFY=true
 ENV NOTIF_URL=https://notifications-p3dy744wqq-uc.a.run.app
 
-ENV FIREBASE_CREDENTIALS_PATH=./files/firebase-credentials.json
+ENV KEY_FILE_PATH=localhost.key
+ENV CERT_FILE_PATH=localhost.crt
+ENV FIREBASE_FILE_PATH=./files/firebase-credentials.json
 ENV MAPKIT_TOKEN=eyJraWQiOiIyWjdRWllUVUNVIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzM5ODQ1NjA1LCJleHAiOjE3NDA0NzAzOTl9.S5Q6n90TN_ImvJYSFi8UlxInw7gOfhlWkO-K_auxdZDx_ymNgcl5j2WnanDOaYQg674tlsnAa7t-tfs_knl7kQ
 
 EXPOSE 443

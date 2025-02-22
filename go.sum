@@ -115,8 +115,6 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/olympsis/models v0.0.0-20250219022016-3b1aad940729 h1:gEYiwCibGUkCMRjG/myaNrSOIc4wPOpAojsLp3YfN4s=
 github.com/olympsis/models v0.0.0-20250219022016-3b1aad940729/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
-github.com/olympsis/search v0.0.0-20250218234545-5cbb0993b9d9 h1:zDlMIztkuBnBIGmmPpAruuLCiccp+dTKVoTh/IoiVQs=
-github.com/olympsis/search v0.0.0-20250218234545-5cbb0993b9d9/go.mod h1:7KCYnm8goVDOCGKA9lzp29m2P3tcOil5jneSS4grXtQ=
 github.com/olympsis/search v0.0.0-20250219024747-aa9b192b9182 h1:xoHik2Gmtvf3EK7SdrL7H30PH32DMqrrV/eKyiJ+ytM=
 github.com/olympsis/search v0.0.0-20250219024747-aa9b192b9182/go.mod h1:ozqUYBY+9GfDy/HeRJoduYEDPzhcot+BcfmcX7DxQiI=
 github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=

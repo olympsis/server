@@ -275,7 +275,7 @@ func (e *Service) GetEventsByLocation() http.HandlerFunc {
 
 			// fetch the nearby venues
 			ctx := r.Context()
-			cursor, err := e.Database.FieldCol.Find(ctx, filter)
+			cursor, err := e.Database.VenueCol.Find(ctx, filter)
 			if err != nil {
 				if err == mongo.ErrNoDocuments {
 					wgError = &err
@@ -978,7 +978,7 @@ func (e *Service) Location() http.HandlerFunc {
 
 			// fetch the nearby venues
 			ctx := r.Context()
-			cursor, err := e.Database.FieldCol.Find(ctx, filter)
+			cursor, err := e.Database.VenueCol.Find(ctx, filter)
 			if err != nil {
 				if err == mongo.ErrNoDocuments {
 					wgError = &err

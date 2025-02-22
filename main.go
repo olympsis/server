@@ -33,12 +33,14 @@ func main() {
 	// mux router
 	r := mux.NewRouter()
 
+	// Server configuration
+	config := utils.GetServerConfig()
+
 	// database
 	d := database.NewDatabase(l)
 	d.EstablishConnection()
 
-	path := os.Getenv("FIREBASE_CREDENTIALS_PATH")
-	opt := option.WithCredentialsFile(path)
+	opt := option.WithCredentialsFile(config.FirebaseFilePath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		l.Fatalf("error starting firebase app: %s\n", err)
@@ -79,21 +81,9 @@ func main() {
 		utils.HealthCheckHandler(),
 	).Methods("GET")
 
-	// Get the port from environment
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "80"
-	}
-
-	// Get the mode from environment
-	mode := os.Getenv("MODE")
-	if mode == "" {
-		mode = "DEVELOPMENT"
-	}
-
 	// server config
 	s := &http.Server{
-		Addr:         `:` + port,
+		Addr:         `:` + config.Port,
 		Handler:      r,
 		IdleTimeout:  60 * time.Second,
 		ReadTimeout:  30 * time.Second,
@@ -102,19 +92,21 @@ func main() {
 
 	// start server
 	go func() {
-		l.Info(`Starting olympsis server at...` + port)
-		var err error
+		l.Info(`Starting olympsis server at...` + config.Port)
 
-		httpMode := os.Getenv("HTTP")
-		if httpMode == "SECURE" {
-			err = s.ListenAndServeTLS("localhost.crt", "localhost.key")
-		} else {
-			err = s.ListenAndServe()
-		}
-
-		if err != nil {
-			l.Info("Error starting server: ", err)
-			os.Exit(1)
+		switch config.Http {
+		case "SECURE":
+			err := s.ListenAndServeTLS(config.CertFilePath, config.KeyFilePath)
+			if err != nil {
+				l.Info("Error starting server: ", err)
+				os.Exit(1)
+			}
+		default:
+			err := s.ListenAndServe()
+			if err != nil {
+				l.Info("Error starting server: ", err)
+				os.Exit(1)
+			}
 		}
 	}()
 
