@@ -27,7 +27,7 @@ func (h *HealthAPI) Ready() {
 	)
 
 	h.Router.Handle(
-		"/v1/wsg",
+		"/v1/health/wsg",
 		HandleWhatsGood(),
 	)
 }
