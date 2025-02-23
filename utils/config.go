@@ -32,6 +32,9 @@ func GetServerConfig() ServerConfig {
 
 	mapkit := os.Getenv("MAPKIT_TOKEN")
 
+	notif := os.Getenv("NOTIF_URL")
+	storage := os.Getenv("STORAGE_URL")
+
 	return ServerConfig{
 		Port:             port,
 		Mode:             mode,
@@ -39,6 +42,9 @@ func GetServerConfig() ServerConfig {
 		FirebaseFilePath: firebase,
 
 		MapKitToken: mapkit,
+
+		NotifServiceURL:   notif,
+		StorageServiceURL: storage,
 
 		KeyFilePath:  keyPath,
 		CertFilePath: certPath,

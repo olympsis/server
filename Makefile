@@ -32,6 +32,9 @@ build: dep ## Build the binary file
 run:
 	go run -x main.go
 
+docker-build:
+	docker build -f ./tools/Dockerfile.http.dev . -t $(SERVICE_NAME)-unsecure
+
 docker-hub: #Publish image to gcp docker-hub
 	docker build . -f ./tools/Dockerfile.dev -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
 	docker tag $(SERVICE_NAME) $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)

@@ -8,6 +8,9 @@ type ServerConfig struct {
 
 	MapKitToken string // Apple Mapkit token
 
+	NotifServiceURL   string
+	StorageServiceURL string
+
 	KeyFilePath  string // TLS key file
 	CertFilePath string // TLS cert file
 }
