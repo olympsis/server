@@ -73,11 +73,18 @@ func GetDatabaseConfig() DatabaseConfig {
 		panic("database password required in config")
 	}
 
+	localeDB := os.Getenv("COUNTRY_COL")
+	if localeDB == "" {
+		panic("locale database name required in config")
+	}
+
 	return DatabaseConfig{
 		Name:     name,
 		Address:  addr,
 		User:     user,
 		Password: pass,
+
+		LocaleName: localeDB,
 	}
 }
 
