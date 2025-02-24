@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -44,7 +45,8 @@ func (s *StorageInterface) GetMapSnapshot(token string, name string) ([]byte, er
 
 func (s *StorageInterface) GetMapKitSnapshot(token string, name string) ([]byte, error) {
 	// Craft http request
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s", name, s.MapKitToken), nil)
+	encodedLocation := url.QueryEscape(name)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s", encodedLocation, s.MapKitToken), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -64,16 +66,19 @@ func (s *StorageInterface) GetMapKitSnapshot(token string, name string) ([]byte,
 	if !strings.HasPrefix(contentType, "image/") {
 		// Read the body for error information
 		body, _ := io.ReadAll(resp.Body)
+		s.Logger.Errorf("URL Request: %s", req.URL)
 		return nil, fmt.Errorf("unexpected content type: %s, body: %s", contentType, string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		s.Logger.Errorf("URL Request: %s", req.URL)
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	// Read the image data from the response
 	imageData, err := io.ReadAll(resp.Body)
 	if err != nil {
+		s.Logger.Errorf("URL Request: %s", req.URL)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
