@@ -28,7 +28,7 @@ func (h *HealthAPI) Ready() {
 			HealthCheckHandler(),
 			middleware.CORS(),
 		),
-	).Methods("GET OPTIONS")
+	).Methods("GET", "OPTIONS")
 
 	h.Router.Handle(
 		"/v1/health/wsg",
@@ -36,7 +36,7 @@ func (h *HealthAPI) Ready() {
 			HandleWhatsGood(),
 			middleware.CORS(),
 		),
-	).Methods("GET OPTIONS")
+	).Methods("GET", "OPTIONS")
 }
 
 func HealthCheckHandler() http.HandlerFunc {
