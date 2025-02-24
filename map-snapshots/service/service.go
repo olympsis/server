@@ -46,6 +46,7 @@ func (s *Service) GetMapSnapShot() http.HandlerFunc {
 
 		data, err := s.StorageInterface.GetMapSnapshot(token, center)
 		if err != nil {
+			s.Logger.Errorf("Failed to get map snapshot. Error: %s", err.Error())
 			http.Error(w, `{ "msg": "failed to get map snapshot"} `, http.StatusInternalServerError)
 			return
 		}

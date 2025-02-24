@@ -24,7 +24,7 @@ func NewMapSnapshotAPI(i *server.ServerInterface, config *utils.ServerConfig) *M
 			i.Logger,
 			i.Router,
 			i.Database,
-			utils.NewStorageInterface(config.StorageServiceURL, config.MapKitToken),
+			utils.NewStorageInterface(config.StorageServiceURL, config.MapKitToken, i.Logger),
 		),
 	}
 }

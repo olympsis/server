@@ -4,24 +4,27 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 type StorageInterface struct {
 	ServiceURL string
 	Status     string
 	Client     http.Client
+	Logger     *logrus.Logger
 
 	MapKitToken string
 }
 
-func NewStorageInterface(u string, token string) *StorageInterface {
+func NewStorageInterface(u string, token string, logger *logrus.Logger) *StorageInterface {
 	return &StorageInterface{
 		ServiceURL:  u,
 		Status:      "good",
 		Client:      http.Client{},
+		Logger:      logger,
 		MapKitToken: token,
 	}
 }
@@ -77,7 +80,7 @@ func (s *StorageInterface) GetMapKitSnapshot(token string, name string) ([]byte,
 	// Start a goroutine to upload the image to storage
 	go func() {
 		if err := s.UploadMapKitSnapshotToStorage(token, name, imageData); err != nil {
-			log.Printf("Failed to upload image to storage: %v", err)
+			s.Logger.Errorf("Failed to upload image to storage: %v", err)
 		}
 	}()
 
