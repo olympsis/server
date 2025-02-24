@@ -65,40 +65,6 @@ func (n *NotificationInterface) SendNotification(authToken string, notification 
 	return nil
 }
 
-// This is the single, unified function for sending notifications
-// The backward compatibility functions have been removed
-
-// Create a new notification topic
-func (n *NotificationInterface) CreateNotificationTopic(name string) error {
-	topic := models.NotificationTopicDao{
-		Name: &name,
-	}
-	return n.CreateTopic("", topic)
-}
-
-// Delete a notification topic
-func (n *NotificationInterface) DeleteNotificationTopic(name string) error {
-	return n.DeleteTopic("", name)
-}
-
-// Add a user to a topic
-func (n *NotificationInterface) AddTokenToTopic(topic string, user string) error {
-	updateReq := models.NotificationTopicUpdateRequest{
-		Action: "add",
-		Users:  []string{user},
-	}
-	return n.ModifyTopic("", topic, updateReq)
-}
-
-// Remove a user from a topic
-func (n *NotificationInterface) RemoveTokenFromTopic(topic string, user string) error {
-	updateReq := models.NotificationTopicUpdateRequest{
-		Action: "remove",
-		Users:  []string{user},
-	}
-	return n.ModifyTopic("", topic, updateReq)
-}
-
 // Create a notification topic
 func (n *NotificationInterface) CreateTopic(authToken string, topic models.NotificationTopicDao) error {
 	// convert topic to json

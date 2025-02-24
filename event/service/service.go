@@ -589,21 +589,12 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		}
 
 		// Cleanup notifications
-		if deleteAll {
-			if event.ParentEventID != nil {
-				e.Logger.Info("Deleting parent notification topic:", event.ParentEventID.Hex())
-				e.Notification.DeleteNotificationTopic(event.ParentEventID.Hex())
-			}
-			e.Logger.Info("Deleting event notification topic:", id)
-			e.Notification.DeleteNotificationTopic(id)
-		} else {
-			e.Logger.Info("Deleting single event notification topic:", id)
-			e.Notification.DeleteNotificationTopic(id)
-		}
+		// TODO - CLEAN UP NOTIF OF REPEATED CHILD EVENTS
+		e.Logger.Info("Deleting single event notification topic:", id)
+		e.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
 
 		rw.WriteHeader(http.StatusOK)
-		response := map[string]string{"msg": "OK"}
-		json.NewEncoder(rw).Encode(response)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -816,11 +807,10 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// unsubscribe removed user from notifications
-		if participantID, exists := vars["participantID"]; exists && participantID != "" {
-			e.Notification.RemoveTokenFromTopic(eventID, uuid)
-		} else {
-			e.Notification.RemoveTokenFromTopic(eventID, uuid)
-		}
+		e.Notification.ModifyTopic(r.Header.Get("Authorization"), eventID, models.NotificationTopicUpdateRequest{
+			Action: "unsubscribe",
+			Users:  []string{uuid},
+		})
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "participant successfully removed" }`))

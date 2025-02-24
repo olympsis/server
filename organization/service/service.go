@@ -61,7 +61,6 @@ Create a new organization
 */
 func (e *Service) CreateOrganization() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
 		uuid := r.Header.Get("UUID")
 
 		// decode request
@@ -83,6 +82,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			JoinedAt: timeStamp,
 		}
 		members := []models.MemberDao{member}
+		verification := false
 
 		// new organization model
 		organization := models.OrganizationDao{
@@ -95,7 +95,8 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			Logo:        req.Logo,
 			Banner:      req.Banner,
 			Members:     &members,
-			IsVerified:  req.IsVerified,
+			BlackList:   req.BlackList,
+			IsVerified:  &verification,
 			CreatedAt:   &timeStamp,
 		}
 
@@ -118,21 +119,31 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			e.Logger.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
 		}
 
-		// subscribe to notifications
-		err = e.Notification.CreateNotificationTopic(id.Hex())
-		if err != nil {
-			e.Logger.Error("Failed to create topic: ", err.Error())
+		// create notification topics
+		topicName := id.Hex()
+		adminName := id.Hex() + "_admin"
+		orgTopic := models.NotificationTopicDao{
+			Name:  &topicName,
+			Users: &[]string{uuid},
 		}
-		err = e.Notification.AddTokenToTopic(id.Hex(), uuid)
-		if err != nil {
-			e.Logger.Error("Failed to add token to topic: ", err.Error())
+		adminTopic := models.NotificationTopicDao{
+			Name:  &adminName,
+			Users: &[]string{uuid},
 		}
 
-		resp := models.CreateResponse{ID: id.Hex()}
+		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), orgTopic)
+		if err != nil {
+			e.Logger.Error("Failed to create organization topic: ", err.Error())
+		}
 
-		// return created organization
+		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), adminTopic)
+		if err != nil {
+			e.Logger.Error("Failed to create organization admin topic: ", err.Error())
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(resp)
+		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s"}`, id.Hex())))
 	}
 }
 
@@ -801,10 +812,6 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		err = e.Notification.SendNotification(r.Header.Get("Authorization"), request)
 		if err != nil {
 			e.Logger.Error("Failed to send notification: " + err.Error())
-		}
-		err = e.Notification.AddTokenToTopic(req.SubjectID.Hex(), req.Recipient)
-		if err != nil {
-			e.Logger.Error("Failed to add token to topic: " + err.Error())
 		}
 		w.WriteHeader(http.StatusOK)
 	}

@@ -34,11 +34,11 @@ Create new Club service struct
 */
 func NewClubService(i *server.ServerInterface) *Service {
 	return &Service{
-		Logger:       i.Logger,
-		Router:       i.Router,
-		Database:     i.Database,
+		Logger:        i.Logger,
+		Router:        i.Router,
+		Database:      i.Database,
 		SearchService: i.Search,
-		Notification: i.Notification,
+		Notification:  i.Notification,
 	}
 }
 
@@ -203,32 +203,29 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		}
 
 		// create notification topics
-		clubTopic := id.Hex()
-		clubAdminTopic := id.Hex() + "_admin"
+		topicName := id.Hex()
+		adminName := id.Hex() + "_admin"
+		clubTopic := models.NotificationTopicDao{
+			Name:  &topicName,
+			Users: &[]string{uuid},
+		}
+		adminTopic := models.NotificationTopicDao{
+			Name:  &adminName,
+			Users: &[]string{uuid},
+		}
 
-		// create topics and subscribe owner to it
-		err = c.Notification.CreateNotificationTopic(clubTopic)
+		err = c.Notification.CreateTopic(r.Header.Get("Authorization"), clubTopic)
 		if err != nil {
 			c.Logger.Error("Failed to create club topic: ", err.Error())
 		}
 
-		err = c.Notification.CreateNotificationTopic(clubAdminTopic)
+		err = c.Notification.CreateTopic(r.Header.Get("Authorization"), adminTopic)
 		if err != nil {
 			c.Logger.Error("Failed to create club admin topic: ", err.Error())
 		}
 
-		err = c.Notification.AddTokenToTopic(clubTopic, uuid)
-		if err != nil {
-			c.Logger.Error("Failed to add token to club topic: ", err.Error())
-		}
-
-		err = c.Notification.AddTokenToTopic(clubAdminTopic, uuid)
-		if err != nil {
-			c.Logger.Error("Failed to add token club admin topic: ", err.Error())
-		}
-
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(models.CreateResponse{ID: id.Hex()})
+		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s"}`, id.Hex())))
 	}
 }
 
@@ -342,12 +339,12 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		clubTopic := id
 		clubAdminTopic := id + "_admin"
 
-		err = c.Notification.DeleteNotificationTopic(clubTopic)
+		err = c.Notification.DeleteTopic(r.Header.Get("Authorization"), clubTopic)
 		if err != nil {
 			c.Logger.Error("failed to delete topic", err.Error())
 		}
 
-		err = c.Notification.DeleteNotificationTopic(clubAdminTopic)
+		err = c.Notification.DeleteTopic(r.Header.Get("Authorization"), clubAdminTopic)
 		if err != nil {
 			c.Logger.Error("failed to delete topic", err.Error())
 		}
@@ -371,7 +368,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"msg": "OK"}`))
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -474,36 +471,42 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			c.Logger.Error("failed to get user data: " + err.Error())
 		}
 
-		// text := ""
-		// if req.Role == "owner" {
-		// 	text = "You've been promoted to Owner"
-		// } else if req.Role == "admin" {
-		// 	text = "You've been promoted to Admin"
-		// } else if req.Role == "moderator" {
-		// 	text = "You've been promoted to Moderator"
-		// } else {
-		// 	text = "You've been demoted"
-		// }
+		var noteText string
+		switch req.Role {
+		case "owner":
+			noteText = "You've been promoted to Owner"
+		case "admin":
+			noteText = "You've been promoted to Admin"
+		default:
+			noteText = "You've been demoted to Member"
+		}
 
 		// if user was member then add them to the admin topic
 		if members[index].Role == "member" {
-			err = c.Notification.AddTokenToTopic(id+"_admin", usr.UUID)
+			err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), id+"_admin", models.NotificationTopicUpdateRequest{
+				Action: "subscribe",
+				Users:  []string{usr.UUID},
+			})
 			if err != nil {
-				c.Logger.Error("failed to add token to topic: ", err.Error())
+				c.Logger.Error("failed to add user to topic: ", err.Error())
 			}
 		}
 
 		// notify user that they had their rank changed
-		// notification := models.Notification{
-		// 	Title: *club.Name,
-		// 	Body:  text,
-		// }
-
-		// for i := range *usr.DeviceTokens {
-		// 	tokens := *usr.DeviceTokens
-		// 	token := tokens[i]
-		// 	utils.SendNotificationToToken(token, &notification)
-		// }
+		note := models.PushNotification{
+			Title: *club.Name,
+			Body:  noteText,
+			Data: map[string]interface{}{
+				"club_id": club.ID.Hex(),
+			},
+		}
+		err = c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+			Users:        &[]string{usr.UUID},
+			Notification: note,
+		})
+		if err != nil {
+			c.Logger.Error("Failed to add user to admin topic")
+		}
 
 		// fetch updated club data
 		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
@@ -618,28 +621,33 @@ func (c *Service) KickMember() http.HandlerFunc {
 			return
 		}
 
-		// notify user then remove them from the topics
-		// notification := models.Notification{
-		// 	Title: *club.Name,
-		// 	Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
-		// }
+		// Notify the user that they have been kicked out of the club
+		note := models.PushNotification{
+			Title: *club.Name,
+			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
+		}
+		err = c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+			Users:        &[]string{usr.UUID},
+			Notification: note,
+		})
+		if err != nil {
+			c.Logger.Error("failed to send user a notification: ", err.Error())
+		}
 
-		// if usr.DeviceTokens != nil {
-		// 	for i := range *usr.DeviceTokens {
-		// 		tokens := *usr.DeviceTokens
-		// 		token := tokens[i]
-		// 		utils.SendNotificationToToken(token, &notification)
-		// 	}
-		// }
-
-		err = c.Notification.RemoveTokenFromTopic(id, usr.UUID)
+		clubTopic := club.ID.Hex()
+		adminTopic := club.ID.Hex() + "_admin"
+		req := models.NotificationTopicUpdateRequest{
+			Action: "unsubscribe",
+			Users:  []string{usr.UUID},
+		}
+		err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), clubTopic, req)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
-		err = c.Notification.RemoveTokenFromTopic(id+"_admin", usr.UUID)
+		err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), adminTopic, req)
 		if err != nil {
-			c.Logger.Error("failed to remove token from topic: ", err.Error())
+			c.Logger.Error("failed to remove token from admin topic: ", err.Error())
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -710,19 +718,25 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 		}
 
 		// remove from topics
-		err = c.Notification.RemoveTokenFromTopic(club.ID.Hex(), uuid)
+		topicName := club.ID.Hex()
+		adminName := club.ID.Hex() + "_admin"
+		request := models.NotificationTopicUpdateRequest{
+			Action: "unsubscribe",
+			Users:  []string{uuid},
+		}
+		err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), topicName, request)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
-		err = c.Notification.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
+		err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), adminName, request)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"msg": "OK"}`))
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
+	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -163,4 +164,25 @@ func CreateImageHash(input string) string {
 	h := sha256.New()
 	h.Write([]byte(input))
 	return hex.EncodeToString(h.Sum(nil)) + ".png"
+}
+
+func RemovePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Post {
+	var result []models.Post
+	if len(*posts) > 0 {
+		for _, post := range *posts {
+			found := false
+			for _, uuid := range uuids {
+				if post.Poster != nil {
+					if post.Poster.UUID == uuid {
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				result = append(result, post)
+			}
+		}
+	}
+	return &result
 }

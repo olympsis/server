@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/server"
+	"olympsis-server/utils"
 	"sync"
 	"time"
 
@@ -114,7 +115,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 
 		if user.BlockedUsers != nil {
 			blockedList := *user.BlockedUsers
-			_posts := removePostsByPosterUUIDs(posts, blockedList)
+			_posts := utils.RemovePostsByPosterUUIDs(posts, blockedList)
 
 			if _posts == nil || len(*_posts) == 0 {
 				http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
@@ -240,16 +241,33 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		// create post notif topic
-
-		err = p.Notification.CreateNotificationTopic(post.ID.Hex())
+		postID := post.ID.Hex()
+		topic := models.NotificationTopicDao{
+			Name:  &postID,
+			Users: &[]string{uuid},
+		}
+		err = p.Notification.CreateTopic(r.Header.Get("Authorization"), topic)
 		if err != nil {
 			p.Logger.Error("failed to create topic: " + err.Error())
 		}
 
-		if *req.Type == "announcement" {
+		var user models.UserData
+		var note models.PushNotification
 
-			// grab org data
+		// grab user info
+		user, err = p.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			p.Logger.Error("failed to fetch user data: ", err.Error())
+			rw.WriteHeader(http.StatusCreated)
+			rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+			return
+		}
+
+		switch *req.Type {
+		case "announcement":
+			var memberUUIDs []string
 			var org models.OrganizationDao
+
 			filter := bson.M{"_id": post.GroupID}
 			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
 			if err != nil {
@@ -258,13 +276,15 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				return
 			}
 
-			members := *org.Members
-
-			for i := 0; i < len(members); i++ {
-				err = p.Notification.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
-				if err != nil {
-					p.Logger.Error("failed to create topic: " + err.Error())
-				}
+			for _, v := range *org.Members {
+				memberUUIDs = append(memberUUIDs, v.UUID)
+			}
+			err := p.Notification.ModifyTopic(r.Header.Get("Authorization"), org.ID.Hex(), models.NotificationTopicUpdateRequest{
+				Action: "subscribe",
+				Users:  memberUUIDs,
+			})
+			if err != nil {
+				p.Logger.Error("Failed to add organization members to new announcement topic.")
 			}
 
 			// find child clubs
@@ -296,9 +316,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 					Notification: note,
 				})
 			}
-
-		} else if *req.Type == "post" {
-
+		default:
 			// grab club info
 			var club models.Club
 			filter := bson.M{"_id": post.GroupID}
@@ -307,27 +325,16 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				p.Logger.Error("failed to fetch club data: ", err.Error())
 				rw.WriteHeader(http.StatusCreated)
 				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
-				return
 			}
 
-			// grab user info
-			user, err := p.SearchService.SearchUserByUUID(uuid)
-			if err != nil {
-				p.Logger.Error("failed to fetch user data: ", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
-				return
-			}
-
-			// send notification to club members
-			note := models.PushNotification{
+			note = models.PushNotification{
 				Title: club.Name,
 				Body:  user.Username + " created a post!",
 				Data:  map[string]interface{}{"post_id": post.ID},
 			}
 
 			clubID := club.ID.Hex()
-			p.Notification.SendNotification("", models.NotificationPushRequest{
+			p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 				Topic:        &clubID,
 				Notification: note,
 			})
@@ -450,7 +457,7 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		// delete notif topic
-		err = p.Notification.DeleteNotificationTopic(id)
+		err = p.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
 		if err != nil {
 			p.Logger.Error("failed to delete topic: ", err.Error())
 		}
@@ -671,25 +678,4 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 		rw.Write([]byte(`{ "msg": "OK" }`))
 
 	}
-}
-
-func removePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Post {
-	var result []models.Post
-	if len(*posts) > 0 {
-		for _, post := range *posts {
-			found := false
-			for _, uuid := range uuids {
-				if post.Poster != nil {
-					if post.Poster.UUID == uuid {
-						found = true
-						break
-					}
-				}
-			}
-			if !found {
-				result = append(result, post)
-			}
-		}
-	}
-	return &result
 }
