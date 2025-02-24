@@ -53,6 +53,8 @@ func (s *StorageInterface) GetMapKitSnapshot(token string, name string) ([]byte,
 
 	// Add Accept header to explicitly request image data
 	req.Header.Set("Accept", "image/png")
+	req.Header.Set("Origin", "https://api.olympsis.com")
+	req.Header.Set("Referer", "https://api.olympsis.com")
 
 	// Make http request
 	resp, err := s.Client.Do(req)
