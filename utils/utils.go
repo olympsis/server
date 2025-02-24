@@ -159,8 +159,8 @@ func RemoveTokenFromTopic(topic string, user string) error {
 	return nil
 }
 
-func CreateHash(input string) string {
+func CreateImageHash(input string) string {
 	h := sha256.New()
 	h.Write([]byte(input))
-	return hex.EncodeToString(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil)) + ".png"
 }

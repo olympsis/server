@@ -34,7 +34,7 @@ func (s *StorageInterface) GetMapSnapshot(token string, name string) ([]byte, er
 	var image []byte
 
 	// Check storage for image
-	image, err := s.GetSnapshotFromStorage(CreateHash(name))
+	image, err := s.GetSnapshotFromStorage(CreateImageHash(name))
 	if err != nil {
 		// We assume we don't have it. Fetch image from mapkit
 		return s.GetMapKitSnapshot(token, name)
@@ -86,7 +86,7 @@ func (s *StorageInterface) GetMapKitSnapshot(token string, name string) ([]byte,
 
 	// Start a goroutine to upload the image to storage
 	go func() {
-		if err := s.UploadMapKitSnapshotToStorage(token, CreateHash(name), imageData); err != nil {
+		if err := s.UploadMapKitSnapshotToStorage(token, CreateImageHash(name), imageData); err != nil {
 			s.Logger.Errorf("Failed to upload image to storage: %v", err)
 		}
 	}()
