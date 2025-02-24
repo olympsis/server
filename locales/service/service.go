@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/server"
+	"olympsis-server/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -14,22 +16,29 @@ import (
 )
 
 /*
-Organization Service Struct
+Locale Service Struct
   - Database pointer
   - Logger pointer
   - Router pointer
+  - Notification interface
 */
 type Service struct {
-	Database *database.Database
-	Logger   *logrus.Logger
-	Router   *mux.Router
+	Database     *database.Database
+	Logger       *logrus.Logger
+	Router       *mux.Router
+	Notification *utils.NotificationInterface
 }
 
 /*
 Creates a new instance of the locale service
 */
-func NewLocaleService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Logger: l, Router: r, Database: d}
+func NewLocaleService(i *server.ServerInterface) *Service {
+	return &Service{
+		Logger:       i.Logger, 
+		Router:       i.Router, 
+		Database:     i.Database,
+		Notification: i.Notification,
+	}
 }
 
 func (s *Service) GetCountries() http.HandlerFunc {

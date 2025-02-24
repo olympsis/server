@@ -17,15 +17,20 @@ type MapSnapShotAPI struct {
 }
 
 func NewMapSnapshotAPI(i *server.ServerInterface, config *utils.ServerConfig) *MapSnapShotAPI {
+	// Create a service instance first
+	snapService := service.NewSnapService(i)
+	
+	// Set the storage interface
+	snapService.StorageInterface = utils.NewStorageInterface(
+		config.StorageServiceURL, 
+		config.MapKitToken, 
+		i.Logger,
+	)
+	
 	return &MapSnapShotAPI{
-		Logger: i.Logger,
-		Router: i.Router,
-		Service: service.NewSnapshotService(
-			i.Logger,
-			i.Router,
-			i.Database,
-			utils.NewStorageInterface(config.StorageServiceURL, config.MapKitToken, i.Logger),
-		),
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: snapService,
 	}
 }
 

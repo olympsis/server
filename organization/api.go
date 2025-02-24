@@ -20,7 +20,7 @@ func NewOrganizationAPI(i *server.ServerInterface) *OrganizationAPI {
 	return &OrganizationAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewOrganizationService(i.Logger, i.Router, i.Database, i.Search),
+		Service: service.NewOrgService(i),
 	}
 }
 

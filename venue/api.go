@@ -19,7 +19,7 @@ func NewVenueAPI(i *server.ServerInterface) *VenueAPI {
 	return &VenueAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewFieldService(i.Logger, i.Router, i.Database),
+		Service: service.NewVenueService(i),
 	}
 }
 

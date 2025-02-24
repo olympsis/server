@@ -37,8 +37,8 @@ Create new event service struct
 */
 func NewEventService(i *server.ServerInterface) *Service {
 	return &Service{
-		Logger:       i.Logger,
-		Router:       i.Router,
+		Logger:       i.Logger, 
+		Router:       i.Router, 
 		Database:     i.Database,
 		Notification: i.Notification,
 	}
@@ -592,13 +592,13 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		if deleteAll {
 			if event.ParentEventID != nil {
 				e.Logger.Info("Deleting parent notification topic:", event.ParentEventID.Hex())
-				e.Notification.DeleteNotificationTopic(event.ParentEventID.Hex())
+				utils.DeleteNotificationTopic(event.ParentEventID.Hex())
 			}
 			e.Logger.Info("Deleting event notification topic:", id)
-			e.Notification.DeleteNotificationTopic(id)
+			utils.DeleteNotificationTopic(id)
 		} else {
 			e.Logger.Info("Deleting single event notification topic:", id)
-			e.Notification.DeleteNotificationTopic(id)
+			utils.DeleteNotificationTopic(id)
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -708,10 +708,10 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		// 	Body:  "New Participant RSVP'd!",
 		// 	Topic: id,
 		// }
-		// e.Notification.SendNotification(&notif)
+		// utils.SendNotificationToTopic(&notif)
 
 		// subscribe user to notifications
-		// e.Notification.AddTokenToTopic(id, uuid)
+		// utils.AddTokenToTopic(id, uuid)
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "successful" }`))
@@ -804,22 +804,20 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 
 			// Notify the promoted participant
 			if event.Title != nil {
-				notif := models.PushNotification{
+				notif := models.Notification{
 					Title: *event.Title,
 					Body:  "You've been promoted from the wait-list!",
+					Topic: *firstWaitListed.UUID,
 				}
-				e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-					Users:        &[]string{*firstWaitListed.UUID},
-					Notification: notif,
-				})
+				utils.SendNotificationToTopic(&notif)
 			}
 		}
 
 		// unsubscribe removed user from notifications
 		if participantID, exists := vars["participantID"]; exists && participantID != "" {
-			e.Notification.RemoveTokenFromTopic(eventID, uuid)
+			utils.RemoveTokenFromTopic(eventID, uuid)
 		} else {
-			e.Notification.RemoveTokenFromTopic(eventID, uuid)
+			utils.RemoveTokenFromTopic(eventID, uuid)
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -845,7 +843,7 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 		}
 
 		// decode request
-		var req models.PushNotification
+		var req models.Notification
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			e.Logger.Error("failed to decode notification", err.Error())
@@ -853,10 +851,8 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 			return
 		}
 
-		e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-			Topic:        &id,
-			Notification: req,
-		})
+		req.Topic = id
+		utils.SendNotificationToTopic(&req)
 		rw.WriteHeader(http.StatusOK)
 	}
 }
@@ -878,17 +874,15 @@ func (e *Service) NotifyClubMembers() http.HandlerFunc {
 		}
 
 		// decode request
-		var req models.PushNotification
+		var req models.Notification
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusInternalServerError)
 			return
 		}
 
-		e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-			Topic:        &id,
-			Notification: req,
-		})
+		req.Topic = id
+		utils.SendNotificationToTopic(&req)
 		rw.WriteHeader(http.StatusOK)
 	}
 }

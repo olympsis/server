@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/server"
+	"olympsis-server/utils"
 	"os"
 	"strconv"
 	"strings"
@@ -30,13 +32,21 @@ type Service struct {
 
 	// mux Router to complete http requests
 	Router *mux.Router
+	
+	// Notification service for sending notifications
+	Notification *utils.NotificationInterface
 }
 
 /*
 Create new field service struct
 */
-func NewFieldService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Log: l, Router: r, Database: d}
+func NewVenueService(i *server.ServerInterface) *Service {
+	return &Service{
+		Log:          i.Logger, 
+		Router:       i.Router, 
+		Database:     i.Database,
+		Notification: i.Notification,
+	}
 }
 
 /*

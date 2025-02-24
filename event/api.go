@@ -20,7 +20,7 @@ func NewEventAPI(i *server.ServerInterface) *EventAPI {
 	return &EventAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewEventService(i.Logger, i.Router, i.Database),
+		Service: service.NewEventService(i),
 	}
 }
 

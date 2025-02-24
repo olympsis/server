@@ -20,7 +20,7 @@ func NewClubAPI(i *server.ServerInterface) *ClubAPI {
 	return &ClubAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewClubService(i.Logger, i.Router, i.Database, i.Search),
+		Service: service.NewClubService(i),
 	}
 }
 

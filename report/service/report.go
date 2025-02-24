@@ -3,6 +3,8 @@ package service
 import (
 	"olympsis-server/database"
 	"olympsis-server/report/orm"
+	"olympsis-server/server"
+	"olympsis-server/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -17,37 +19,41 @@ type Service struct {
 	MemberReport *orm.MemberReportORM
 	FieldReport  *orm.FieldReportORM
 	EventReport  *orm.EventReportORM
+	Notification *utils.NotificationInterface
 }
 
-func NewReportService(d *database.Database, l *logrus.Logger, r *mux.Router) *Service {
+func NewReportService(i *server.ServerInterface) *Service {
+	// Create ORMs
 	bugORM := orm.BugReportORM{
-		Database: d,
-		Logger:   l,
+		Database: i.Database,
+		Logger:   i.Logger,
 	}
 	postORM := orm.PostReportORM{
-		Database: d,
-		Logger:   l,
+		Database: i.Database,
+		Logger:   i.Logger,
 	}
 	memberORM := orm.MemberReportORM{
-		Database: d,
-		Logger:   l,
+		Database: i.Database,
+		Logger:   i.Logger,
 	}
 	fieldORM := orm.FieldReportORM{
-		Database: d,
-		Logger:   l,
+		Database: i.Database,
+		Logger:   i.Logger,
 	}
 	eventORM := orm.EventReportORM{
-		Database: d,
-		Logger:   l,
+		Database: i.Database,
+		Logger:   i.Logger,
 	}
+	
 	return &Service{
-		Database:     d,
-		Logger:       l,
-		Router:       r,
+		Database:     i.Database,
+		Logger:       i.Logger,
+		Router:       i.Router,
 		BugReport:    &bugORM,
 		PostReport:   &postORM,
 		MemberReport: &memberORM,
 		FieldReport:  &fieldORM,
 		EventReport:  &eventORM,
+		Notification: i.Notification,
 	}
 }

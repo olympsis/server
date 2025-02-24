@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/server"
+	"olympsis-server/utils"
 	"sync"
 	"time"
 
@@ -241,7 +242,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 		// create post notif topic
 
-		err = p.Notification.CreateNotificationTopic(post.ID.Hex())
+		err = utils.CreateNotificationTopic(post.ID.Hex())
 		if err != nil {
 			p.Logger.Error("failed to create topic: " + err.Error())
 		}
@@ -261,7 +262,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			members := *org.Members
 
 			for i := 0; i < len(members); i++ {
-				err = p.Notification.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
+				err = utils.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
 				if err != nil {
 					p.Logger.Error("failed to create topic: " + err.Error())
 				}
@@ -284,17 +285,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				}
 
 				// send notification to club members
-				note := models.PushNotification{
-					Title: *org.Name,
-					Body:  "New announcement!",
-					Data:  map[string]interface{}{"post_id": post.ID},
-				}
+				// note := models.Notification{
+				// 	Title: *org.Name,
+				// 	Body:  "New announcement!",
+				// 	Topic: club.ID.Hex(),
+				// 	Data:  post,
+				// }
 
-				clubID := club.ID.Hex()
-				p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-					Topic:        &clubID,
-					Notification: note,
-				})
+				// utils.SendNotificationToTopic(&note)
 			}
 
 		} else if *req.Type == "post" {
@@ -311,26 +309,22 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			}
 
 			// grab user info
-			user, err := p.SearchService.SearchUserByUUID(uuid)
-			if err != nil {
-				p.Logger.Error("failed to fetch user data: ", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
-				return
-			}
+			// user, err := p.SearchService.SearchUserByUUID(uuid)
+			// if err != nil {
+			// 	p.Logger.Error("failed to fetch user data: ", err.Error())
+			// 	rw.WriteHeader(http.StatusCreated)
+			// 	rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+			// 	return
+			// }
 
 			// send notification to club members
-			note := models.PushNotification{
-				Title: club.Name,
-				Body:  user.Username + " created a post!",
-				Data:  map[string]interface{}{"post_id": post.ID},
-			}
-
-			clubID := club.ID.Hex()
-			p.Notification.SendNotification("", models.NotificationPushRequest{
-				Topic:        &clubID,
-				Notification: note,
-			})
+			// note := models.Notification{
+			// 	Title: club.Name,
+			// 	Body:  user.Username + " created a post!",
+			// 	Topic: club.ID.Hex(),
+			// 	Data:  post,
+			// }
+			// utils.SendNotificationToTopic(&note)
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -450,7 +444,7 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		// delete notif topic
-		err = p.Notification.DeleteNotificationTopic(id)
+		err = utils.DeleteNotificationTopic(id)
 		if err != nil {
 			p.Logger.Error("failed to delete topic: ", err.Error())
 		}

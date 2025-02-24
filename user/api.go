@@ -20,7 +20,7 @@ func NewUserAPI(i *server.ServerInterface) *UserAPI {
 	return &UserAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewUserService(i.Logger, i.Router, i.Database),
+		Service: service.NewUserService(i),
 	}
 }
 

@@ -19,7 +19,7 @@ func NewLocaleAPI(i *server.ServerInterface) *LocaleAPI {
 	return &LocaleAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewLocaleService(i.Logger, i.Router, i.Database),
+		Service: service.NewLocaleService(i),
 	}
 }
 

@@ -207,22 +207,22 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		clubAdminTopic := id.Hex() + "_admin"
 
 		// create topics and subscribe owner to it
-		err = c.Notification.CreateNotificationTopic(clubTopic)
+		err = utils.CreateNotificationTopic(clubTopic)
 		if err != nil {
 			c.Logger.Error("Failed to create club topic: ", err.Error())
 		}
 
-		err = c.Notification.CreateNotificationTopic(clubAdminTopic)
+		err = utils.CreateNotificationTopic(clubAdminTopic)
 		if err != nil {
 			c.Logger.Error("Failed to create club admin topic: ", err.Error())
 		}
 
-		err = c.Notification.AddTokenToTopic(clubTopic, uuid)
+		err = utils.AddTokenToTopic(clubTopic, uuid)
 		if err != nil {
 			c.Logger.Error("Failed to add token to club topic: ", err.Error())
 		}
 
-		err = c.Notification.AddTokenToTopic(clubAdminTopic, uuid)
+		err = utils.AddTokenToTopic(clubAdminTopic, uuid)
 		if err != nil {
 			c.Logger.Error("Failed to add token club admin topic: ", err.Error())
 		}
@@ -342,12 +342,12 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		clubTopic := id
 		clubAdminTopic := id + "_admin"
 
-		err = c.Notification.DeleteNotificationTopic(clubTopic)
+		err = utils.DeleteNotificationTopic(clubTopic)
 		if err != nil {
 			c.Logger.Error("failed to delete topic", err.Error())
 		}
 
-		err = c.Notification.DeleteNotificationTopic(clubAdminTopic)
+		err = utils.DeleteNotificationTopic(clubAdminTopic)
 		if err != nil {
 			c.Logger.Error("failed to delete topic", err.Error())
 		}
@@ -487,7 +487,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 
 		// if user was member then add them to the admin topic
 		if members[index].Role == "member" {
-			err = c.Notification.AddTokenToTopic(id+"_admin", usr.UUID)
+			err = utils.AddTokenToTopic(id+"_admin", usr.UUID)
 			if err != nil {
 				c.Logger.Error("failed to add token to topic: ", err.Error())
 			}
@@ -632,12 +632,12 @@ func (c *Service) KickMember() http.HandlerFunc {
 		// 	}
 		// }
 
-		err = c.Notification.RemoveTokenFromTopic(id, usr.UUID)
+		err = utils.RemoveTokenFromTopic(id, usr.UUID)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
-		err = c.Notification.RemoveTokenFromTopic(id+"_admin", usr.UUID)
+		err = utils.RemoveTokenFromTopic(id+"_admin", usr.UUID)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
@@ -710,12 +710,12 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 		}
 
 		// remove from topics
-		err = c.Notification.RemoveTokenFromTopic(club.ID.Hex(), uuid)
+		err = utils.RemoveTokenFromTopic(club.ID.Hex(), uuid)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
 
-		err = c.Notification.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
+		err = utils.RemoveTokenFromTopic(club.ID.Hex()+"_admin", uuid)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}

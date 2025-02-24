@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/aggregations"
-	"olympsis-server/database"
+	"olympsis-server/server"
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,21 +18,26 @@ import (
 )
 
 /*
-Creates New Auth Service
+Creates New User Service
 
-  - Creates new instance of auth service object
+  - Creates new instance of user service object
 
 Args:
 
-	l - logrus logger (log info, errors or statuses)
-	r - mux router (handle http requests)
+	i - server interface with references to common resources
 
 Returns:
 
-	*AuthenticationService - pointer referencing to new instance of service object
+	*Service - pointer referencing to new instance of service object
 */
-func NewUserService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Log: l, Router: r, Database: d}
+func NewUserService(i *server.ServerInterface) *Service {
+	return &Service{
+		Log:           i.Logger,
+		Router:        i.Router,
+		Database:      i.Database,
+		SearchService: i.Search,
+		Notification:  i.Notification,
+	}
 }
 
 /*

@@ -3,6 +3,7 @@ package service
 import (
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/server"
 	"olympsis-server/utils"
 
 	"github.com/gorilla/mux"
@@ -14,20 +15,27 @@ Service Struct
   - Database pointer
   - Logger pointer
   - Router pointer
+  - Notification interface
 */
 type Service struct {
 	Database *database.Database
 	Logger   *logrus.Logger
 	Router   *mux.Router
-
+	
 	StorageInterface *utils.StorageInterface
+	Notification     *utils.NotificationInterface
 }
 
 /*
-Creates a new instance of the locale service
+Creates a new instance of the map snapshot service
 */
-func NewSnapshotService(l *logrus.Logger, r *mux.Router, d *database.Database, s *utils.StorageInterface) *Service {
-	return &Service{Logger: l, Router: r, Database: d, StorageInterface: s}
+func NewSnapService(i *server.ServerInterface) *Service {
+	return &Service{
+		Logger:        i.Logger, 
+		Router:        i.Router, 
+		Database:      i.Database,
+		Notification:  i.Notification,
+	}
 }
 
 func (s *Service) GetMapSnapShot() http.HandlerFunc {

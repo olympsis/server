@@ -2,6 +2,7 @@ package service
 
 import (
 	"olympsis-server/database"
+	"olympsis-server/utils"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -23,4 +24,7 @@ type Service struct {
 
 	// Firebase Auth
 	Client *auth.Client
+	
+	// Notification Service
+	Notification *utils.NotificationInterface
 }

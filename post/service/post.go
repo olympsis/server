@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"olympsis-server/database"
+	"olympsis-server/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
@@ -16,6 +17,7 @@ type Service struct {
 	Logger        *logrus.Logger
 	Router        *mux.Router
 	SearchService *search.Service
+	Notification  *utils.NotificationInterface
 }
 
 // Insert one post into database

@@ -20,7 +20,7 @@ func NewReportAPI(i *server.ServerInterface) *ReportAPI {
 	return &ReportAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewReportService(i.Database, i.Logger, i.Router),
+		Service: service.NewReportService(i),
 	}
 }
 

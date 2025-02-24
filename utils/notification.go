@@ -5,174 +5,213 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/olympsis/models"
+	"github.com/sirupsen/logrus"
 )
 
-// Contact the notification service and send a notification to a token belonging to a device
-func SendNotificationToToken(token string, notification *models.Notification) error {
+type NotificationInterface struct {
+	ServiceURL string
+	Status     string
+	Client     http.Client
+	Logger     *logrus.Logger
+}
 
+func NewNotificationInterface(u string, logger *logrus.Logger) *NotificationInterface {
+	return &NotificationInterface{
+		ServiceURL: u,
+		Status:     "good",
+		Client:     http.Client{},
+		Logger:     logger,
+	}
+}
+
+// Send a notification - handles both token and topic notifications
+func (n *NotificationInterface) SendNotification(authToken string, notification models.NotificationPushRequest) error {
 	// convert notification to json
 	data, err := json.Marshal(notification)
 	if err != nil {
+		n.Logger.Errorf("Failed to marshal notification: %v", err)
 		return err
 	}
 
 	// craft http request
-	url := os.Getenv("NOTIF_URL")
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/notifications/%s", url, token), bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/notifications", n.ServiceURL), bytes.NewBuffer(data))
 	if err != nil {
+		n.Logger.Errorf("Failed to create request: %v", err)
 		return err
 	}
 
 	// Set the request headers
 	req.Header.Set("Content-Type", "application/json")
+	if authToken != "" {
+		req.Header.Set("Authorization", authToken)
+	}
 
-	// Create a new HTTP client and send the request
-	client := &http.Client{}
+	// Send the request asynchronously
 	go func() {
-		_, err := client.Do(req)
+		resp, err := n.Client.Do(req)
 		if err != nil {
-			fmt.Sprintln("Notification error: " + err.Error())
+			n.Logger.Errorf("Failed to send notification: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+			n.Logger.Errorf("Notification service returned non-success status code: %d", resp.StatusCode)
 		}
 	}()
 
 	return nil
 }
 
-// Contact the notification service and send a notification to a topic
-func SendNotificationToTopic(notification *models.Notification) error {
+// This is the single, unified function for sending notifications
+// The backward compatibility functions have been removed
 
-	// convert notification to json
-	data, err := json.Marshal(notification)
+// Create a new notification topic
+func (n *NotificationInterface) CreateNotificationTopic(name string) error {
+	topic := models.NotificationTopicDao{
+		Name: &name,
+	}
+	return n.CreateTopic("", topic)
+}
+
+// Delete a notification topic
+func (n *NotificationInterface) DeleteNotificationTopic(name string) error {
+	return n.DeleteTopic("", name)
+}
+
+// Add a user to a topic
+func (n *NotificationInterface) AddTokenToTopic(topic string, user string) error {
+	updateReq := models.NotificationTopicUpdateRequest{
+		Action: "add",
+		Users:  []string{user},
+	}
+	return n.ModifyTopic("", topic, updateReq)
+}
+
+// Remove a user from a topic
+func (n *NotificationInterface) RemoveTokenFromTopic(topic string, user string) error {
+	updateReq := models.NotificationTopicUpdateRequest{
+		Action: "remove",
+		Users:  []string{user},
+	}
+	return n.ModifyTopic("", topic, updateReq)
+}
+
+// Create a notification topic
+func (n *NotificationInterface) CreateTopic(authToken string, topic models.NotificationTopicDao) error {
+	// convert topic to json
+	data, err := json.Marshal(topic)
 	if err != nil {
+		n.Logger.Errorf("Failed to marshal topic: %v", err)
 		return err
 	}
 
 	// craft http request
-	url := os.Getenv("NOTIF_URL")
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/notifications", url), bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/notifications/topics", n.ServiceURL), bytes.NewBuffer(data))
 	if err != nil {
+		n.Logger.Errorf("Failed to create request: %v", err)
 		return err
 	}
 
-	// Set the request headers
+	// Set headers
 	req.Header.Set("Content-Type", "application/json")
+	if authToken != "" {
+		req.Header.Set("Authorization", authToken)
+	}
 
-	// Create a new HTTP client and send the request
-	client := &http.Client{}
-	go func() {
-		_, err := client.Do(req)
-		if err != nil {
-			fmt.Sprintln("Notification error: " + err.Error())
-		}
-	}()
+	// Send the request
+	resp, err := n.Client.Do(req)
+	if err != nil {
+		n.Logger.Errorf("Failed to create topic: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
 
-	return nil
-}
-
-// Contact the notification service and create a new topic
-func CreateNotificationTopic(name string) error {
-	// data, err := json.Marshal(models.Topic{Name: name})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // craft http request
-	// url := os.Getenv("NOTIF_URL")
-	// req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/notifications/topics", url), bytes.NewBuffer(data))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Set the request headers
-	// req.Header.Set("Content-Type", "application/json")
-
-	// // Create a new HTTP client and send the request
-	// client := &http.Client{}
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if resp.StatusCode != 200 {
-	// 	return errors.New("status code not ok")
-	// }
+	// Check status code
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		n.Logger.Errorf("Notification service returned non-200/201 status code: %d", resp.StatusCode)
+		return fmt.Errorf("notification service returned error status code: %d", resp.StatusCode)
+	}
 
 	return nil
 }
 
-// Contact the notification service and delete a topic
-func DeleteNotificationTopic(name string) error {
-	// // craft http request
-	// url := os.Getenv("NOTIF_URL")
-	// req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v1/notifications/topics/%s", url, name), &bytes.Buffer{})
-	// if err != nil {
-	// 	return err
-	// }
+// Modify a notification topic (add/remove users)
+func (n *NotificationInterface) ModifyTopic(authToken string, topicName string, update models.NotificationTopicUpdateRequest) error {
+	// convert update to json
+	data, err := json.Marshal(update)
+	if err != nil {
+		n.Logger.Errorf("Failed to marshal topic update: %v", err)
+		return err
+	}
 
-	// // Set the request headers
-	// req.Header.Set("Content-Type", "application/json")
+	// craft http request
+	var endpoint string
+	if update.Action == "add" {
+		endpoint = fmt.Sprintf("%s/v1/notifications/topics/%s/add", n.ServiceURL, topicName)
+	} else {
+		endpoint = fmt.Sprintf("%s/v1/notifications/topics/%s/remove", n.ServiceURL, topicName)
+	}
 
-	// // Create a new HTTP client and send the request
-	// client := &http.Client{}
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	return err
-	// }
+	req, err := http.NewRequest("PUT", endpoint, bytes.NewBuffer(data))
+	if err != nil {
+		n.Logger.Errorf("Failed to create request: %v", err)
+		return err
+	}
 
-	// if resp.StatusCode != 200 {
-	// 	return errors.New("status code not ok")
-	// }
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	if authToken != "" {
+		req.Header.Set("Authorization", authToken)
+	}
 
-	return nil
-}
+	// Send the request
+	resp, err := n.Client.Do(req)
+	if err != nil {
+		n.Logger.Errorf("Failed to modify topic: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
 
-// Contact the notification service and add a user to a topic
-func AddTokenToTopic(topic string, user string) error {
-	// data, err := json.Marshal(models.ModifyTopic{User: user})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // craft http request
-	// url := os.Getenv("NOTIF_URL")
-	// req, err := http.NewRequest("PUT", fmt.Sprintf("%s/v1/notifications/topics/%s/add", url, topic), bytes.NewBuffer(data))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Set the request headers
-	// req.Header.Set("Content-Type", "application/json")
-
-	// // Create a new HTTP client and send the request
-	// client := &http.Client{}
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if resp.StatusCode != 200 {
-	// 	return errors.New("status code not ok")
-	// }
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		n.Logger.Errorf("Notification service returned non-200 status code: %d", resp.StatusCode)
+		return fmt.Errorf("notification service returned error status code: %d", resp.StatusCode)
+	}
 
 	return nil
 }
 
-func GetUserNotifications(token string, uuid string) *models.NotificationListResponse {
-	return nil
-}
+// Delete a notification topic
+func (n *NotificationInterface) DeleteTopic(authToken string, name string) error {
+	// craft http request
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v1/notifications/topics/%s", n.ServiceURL, name), nil)
+	if err != nil {
+		n.Logger.Errorf("Failed to create request: %v", err)
+		return err
+	}
 
-func SendNotification(token string, note models.NotificationPushRequest) {
-	return
-}
-func _CreateNotificationTopic(token string, topic models.NotificationTopicDao) {
-	return
-}
-func _ModifyNotificationTopic(token string, topic models.NotificationTopicUpdateRequest) {
-	return
-}
-func _DeleteNotificationTopic(token string, name string) bool {
-	return true
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	if authToken != "" {
+		req.Header.Set("Authorization", authToken)
+	}
+
+	// Send the request
+	resp, err := n.Client.Do(req)
+	if err != nil {
+		n.Logger.Errorf("Failed to delete topic: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		n.Logger.Errorf("Notification service returned non-200 status code: %d", resp.StatusCode)
+		return fmt.Errorf("notification service returned error status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }

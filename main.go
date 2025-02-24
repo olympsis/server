@@ -66,6 +66,8 @@ func main() {
 
 		Auth:   client,
 		Search: sh,
+
+		Notification: utils.NewNotificationInterface(config.NotifServiceURL, l),
 	}
 
 	authAPI := auth.NewAuthAPI(serverInterface)

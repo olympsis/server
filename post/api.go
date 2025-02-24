@@ -20,7 +20,7 @@ func NewPostAPI(i *server.ServerInterface) *PostAPI {
 	return &PostAPI{
 		Logger:  i.Logger,
 		Router:  i.Router,
-		Service: service.NewPostService(i.Logger, i.Router, i.Database, i.Search),
+		Service: service.NewPostService(i),
 	}
 }
 

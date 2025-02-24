@@ -17,7 +17,7 @@ type AuthAPI struct {
 }
 
 func NewAuthAPI(i *server.ServerInterface) *AuthAPI {
-	return &AuthAPI{Logger: i.Logger, Router: i.Router, Service: service.NewAuthService(i.Logger, i.Router, i.Database, i.Auth)}
+	return &AuthAPI{Logger: i.Logger, Router: i.Router, Service: service.NewAuthService(i)}
 }
 
 func (s *AuthAPI) Ready(firebase *auth.Client) {
