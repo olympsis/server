@@ -1,12 +1,12 @@
 module olympsis-server
 
-go 1.22.7
+go 1.23.0
 
 require (
 	cloud.google.com/go/storage v1.46.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20250219022016-3b1aad940729
+	github.com/olympsis/models v0.0.0-20250220213236-8a73cd810384
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.205.0
 )
@@ -42,7 +42,7 @@ require (
 	go.opentelemetry.io/otel v1.32.0 // indirect
 	go.opentelemetry.io/otel/metric v1.32.0 // indirect
 	go.opentelemetry.io/otel/trace v1.32.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/net v0.31.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect

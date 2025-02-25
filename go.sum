@@ -115,6 +115,8 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/olympsis/models v0.0.0-20250219022016-3b1aad940729 h1:gEYiwCibGUkCMRjG/myaNrSOIc4wPOpAojsLp3YfN4s=
 github.com/olympsis/models v0.0.0-20250219022016-3b1aad940729/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
+github.com/olympsis/models v0.0.0-20250220213236-8a73cd810384 h1:mphm9hnhu8HOm8A7W5YKTW6fRhksyxzlW+JdBpEZtvI=
+github.com/olympsis/models v0.0.0-20250220213236-8a73cd810384/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
 github.com/olympsis/search v0.0.0-20250219024747-aa9b192b9182 h1:xoHik2Gmtvf3EK7SdrL7H30PH32DMqrrV/eKyiJ+ytM=
 github.com/olympsis/search v0.0.0-20250219024747-aa9b192b9182/go.mod h1:ozqUYBY+9GfDy/HeRJoduYEDPzhcot+BcfmcX7DxQiI=
 github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=
@@ -171,6 +173,8 @@ golang.org/x/crypto v0.23.0/go.mod h1:CKFgDieR+mRhux2Lsu27y0fO304Db0wZe70UKqHu0v
 golang.org/x/crypto v0.31.0/go.mod h1:kDsLvtWBEx7MV9tJOj9bnXsPbxwJQ6csT/x4KIN4Ssk=
 golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
 golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
+golang.org/x/crypto v0.35.0 h1:b15kiHdrGCHrP6LvwaQ3c03kgNhhiMgvlhxHQhmg2Xs=
+golang.org/x/crypto v0.35.0/go.mod h1:dy7dXNW32cAb/6/PRuTNsix8T+vJAqvuIy5Bli/x0YQ=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
 golang.org/x/lint v0.0.0-20190227174305-5b3e6a55c961/go.mod h1:wehouNa3lNwaWXcvxsM5YxQ5yQlVC4a0KAMCusXpPoU=

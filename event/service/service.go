@@ -100,8 +100,33 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 				return
 			}
 
+			eventID := id.Hex()
+			topic := models.NotificationTopicDao{
+				Name:  &eventID,
+				Users: &[]string{uuid},
+			}
+			err = e.Notification.CreateTopic(r.Header.Get("Authorization"), topic)
+			if err != nil {
+				e.Logger.Errorf("Failed to create new event topic. Error: %s", err.Error())
+			}
+
+			// Notify group members
+			note := models.PushNotification{
+				Title:    "New Event Created!",
+				Body:     *event.Title,
+				Type:     "push",
+				Category: "events",
+				Data: map[string]interface{}{
+					"event_id": eventID,
+				},
+			}
+			if event.Organizers != nil {
+				notifyOrganizers(*event.Organizers, &note, r.Header.Get("Authorization"), e.Notification)
+			}
+
+			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusCreated)
-			rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, id.Hex())))
+			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, id.Hex())))
 			return
 		}
 
@@ -153,6 +178,21 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			}
 		}
 
+		// Notify group members of recurring event
+		note := models.PushNotification{
+			Title:    "New Events Created!",
+			Body:     *event.Title,
+			Type:     "push",
+			Category: "events",
+			Data: map[string]interface{}{
+				"event_id": parentID,
+			},
+		}
+		if event.Organizers != nil {
+			notifyOrganizers(*event.Organizers, &note, r.Header.Get("Authorization"), e.Notification)
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, parentID.Hex())))
 	}
@@ -610,22 +650,21 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 
 		uuid := r.Header.Get("UUID")
 
-		// grab id from path
+		// Grab event id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
-			http.Error(rw, `"msg": "bad event id" `, http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
 
-		// decode request
+		// Decode request
 		var req models.ParticipantDao
 		json.NewDecoder(r.Body).Decode(&req)
-
 		oid, _ := primitive.ObjectIDFromHex(id)
 		timestamp := time.Now().Unix()
 
-		// find event data in database
+		// Find event data in database
 		filter := bson.M{"_id": oid}
 		event, err := e.FindEvent(context.Background(), filter)
 		if err != nil {
@@ -638,7 +677,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			return
 		}
 
-		// check if participant already exists
+		// Check if participant already exists
 		participants := *event.Participants
 		for i := range participants {
 			if *participants[i].UUID == uuid {
@@ -648,7 +687,7 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			}
 		}
 
-		// if event is full add the user to the wait-list
+		// If event is full add the user to the wait-list
 		if event.MaxParticipants != nil {
 			if *event.MaxParticipants != 0 {
 				if len(participants) >= int(*event.MaxParticipants) {
@@ -670,14 +709,20 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 						return
 					}
 
+					// Add participant to notifications
+					e.Notification.ModifyTopic(r.Header.Get("Authorization"), id, models.NotificationTopicUpdateRequest{
+						Action: "subscribe",
+						Users:  []string{uuid},
+					})
+
 					rw.WriteHeader(http.StatusOK)
-					rw.Write([]byte(`{ "msg": "successful" }`))
+					rw.Write([]byte(`{ "msg": "OK" }`))
 					return
 				}
 			}
 		}
 
-		// participant object
+		// New participant object
 		newID := primitive.NewObjectID()
 		part := &models.ParticipantDao{
 			ID:        &newID,
@@ -693,19 +738,32 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			return
 		}
 
-		// notify all participants
-		// notif := models.Notification{
-		// 	Title: *event.Title,
-		// 	Body:  "New Participant RSVP'd!",
-		// 	Topic: id,
-		// }
-		// e.Notification.SendNotification(&notif)
+		// Add participant to notifications
+		e.Notification.ModifyTopic(r.Header.Get("Authorization"), id, models.NotificationTopicUpdateRequest{
+			Action: "subscribe",
+			Users:  []string{uuid},
+		})
 
-		// subscribe user to notifications
-		// e.Notification.AddTokenToTopic(id, uuid)
+		// Notify event participants
+		note := models.PushNotification{
+			Title:    *event.Title,
+			Body:     fmt.Sprintf("New Participant RSVP'ed %s", req.Status),
+			Type:     "push",
+			Category: "events",
+			Data: map[string]interface{}{
+				"event_id": oid.Hex(),
+			},
+		}
+
+		// Notify event participants
+		topicName := oid.Hex()
+		e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+			Topic:        &topicName,
+			Notification: note,
+		})
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "successful" }`))
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -727,7 +785,6 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
-
 		oid, _ := primitive.ObjectIDFromHex(eventID)
 
 		// First, fetch the event to check the wait-list
@@ -739,20 +796,36 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		var pullQuery bson.M
+		var participant models.ParticipantDao
 
-		// Check if a specific participant ID was provided
 		if participantID, exists := vars["participantID"]; exists && participantID != "" {
 			// Verify that the requestor is the event organizer
-			if *event.Poster != uuid {
-				http.Error(rw, `{ "msg": "unauthorized - only event organizer can remove other participants" }`, http.StatusUnauthorized)
-				return
-			}
+			// TODO:  FIGURE OUT CLUB AUTH
+			// if *event.Poster != uuid {
+			// 	http.Error(rw, `{ "msg": "unauthorized - only event organizer can remove other participants" }`, http.StatusUnauthorized)
+			// 	return
+			// }
+
 			// Remove by participant _id
 			participantOID, _ := primitive.ObjectIDFromHex(participantID)
 			pullQuery = bson.M{"$pull": bson.M{"participants": bson.M{"_id": participantOID}}}
+
+			// Assign Participant
+			for _, v := range *event.Participants {
+				if *v.ID == participantOID {
+					participant = v
+				}
+			}
 		} else {
 			// Remove by UUID (user removing themselves)
 			pullQuery = bson.M{"$pull": bson.M{"participants": bson.M{"uuid": uuid}}}
+
+			// Assign Participant
+			for _, v := range *event.Participants {
+				if *v.UUID == uuid {
+					participant = v
+				}
+			}
 		}
 
 		// First operation: Remove participant
@@ -809,7 +882,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		// unsubscribe removed user from notifications
 		e.Notification.ModifyTopic(r.Header.Get("Authorization"), eventID, models.NotificationTopicUpdateRequest{
 			Action: "unsubscribe",
-			Users:  []string{uuid},
+			Users:  []string{*participant.UUID},
 		})
 
 		rw.WriteHeader(http.StatusOK)
@@ -848,6 +921,7 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 			Notification: req,
 		})
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -857,7 +931,7 @@ Notify Club members (POST)
 	http handler
 	notifies all club members of an event
 */
-func (e *Service) NotifyClubMembers() http.HandlerFunc {
+func (e *Service) NotifyOrganizers() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab id from path
 		vars := mux.Vars(r)
@@ -866,20 +940,39 @@ func (e *Service) NotifyClubMembers() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
 			return
 		}
-
-		// decode request
-		var req models.PushNotification
-		err := json.NewDecoder(r.Body).Decode(&req)
+		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "failed to encode id to OID" }`, http.StatusBadRequest)
 			return
 		}
 
-		e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-			Topic:        &id,
-			Notification: req,
-		})
+		// Decode request
+		var req models.PushNotification
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
+			return
+		}
+
+		// Grab event dao object
+		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				http.Error(rw, `{ "msg": "event not found" }`, http.StatusNotFound)
+				return
+			}
+			e.Logger.Error("failed to find event", err.Error())
+			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+			return
+		}
+
+		// Notify organizers
+		if event.Organizers != nil {
+			notifyOrganizers(*event.Organizers, &req, r.Header.Get("Authorization"), e.Notification)
+		}
+
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 

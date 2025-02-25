@@ -1,6 +1,7 @@
 package service
 
 import (
+	"olympsis-server/utils"
 	"time"
 
 	"github.com/olympsis/models"
@@ -142,4 +143,18 @@ func generateEventInstancesBatched(baseEventID *primitive.ObjectID, baseEvent *m
 	}
 
 	return instances
+}
+
+func notifyOrganizers(organizers []models.Organizer, note *models.PushNotification, token string, service *utils.NotificationInterface) {
+	for _, v := range organizers {
+		ID := v.ID.Hex()
+		err := service.SendNotification(token, models.NotificationPushRequest{
+			Topic:        &ID,
+			Notification: *note,
+		})
+
+		if err != nil {
+			service.Logger.Errorf("Failed to send notification. Error: %s", err.Error())
+		}
+	}
 }

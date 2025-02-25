@@ -158,9 +158,9 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("POST", "OPTIONS")
 
 	// notify club members
-	e.Router.Handle("/v1/events/{id}/notify/club",
+	e.Router.Handle("/v1/events/{id}/notify/organizers",
 		middleware.Chain(
-			e.Service.NotifyClubMembers(),
+			e.Service.NotifyOrganizers(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
