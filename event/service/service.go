@@ -50,7 +50,6 @@ Create Event Data (POST)
 	http handler
 	create an event and add it into the database
 */
-// CreateEvent handles both single and recurring event creation
 func (e *Service) CreateEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// Create a context with 25s timeout (leaving 5s buffer from the 30s server timeout)
@@ -111,15 +110,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 			}
 
 			// Notify group members
-			note := models.PushNotification{
-				Title:    "New Event Created!",
-				Body:     *event.Title,
-				Type:     "push",
-				Category: "events",
-				Data: map[string]interface{}{
-					"event_id": eventID,
-				},
-			}
+			note := generateNewEventNotification(eventID, *event.Title)
 			if event.Organizers != nil {
 				notifyOrganizers(*event.Organizers, &note, r.Header.Get("Authorization"), e.Notification)
 			}
@@ -179,15 +170,7 @@ func (e *Service) CreateEvent() http.HandlerFunc {
 		}
 
 		// Notify group members of recurring event
-		note := models.PushNotification{
-			Title:    "New Events Created!",
-			Body:     *event.Title,
-			Type:     "push",
-			Category: "events",
-			Data: map[string]interface{}{
-				"event_id": parentID,
-			},
-		}
+		note := generateNewEventNotification(parentID.Hex(), *event.Title)
 		if event.Organizers != nil {
 			notifyOrganizers(*event.Organizers, &note, r.Header.Get("Authorization"), e.Notification)
 		}
@@ -745,18 +728,12 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		})
 
 		// Notify event participants
-		note := models.PushNotification{
-			Title:    *event.Title,
-			Body:     fmt.Sprintf("New Participant RSVP'ed %s", req.Status),
-			Type:     "push",
-			Category: "events",
-			Data: map[string]interface{}{
-				"event_id": oid.Hex(),
-			},
+		status := "yes"
+		if *req.Status == 0 {
+			status = "maybe"
 		}
-
-		// Notify event participants
 		topicName := oid.Hex()
+		note := generateNewParticipantNotification(oid.Hex(), *event.Title, status)
 		e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 			Topic:        &topicName,
 			Notification: note,
@@ -839,6 +816,24 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			return
 		}
 
+		// If participant is being removed and not user removing themselves
+		if participantID, exists := vars["participantID"]; exists && participantID != "" {
+			notif := models.PushNotification{
+				Title:    *event.Title,
+				Body:     "You've been booted from the participants list!",
+				Type:     "push",
+				Category: "events",
+				Data: map[string]interface{}{
+					"type": "event_update",
+					"id":   eventID,
+				},
+			}
+			e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+				Users:        &[]string{*participant.UUID},
+				Notification: notif,
+			})
+		}
+
 		// Handle wait-list if someone was successfully removed
 		if event.WaitList != nil && len(*event.WaitList) > 0 {
 			waitList := *event.WaitList
@@ -869,8 +864,14 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			// Notify the promoted participant
 			if event.Title != nil {
 				notif := models.PushNotification{
-					Title: *event.Title,
-					Body:  "You've been promoted from the wait-list!",
+					Title:    *event.Title,
+					Body:     "You've been promoted from the wait-list!",
+					Type:     "push",
+					Category: "events",
+					Data: map[string]interface{}{
+						"type": "event_update",
+						"id":   eventID,
+					},
 				}
 				e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 					Users:        &[]string{*firstWaitListed.UUID},

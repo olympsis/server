@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"olympsis-server/utils"
 	"time"
 
@@ -145,6 +146,7 @@ func generateEventInstancesBatched(baseEventID *primitive.ObjectID, baseEvent *m
 	return instances
 }
 
+// Helper function to send notifications to an event's organizers
 func notifyOrganizers(organizers []models.Organizer, note *models.PushNotification, token string, service *utils.NotificationInterface) {
 	for _, v := range organizers {
 		ID := v.ID.Hex()
@@ -156,5 +158,31 @@ func notifyOrganizers(organizers []models.Organizer, note *models.PushNotificati
 		if err != nil {
 			service.Logger.Errorf("Failed to send notification. Error: %s", err.Error())
 		}
+	}
+}
+
+func generateNewEventNotification(id string, title string) models.PushNotification {
+	return models.PushNotification{
+		Title:    "New Event Created!",
+		Body:     title,
+		Type:     "push",
+		Category: "events",
+		Data: map[string]interface{}{
+			"type": "new_event",
+			"id":   id,
+		},
+	}
+}
+
+func generateNewParticipantNotification(id string, title string, status string) models.PushNotification {
+	return models.PushNotification{
+		Title:    title,
+		Body:     fmt.Sprintf("New Participant RSVP'ed %s", status),
+		Type:     "push",
+		Category: "events",
+		Data: map[string]interface{}{
+			"type": "event_update",
+			"id":   id,
+		},
 	}
 }
