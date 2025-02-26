@@ -304,13 +304,8 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				}
 
 				// send notification to club members
-				note := models.PushNotification{
-					Title: *org.Name,
-					Body:  "New announcement!",
-					Data:  map[string]interface{}{"post_id": post.ID},
-				}
-
 				clubID := club.ID.Hex()
+				note = generateNewAnnouncementNotification(postID, *org.Name)
 				p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 					Topic:        &clubID,
 					Notification: note,
@@ -327,13 +322,8 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
 			}
 
-			note = models.PushNotification{
-				Title: club.Name,
-				Body:  user.Username + " created a post!",
-				Data:  map[string]interface{}{"post_id": post.ID},
-			}
-
 			clubID := club.ID.Hex()
+			note = generateNewPostNotification(post.ID.Hex(), club.Name, user.Username)
 			p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 				Topic:        &clubID,
 				Notification: note,
