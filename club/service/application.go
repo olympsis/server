@@ -142,11 +142,15 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 					return
 				}
 
-				response := models.CreateResponse{
-					ID: resp.InsertedID.(primitive.ObjectID).Hex(),
-				}
+				topic := id + "_admin"
+				note := generateNewApplicationNotification(id, resp.InsertedID.(primitive.ObjectID).Hex())
+				c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+					Topic:        &topic,
+					Notification: note,
+				})
+
 				rw.WriteHeader(http.StatusCreated)
-				json.NewEncoder(rw).Encode(response)
+				rw.Write([]byte(fmt.Sprintf(`{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex())))
 				return
 			}
 
@@ -280,6 +284,22 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
 					return
 				}
+
+				var club models.ClubDao
+				err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(club)
+				if err != nil {
+					c.Logger.Error("failed to find club and send notification: ", err.Error())
+					rw.WriteHeader(http.StatusOK)
+					rw.Write([]byte(`{"msg":"OK"}`))
+					return
+				}
+
+				// Notify user that their application was accepted
+				note := generateUpdateApplicationNotification(id, *club.Name, aid, req.Status)
+				c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+					Users:        &[]string{*app.Applicant},
+					Notification: note,
+				})
 
 				rw.WriteHeader(http.StatusOK)
 				rw.Write([]byte(`{"msg":"OK"}`))
