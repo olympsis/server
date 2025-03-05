@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"olympsis-server/announcement"
 	"olympsis-server/auth"
 	"olympsis-server/club"
 	"olympsis-server/database"
@@ -70,6 +71,7 @@ func main() {
 		Notification: utils.NewNotificationInterface(config.NotifServiceURL, l),
 	}
 
+	announceAPI := announcement.NewAnnouncementAPI(serverInterface)
 	authAPI := auth.NewAuthAPI(serverInterface)
 	userAPI := user.NewUserAPI(serverInterface)
 	fieldAPI := venue.NewVenueAPI(serverInterface)
@@ -82,6 +84,7 @@ func main() {
 	healthAPI := health.NewHealthAPI(serverInterface)
 	snapShotAPI := mapsnapshots.NewMapSnapshotAPI(serverInterface, &config)
 
+	announceAPI.Ready(client)
 	authAPI.Ready(client)
 	userAPI.Ready(client)
 	fieldAPI.Ready()

@@ -90,6 +90,12 @@ func GetDatabaseConfig() DatabaseConfig {
 
 // Reads from OS environment variables to create a collections config object
 func GetCollectionsConfig() CollectionsConfig {
+
+	announcementCollection := os.Getenv("ANNOUNCE_COL")
+	if announcementCollection == "" {
+		panic("announcement collection required in config")
+	}
+
 	// USER COLLECTIONS
 	authCollection := os.Getenv("AUTH_COL")
 	if authCollection == "" {
@@ -229,6 +235,8 @@ func GetCollectionsConfig() CollectionsConfig {
 	}
 
 	return CollectionsConfig{
+		AnnouncementCollection: announcementCollection,
+
 		AuthCollection: authCollection,
 		UserCollection: userCollection,
 

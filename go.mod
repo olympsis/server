@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.46.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20250220213236-8a73cd810384
+	github.com/olympsis/models v0.0.0-20250305020544-e735de944702
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.205.0
 )
@@ -56,7 +56,7 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 )
 
-require go.mongodb.org/mongo-driver v1.17.2
+require go.mongodb.org/mongo-driver v1.17.3
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect

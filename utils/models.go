@@ -25,6 +25,8 @@ type DatabaseConfig struct {
 }
 
 type CollectionsConfig struct {
+	AnnouncementCollection string
+
 	// Users
 	AuthCollection string
 	UserCollection string
