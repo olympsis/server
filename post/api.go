@@ -33,7 +33,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	p.Router.Handle("/v1/posts", middleware.Chain(
 		p.Service.GetPosts(),
 		middleware.Logging(),
-		middleware.UserMiddleware(firebase),
 		middleware.CORS(),
 	)).Methods("GET", "OPTIONS")
 

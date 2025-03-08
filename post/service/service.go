@@ -49,6 +49,8 @@ Get Posts (GET)
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		// TODO - THIS SHOULD NO LONGER WORK
+		// LOOK FOR A WORKAROUND
 		uuid := r.Header.Get("UUID")
 
 		// grab query parameters
