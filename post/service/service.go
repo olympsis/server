@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/server"
-	"olympsis-server/utils"
 	"sync"
 	"time"
 
@@ -110,37 +109,45 @@ func (p *Service) GetPosts() http.HandlerFunc {
 			return
 		}
 
-		if user == nil {
-			http.Error(rw, `{ "msg": "user not found!" }`, http.StatusInternalServerError)
-			return
+		// if user == nil {
+		// 	http.Error(rw, `{ "msg": "user not found!" }`, http.StatusInternalServerError)
+		// 	return
+		// }
+
+		// if user.BlockedUsers != nil {
+		// 	blockedList := *user.BlockedUsers
+		// 	_posts := utils.RemovePostsByPosterUUIDs(posts, blockedList)
+
+		// 	if _posts == nil || len(*_posts) == 0 {
+		// 		http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
+		// 		return
+		// 	}
+
+		// 	resp := models.PostsResponse{
+		// 		TotalPosts: len(*_posts),
+		// 		Posts:      *_posts,
+		// 	}
+
+		// 	rw.WriteHeader(http.StatusOK)
+		// 	json.NewEncoder(rw).Encode(resp)
+
+		// } else {
+		// 	resp := models.PostsResponse{
+		// 		TotalPosts: len(*posts),
+		// 		Posts:      *posts,
+		// 	}
+
+		// 	rw.WriteHeader(http.StatusOK)
+		// 	json.NewEncoder(rw).Encode(resp)
+		// }
+
+		resp := models.PostsResponse{
+			TotalPosts: len(*posts),
+			Posts:      *posts,
 		}
 
-		if user.BlockedUsers != nil {
-			blockedList := *user.BlockedUsers
-			_posts := utils.RemovePostsByPosterUUIDs(posts, blockedList)
-
-			if _posts == nil || len(*_posts) == 0 {
-				http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
-				return
-			}
-
-			resp := models.PostsResponse{
-				TotalPosts: len(*_posts),
-				Posts:      *_posts,
-			}
-
-			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(resp)
-
-		} else {
-			resp := models.PostsResponse{
-				TotalPosts: len(*posts),
-				Posts:      *posts,
-			}
-
-			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(resp)
-		}
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
 	}
 }
 
