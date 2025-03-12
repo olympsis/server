@@ -4,9 +4,10 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (s *Service) FindCountries(ctx context.Context, filter interface{}) (*[]models.Country, error) {
+func (s *Service) FindCountries(ctx context.Context, filter bson.M) (*[]models.Country, error) {
 	var countries []models.Country
 	cursor, err := s.Database.CountriesCol.Find(ctx, filter)
 	if err != nil {
@@ -24,7 +25,7 @@ func (s *Service) FindCountries(ctx context.Context, filter interface{}) (*[]mod
 	return &countries, nil
 }
 
-func (s *Service) FindAdministrativeAreas(ctx context.Context, filter interface{}) (*[]models.AdministrativeArea, error) {
+func (s *Service) FindAdministrativeAreas(ctx context.Context, filter bson.M) (*[]models.AdministrativeArea, error) {
 	var adminAreas []models.AdministrativeArea
 	cursor, err := s.Database.AdminAreasCol.Find(ctx, filter)
 	if err != nil {
@@ -42,7 +43,7 @@ func (s *Service) FindAdministrativeAreas(ctx context.Context, filter interface{
 	return &adminAreas, nil
 }
 
-func (s *Service) FindSubAdministrativeAreas(ctx context.Context, filter interface{}) (*[]models.SubAdministrativeArea, error) {
+func (s *Service) FindSubAdministrativeAreas(ctx context.Context, filter bson.M) (*[]models.SubAdministrativeArea, error) {
 	var subAdminAreas []models.SubAdministrativeArea
 	cursor, err := s.Database.SubAdminAreasCol.Find(ctx, filter)
 	if err != nil {
