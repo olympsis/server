@@ -129,37 +129,6 @@ func ValidateClubToken(s string, u string) (string, string, error) {
 	}
 }
 
-// Contact the notification service and remove a user from a topic
-func RemoveTokenFromTopic(topic string, user string) error {
-	// data, err := json.Marshal(models.ModifyTopic{User: user})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// craft http request
-	// url := os.Getenv("NOTIF_URL")
-	// req, err := http.NewRequest("PUT", fmt.Sprintf("%s/v1/notifications/topics/%s/remove", url, topic), bytes.NewBuffer(data))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Set the request headers
-	// req.Header.Set("Content-Type", "application/json")
-
-	// // Create a new HTTP client and send the request
-	// client := &http.Client{}
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if resp.StatusCode != 200 {
-	// 	return errors.New("status code not ok")
-	// }
-
-	return nil
-}
-
 func CreateImageHash(input string) string {
 	h := sha256.New()
 	h.Write([]byte(input))
@@ -185,4 +154,96 @@ func RemovePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Po
 		}
 	}
 	return &result
+}
+
+// Add to the existing service functions
+func GetDefaultTextStyles() (models.TextStyleConfig, models.TextStyleConfig) {
+	// Default title style
+	titleStyle := models.TextStyleConfig{
+		FontSize:      "title",
+		FontWeight:    "bold",
+		Color:         "FFFFFF",
+		TextAlign:     "left",
+		LineHeight:    "1.2",
+		LetterSpacing: "normal",
+	}
+
+	// Default subtitle style
+	subtitleStyle := models.TextStyleConfig{
+		FontSize:      "subtitle",
+		FontWeight:    "normal",
+		Color:         "#FFFFFF",
+		TextAlign:     "left",
+		LineHeight:    "1.4",
+		LetterSpacing: "normal",
+	}
+
+	return titleStyle, subtitleStyle
+}
+
+// Helper to apply default styles where properties are missing
+func FillMissingTextStyles(style *models.TextStyleConfig, defaultStyle models.TextStyleConfig) {
+	if style.FontSize == "" {
+		style.FontSize = defaultStyle.FontSize
+	}
+	if style.FontWeight == "" {
+		style.FontWeight = defaultStyle.FontWeight
+	}
+	if style.Color == "" {
+		style.Color = defaultStyle.Color
+	}
+	if style.TextAlign == "" {
+		style.TextAlign = defaultStyle.TextAlign
+	}
+	if style.LineHeight == "" {
+		style.LineHeight = defaultStyle.LineHeight
+	}
+	if style.LetterSpacing == "" {
+		style.LetterSpacing = defaultStyle.LetterSpacing
+	}
+}
+
+// Helper function to ensure text emphasis settings are consistent
+func ApplyTextEmphasisDefaults(announcement *models.Announcement) {
+	// If text emphasis is not set, default to title
+	if announcement.TextEmphasis == "" {
+		announcement.TextEmphasis = models.EmphasisTitle
+	}
+
+	// Get default styles
+	defaultTitleStyle, defaultSubtitleStyle := GetDefaultTextStyles()
+
+	// Apply emphasis-specific adjustments
+	switch announcement.TextEmphasis {
+	case models.EmphasisTitle:
+		// Title is more prominent - larger font for title, smaller for subtitle
+		if announcement.TitleStyle.FontSize == "" {
+			announcement.TitleStyle.FontSize = "title"
+		}
+		if announcement.SubtitleStyle.FontSize == "" {
+			announcement.SubtitleStyle.FontSize = "subtitle"
+		}
+
+	case models.EmphasisSubtitle:
+		// Subtitle is more prominent - larger font for subtitle, smaller for title
+		if announcement.TitleStyle.FontSize == "" {
+			announcement.TitleStyle.FontSize = "subtitle"
+		}
+		if announcement.SubtitleStyle.FontSize == "" {
+			announcement.SubtitleStyle.FontSize = "title"
+		}
+
+	case models.EmphasisEqual:
+		// Equal prominence - similar font sizes
+		if announcement.TitleStyle.FontSize == "" {
+			announcement.TitleStyle.FontSize = "title"
+		}
+		if announcement.SubtitleStyle.FontSize == "" {
+			announcement.SubtitleStyle.FontSize = "title"
+		}
+	}
+
+	// Fill in any missing style properties with defaults
+	FillMissingTextStyles(&announcement.TitleStyle, defaultTitleStyle)
+	FillMissingTextStyles(&announcement.SubtitleStyle, defaultSubtitleStyle)
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Insert new announcement into database
@@ -17,9 +19,9 @@ func (s *Service) InsertAnnouncement(ctx context.Context, announcement *models.A
 	return &id, err
 }
 
-// Get announcement from database
-func (s *Service) FindAnnouncement(ctx context.Context, filter interface{}) (*models.Announcement, error) {
-	var announcement models.Announcement
+// Get announcement from database using DAO
+func (s *Service) FindAnnouncementDao(ctx context.Context, filter bson.M) (*models.AnnouncementDao, error) {
+	var announcement models.AnnouncementDao
 	err := s.Database.AnnouncementCol.FindOne(ctx, filter).Decode(&announcement)
 	if err != nil {
 		return nil, err
@@ -27,41 +29,36 @@ func (s *Service) FindAnnouncement(ctx context.Context, filter interface{}) (*mo
 	return &announcement, nil
 }
 
-// get announcements from database
-func (s *Service) FindAnnouncements(ctx context.Context, filter interface{}) (*[]models.Announcement, error) {
-	var announcements []models.Announcement
-	cursor, err := s.Database.AnnouncementCol.Find(ctx, filter)
+// Find multiple announcement DAOs
+func (s *Service) FindAnnouncements(ctx context.Context, filter bson.M, opts *options.FindOptions) ([]models.AnnouncementDao, error) {
+	var announcements []models.AnnouncementDao
+	cursor, err := s.Database.AnnouncementCol.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	for cursor.Next(context.TODO()) {
-		var announcement models.Announcement
-		err := cursor.Decode(&announcement)
-		if err != nil {
-			return nil, err
-		}
-		announcements = append(announcements, announcement)
+	defer cursor.Close(ctx)
+	if err = cursor.All(ctx, &announcements); err != nil {
+		return nil, err
 	}
-	return &announcements, nil
+
+	return announcements, nil
 }
 
-// update announcement in database
-func (s *Service) ModifyAnnouncement(ctx context.Context, filter interface{}, update interface{}) error {
-	// update announcement
+// Update announcement in database
+func (s *Service) ModifyAnnouncement(ctx context.Context, filter bson.M, update bson.M) error {
 	_, err := s.Database.AnnouncementCol.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
-// delete announcement in database
-func (s *Service) DeleteAnnouncement(ctx context.Context, filter interface{}) error {
-	// delete announcement
+// Update multiple announcements in database
+func (s *Service) ModifyAnnouncements(ctx context.Context, filter bson.M, update bson.M) error {
+	_, err := s.Database.AnnouncementCol.UpdateMany(ctx, filter, update)
+	return err
+}
+
+// Delete announcement from database
+func (s *Service) RemoveAnnouncement(ctx context.Context, filter bson.M) error {
 	_, err := s.Database.AnnouncementCol.DeleteOne(ctx, filter)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

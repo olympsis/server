@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
 	"olympsis-server/utils"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -33,258 +34,385 @@ func NewAnnouncementService(l *logrus.Logger, r *mux.Router, d *database.Databas
 }
 
 /*
-Create Announcement Data (POST)
-*/
-func (a *Service) CreateAnnouncement() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
+Create Announcement (POST)
 
+	http handler
+	creates a new announcement and adds it to the database
+*/
+func (s *Service) CreateAnnouncement() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+
+		// Get user UUID from header
 		uuid := r.Header.Get("UUID")
+		if uuid == "" {
+			s.Logger.Error("Failed to get uuid from authorization token")
+			http.Error(rw, `{ "msg": "unauthorized" }`, http.StatusUnauthorized)
+			return
+		}
 
 		// Decode request
 		var req models.AnnouncementDao
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			a.Logger.Error("Failed to decode request: " + err.Error())
-			http.Error(rw, `{ "msg": "failed to decode announcement" }`, http.StatusBadRequest)
+			s.Logger.Error("Failed to decode request: ", err.Error())
+			http.Error(rw, `{"msg": "invalid request body"}`, http.StatusBadRequest)
 			return
 		}
 
-		// Validate required fields
-		if req.Title == nil || req.MediaURL == nil {
-			a.Logger.Error("Missing required fields")
-			http.Error(rw, `{ "msg": "title and media_url are required" }`, http.StatusBadRequest)
-			return
+		// Set default values for announcement
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+
+		// Default to title emphasis if not specified
+		textEmphasis := models.EmphasisTitle
+		if req.TextEmphasis == nil {
+			req.TextEmphasis = &textEmphasis
 		}
 
-		// Set creation metadata
-		timestamp := time.Now().Unix()
-		req.CreatedAt = &timestamp
-		req.CreatedBy = &uuid
+		// Get default styles
+		defaultTitleStyle, defaultSubtitleStyle := utils.GetDefaultTextStyles()
 
-		// Insert the announcement
-		id, err := a.InsertAnnouncement(ctx, &req)
-		if err != nil {
-			if ctx.Err() == context.DeadlineExceeded {
-				a.Logger.Error("Timeout inserting announcement")
-				http.Error(rw, `{ "msg": "operation timed out" }`, http.StatusGatewayTimeout)
+		// Create announcement DAO object
+		req.Creator = &uuid
+
+		// Default created event status
+		status := models.StatusPending
+		req.Status = &status
+
+		// Copy fields from request where provided
+		if req.Title == nil {
+			s.Logger.Error("request is missing announcement title")
+			http.Error(rw, `{"msg":"announcement title required"}`, http.StatusBadRequest)
+			return
+		}
+		if req.Subtitle == nil {
+			s.Logger.Error("request is missing announcement subtitle")
+			http.Error(rw, `{"msg":"announcement subtitle required"}`, http.StatusBadRequest)
+			return
+		}
+		if req.MediaURL == nil {
+			s.Logger.Error("request is missing media url")
+			http.Error(rw, `{"msg":"announcement media url required"}`, http.StatusBadRequest)
+			return
+		}
+		if req.MediaType == nil {
+			s.Logger.Error("request is missing media type")
+			http.Error(rw, `{"msg":"announcement media type required"}`, http.StatusBadRequest)
+			return
+		}
+		if req.ActionButton == nil {
+			s.Logger.Error("request is missing action button")
+			http.Error(rw, `{"msg":"announcement action button required"}`, http.StatusBadRequest)
+			return
+		}
+		if req.Position == nil {
+			defaultPos := models.PositionConfig{
+				Alignment:   "left",
+				VerticalPos: "bottom",
+				Width:       "100%",
+				Height:      "100%",
+			}
+			req.Position = &defaultPos
+		}
+		if req.Scope == nil {
+			s.Logger.Error("request is missing scope")
+			http.Error(rw, `{"msg":"announcement Scope required"}`, http.StatusBadRequest)
+			return
+		} else {
+			if *req.Scope == models.ScopeLocal && req.Location == nil {
+				s.Logger.Error("request is missing location")
+				http.Error(rw, `{"msg":"announcement with local scope requires a location"}`, http.StatusBadRequest)
 				return
 			}
-			a.Logger.Error("Failed to insert announcement: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to insert announcement" }`, http.StatusInternalServerError)
+		}
+		if req.ActiveDate == nil {
+			// Default to current time
+			req.ActiveDate = &timestamp
+		}
+		if req.ExpiryDate == nil {
+			// Default to 30 days
+			expiry := primitive.NewDateTimeFromTime(time.Now().Add((24 * time.Hour) * 30))
+			req.ExpiryDate = &expiry
+		}
+
+		// Fill missing text styles
+		utils.FillMissingTextStyles(req.TitleStyle, defaultTitleStyle)
+		utils.FillMissingTextStyles(req.SubtitleStyle, defaultSubtitleStyle)
+
+		// Last time updated announcement
+		req.UpdatedAt = &timestamp
+
+		// Insert announcement into database
+		res, err := s.InsertAnnouncement(r.Context(), &req)
+		if err != nil || res == nil {
+			s.Logger.Error("Failed to insert announcement: ", err.Error())
+			http.Error(rw, `{"msg": "failed to create announcement"}`, http.StatusInternalServerError)
 			return
 		}
 
+		// Return newly created announcement ID
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, id.Hex())))
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, res.Hex()))
 	}
 }
 
 /*
-Get Announcements (GET)
+Get Announcement (GET)
+
+	http handler
+	retrieves a specific announcement by ID
 */
-func (a *Service) GetAnnouncements() http.HandlerFunc {
+func (s *Service) GetAnnouncement() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// Check if location parameters are provided
-		hasLocation := false
-		locationQuery := bson.M{}
-
-		// Check for coordinates
-		longitude, err1 := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
-		latitude, err2 := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
-		if err1 == nil && err2 == nil && longitude != 0 && latitude != 0 {
-			hasLocation = true
-			// Default max distance to 5000m
-			maxDistance := int64(5000)
-
-			locationQuery = bson.M{
-				"location": bson.M{
-					"$near": bson.M{
-						"$geometry": models.GeoJSON{
-							Type:        "Point",
-							Coordinates: []float64{longitude, latitude},
-						},
-						"$maxDistance": maxDistance,
-					},
-				},
-			}
+		// Extract ID from URL
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{"msg": "invalid announcement id"}`, http.StatusBadRequest)
+			return
 		}
 
-		// Check for region-based filtering
-		country := r.URL.Query().Get("country")
-		state := r.URL.Query().Get("state")
-		city := r.URL.Query().Get("city")
-
-		// Build region filter
-		regionFilter := bson.M{}
-		if country != "" {
-			hasLocation = true
-			regionFilter["country"] = country
-			if state != "" {
-				regionFilter["state"] = state
-				if city != "" {
-					regionFilter["city"] = city
-				}
-			}
-		}
-
-		// Pagination parameters
-		skip, _ := strconv.ParseInt(r.URL.Query().Get("skip"), 0, 16)
-		limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 0, 16)
-		if limit == 0 {
-			limit = 20
-		}
-
-		// Current time for filtering active announcements
-		currentTime := time.Now().Unix()
-
-		// Build the main filter
-		filter := bson.M{
-			"start_time": bson.M{"$lte": currentTime},
-			"$or": []bson.M{
-				{"end_time": bson.M{"$exists": false}},
-				{"end_time": bson.M{"$gt": currentTime}},
-			},
-		}
-
-		// Add location filtering if provided
-		if hasLocation {
-			locationFilters := []bson.M{}
-
-			// Only add non-empty filters
-			if len(locationQuery) > 0 {
-				locationFilters = append(locationFilters, locationQuery)
-			}
-
-			if len(regionFilter) > 0 {
-				locationFilters = append(locationFilters, regionFilter)
-			}
-
-			// Add a filter for announcements with no location constraints
-			locationFilters = append(locationFilters, bson.M{
-				"$and": []bson.M{
-					{"location": bson.M{"$exists": false}},
-					{"country": bson.M{"$exists": false}},
-					{"state": bson.M{"$exists": false}},
-					{"city": bson.M{"$exists": false}},
-				},
-			})
-
-			if len(locationFilters) > 0 {
-				filter["$or"] = locationFilters
-			}
-		}
-
-		// Find announcements with pagination
-		options := options.Find().
-			SetSort(bson.D{{Key: "start_time", Value: -1}}).
-			SetSkip(skip).
-			SetLimit(limit)
-
-		cursor, err := a.Database.AnnouncementCol.Find(r.Context(), filter, options)
+		// Convert string ID to ObjectID
+		objID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			a.Logger.Error("Failed to find announcements", err.Error())
-			http.Error(rw, `{ "msg": "failed to find announcements" }`, http.StatusInternalServerError)
-			return
-		}
-		defer cursor.Close(r.Context())
-
-		var announcements []models.Announcement
-		if err := cursor.All(r.Context(), &announcements); err != nil {
-			a.Logger.Error("Failed to decode announcements", err.Error())
-			http.Error(rw, `{ "msg": "failed to decode announcements" }`, http.StatusInternalServerError)
+			http.Error(rw, `{"msg": "invalid announcement id format"}`, http.StatusBadRequest)
 			return
 		}
 
+		// Create context with timeout
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		// Get announcement with aggregation
+		announcement, err := aggregations.AggregateAnnouncement(ctx, objID, s.Database)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				http.Error(rw, `{"msg": "announcement not found"}`, http.StatusNotFound)
+				return
+			}
+			s.Logger.Error("Failed to fetch announcement: ", err.Error())
+			http.Error(rw, `{"msg": "failed to fetch announcement"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Return announcement data
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(announcement)
+	}
+}
+
+/*
+Get Active Announcements (GET)
+
+	http handler
+	retrieves all active announcements, with optional location filtering
+*/
+func (s *Service) GetAnnouncements() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		// Create context with timeout
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+
+		// Parse query parameters for pagination and location
+		// limitStr := r.URL.Query().Get("limit")
+		// limit := 10 // Default limit
+		// if limitStr != "" {
+		// 	if val, err := strconv.Atoi(limitStr); err == nil && val > 0 {
+		// 		limit = val
+		// 	}
+		// }
+
+		// Get announcements with location filter applied
+		announcements, err := aggregations.AggregateAnnouncements(ctx, bson.M{}, &options.AggregateOptions{}, s.Database)
+		if err != nil {
+			s.Logger.Error("Failed to fetch announcements: ", err.Error())
+			http.Error(rw, `{"msg": "failed to fetch announcements"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Handle empty result set
 		if len(announcements) == 0 {
-			rw.WriteHeader(http.StatusOK)
-			resp := models.AnnouncementsResponse{
+			response := models.AnnouncementsResponse{
 				TotalAnnouncements: 0,
 				Announcements:      []models.Announcement{},
 			}
-			json.NewEncoder(rw).Encode(resp)
+			json.NewEncoder(rw).Encode(response)
 			return
 		}
 
-		resp := models.AnnouncementsResponse{
-			TotalAnnouncements: int16(len(announcements)),
+		// Return announcements
+		response := models.AnnouncementsResponse{
+			TotalAnnouncements: len(announcements),
 			Announcements:      announcements,
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(resp)
+		json.NewEncoder(rw).Encode(response)
 	}
 }
 
 /*
 Update Announcement (PUT)
+
+	http handler
+	updates an existing announcement
 */
-func (a *Service) UpdateAnnouncement() http.HandlerFunc {
+func (s *Service) UpdateAnnouncement() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		// Get user UUID from header
+		uuid := r.Header.Get("UUID")
+		if uuid == "" {
+			http.Error(rw, `{"msg": "unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Extract ID from URL
 		vars := mux.Vars(r)
 		id := vars["id"]
 		if len(id) < 24 {
-			http.Error(rw, `{ "msg": "invalid announcement id" }`, http.StatusBadRequest)
+			http.Error(rw, `{"msg": "invalid announcement id"}`, http.StatusBadRequest)
 			return
 		}
 
-		var req models.AnnouncementDao
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
+		// Convert string ID to ObjectID
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(rw, `{"msg": "invalid announcement id format"}`, http.StatusBadRequest)
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
+		// Create context with timeout
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		// Decode update request
+		var updateData models.AnnouncementDao
+		if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
+			s.Logger.Error("Failed to decode request: ", err.Error())
+			http.Error(rw, `{"msg": "invalid request body"}`, http.StatusBadRequest)
+			return
+		}
 
 		// Build update document
-		update := bson.M{"$set": bson.M{}}
-		if req.Title != nil {
-			update["$set"].(bson.M)["title"] = *req.Title
+		updateFields := bson.M{}
+		timestamp := time.Now().Unix()
+
+		// Update fields if provided in request
+		if updateData.Title != nil {
+			updateFields["title"] = *updateData.Title
 		}
-		if req.Body != nil {
-			update["$set"].(bson.M)["body"] = *req.Body
+		if updateData.Subtitle != nil {
+			updateFields["subtitle"] = *updateData.Subtitle
 		}
-		if req.MediaURL != nil {
-			update["$set"].(bson.M)["media_url"] = *req.MediaURL
+		if updateData.TextEmphasis != nil {
+			updateFields["text_emphasis"] = *updateData.TextEmphasis
 		}
-		if req.Action != nil {
-			update["$set"].(bson.M)["action"] = *req.Action
+		if updateData.TitleStyle != nil {
+			updateFields["title_style"] = *updateData.TitleStyle
 		}
-		if req.ActionURL != nil {
-			update["$set"].(bson.M)["action_url"] = *req.ActionURL
+		if updateData.SubtitleStyle != nil {
+			updateFields["subtitle_style"] = *updateData.SubtitleStyle
 		}
-		if req.StartTime != nil {
-			update["$set"].(bson.M)["start_time"] = *req.StartTime
+		if updateData.MediaURL != nil {
+			updateFields["media_url"] = *updateData.MediaURL
 		}
-		if req.EndTime != nil {
-			update["$set"].(bson.M)["end_time"] = *req.EndTime
+		if updateData.MediaType != nil {
+			updateFields["media_type"] = *updateData.MediaType
 		}
-		if req.Location != nil {
-			update["$set"].(bson.M)["location"] = *req.Location
+		if updateData.ActionButton != nil {
+			updateFields["action_button"] = *updateData.ActionButton
 		}
-		if req.Country != nil {
-			update["$set"].(bson.M)["country"] = *req.Country
+		if updateData.Position != nil {
+			updateFields["position"] = *updateData.Position
 		}
-		if req.State != nil {
-			update["$set"].(bson.M)["state"] = *req.State
+		if updateData.Scope != nil {
+			updateFields["scope"] = *updateData.Scope
 		}
-		if req.City != nil {
-			update["$set"].(bson.M)["city"] = *req.City
+		if updateData.Location != nil {
+			updateFields["location"] = *updateData.Location
+		}
+		if updateData.Status != nil {
+			updateFields["status"] = *updateData.Status
+		}
+		if updateData.ActiveDate != nil {
+			updateFields["active_date"] = *updateData.ActiveDate
+		}
+		if updateData.ExpiryDate != nil {
+			updateFields["expiry_date"] = *updateData.ExpiryDate
 		}
 
-		err := a.ModifyAnnouncement(r.Context(), bson.M{"_id": oid}, update)
-		if err != nil {
-			a.Logger.Error("Failed to update announcement", err.Error())
-			http.Error(rw, `{ "msg": "failed to update announcement" }`, http.StatusInternalServerError)
+		// Always update the updated_at timestamp
+		updateFields["updated_at"] = timestamp
+
+		// If there's nothing to update, return early
+		if len(updateFields) == 0 {
+			http.Error(rw, `{"msg": "no updates provided"}`, http.StatusBadRequest)
 			return
 		}
 
-		announcement, _ := a.FindAnnouncement(r.Context(), bson.M{"_id": oid})
-		if announcement != nil {
-			json.NewEncoder(rw).Encode(announcement)
-		} else {
-			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{ "msg": "announcement updated" }`))
+		// Perform update
+		update := bson.M{"$set": updateFields}
+		if err := s.ModifyAnnouncement(ctx, bson.M{"_id": objID}, update); err != nil {
+			s.Logger.Error("Failed to update announcement: ", err.Error())
+			http.Error(rw, `{"msg": "failed to update announcement"}`, http.StatusInternalServerError)
+			return
 		}
+
+		// Get updated announcement
+		updatedAnnouncement, err := aggregations.AggregateAnnouncement(ctx, objID, s.Database)
+		if err != nil {
+			s.Logger.Error("Failed to fetch updated announcement: ", err.Error())
+			http.Error(rw, `{"msg": "announcement updated but failed to retrieve"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Return updated announcement
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(updatedAnnouncement)
+	}
+}
+
+/*
+Delete Announcement (DELETE)
+
+	http handler
+	deletes an announcement from the database
+*/
+func (s *Service) DeleteAnnouncement() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		// Get user UUID from header
+		uuid := r.Header.Get("UUID")
+		if uuid == "" {
+			http.Error(rw, `{"msg": "unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Extract ID from URL
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(rw, `{"msg": "invalid announcement id"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Convert string ID to ObjectID
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(rw, `{"msg": "invalid announcement id format"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Create context with timeout
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		// Delete the announcement
+		if err := s.RemoveAnnouncement(ctx, bson.M{"_id": objID}); err != nil {
+			s.Logger.Error("Failed to delete announcement: ", err.Error())
+			http.Error(rw, `{"msg": "failed to delete announcement"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Return success message
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "announcement deleted successfully"}`))
 	}
 }

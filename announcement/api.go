@@ -43,7 +43,6 @@ func (a *AnnouncementAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			a.Service.CreateAnnouncement(),
 			middleware.Logging(),
-			middleware.AdminMiddleware(),
 			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
@@ -53,7 +52,6 @@ func (a *AnnouncementAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			a.Service.UpdateAnnouncement(),
 			middleware.Logging(),
-			middleware.AdminMiddleware(),
 			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")

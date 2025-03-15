@@ -17,6 +17,7 @@ import (
 	"olympsis-server/server"
 	"olympsis-server/user"
 	"olympsis-server/utils"
+
 	"olympsis-server/venue"
 	"os"
 	"os/signal"
