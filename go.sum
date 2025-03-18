@@ -117,6 +117,8 @@ github.com/olympsis/models v0.0.0-20250314223252-21ee0dfe289f h1:eMl2MzESfe6xGRR
 github.com/olympsis/models v0.0.0-20250314223252-21ee0dfe289f/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
 github.com/olympsis/models v0.0.0-20250314231241-d02f9f046045 h1:1h6AhVqYm6i3sCxSTh9lj5o4RVFYKEfrTShHDjpCwFI=
 github.com/olympsis/models v0.0.0-20250314231241-d02f9f046045/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
+github.com/olympsis/models v0.0.0-20250318143239-1d13718f5989 h1:p9MJLTjWkxn1bRisNPE4CO1+g2zfHPgcaVWYRhVyfx0=
+github.com/olympsis/models v0.0.0-20250318143239-1d13718f5989/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
 github.com/olympsis/search v0.0.0-20250219024747-aa9b192b9182 h1:xoHik2Gmtvf3EK7SdrL7H30PH32DMqrrV/eKyiJ+ytM=
 github.com/olympsis/search v0.0.0-20250219024747-aa9b192b9182/go.mod h1:ozqUYBY+9GfDy/HeRJoduYEDPzhcot+BcfmcX7DxQiI=
 github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=

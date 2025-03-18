@@ -74,4 +74,7 @@ type CollectionsConfig struct {
 	CountriesCollection     string
 	AdminAreasCollection    string
 	SubAdminAreasCollection string
+
+	TagsCollections  string
+	SportsCollection string
 }

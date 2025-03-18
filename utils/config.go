@@ -234,6 +234,16 @@ func GetCollectionsConfig() CollectionsConfig {
 		panic("sub admin area collection name required in config")
 	}
 
+	tagsCollection := os.Getenv("TAGS_COL")
+	if tagsCollection == "" {
+		panic("tags collection name required in config")
+	}
+
+	sportsCollection := os.Getenv("SPORTS_COL")
+	if sportsCollection == "" {
+		panic("sports collection name required in config")
+	}
+
 	return CollectionsConfig{
 		AnnouncementCollection: announcementCollection,
 
@@ -275,5 +285,8 @@ func GetCollectionsConfig() CollectionsConfig {
 		CountriesCollection:     countriesCollection,
 		AdminAreasCollection:    adminAreaCollection,
 		SubAdminAreasCollection: subAdminAreaCollection,
+
+		TagsCollections:  tagsCollection,
+		SportsCollection: sportsCollection,
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"olympsis-server/post"
 	"olympsis-server/report"
 	"olympsis-server/server"
+	"olympsis-server/system"
 	"olympsis-server/user"
 	"olympsis-server/utils"
 
@@ -84,6 +85,7 @@ func main() {
 	localeAPI := locales.NewLocaleAPI(serverInterface)
 	healthAPI := health.NewHealthAPI(serverInterface)
 	snapShotAPI := mapsnapshots.NewMapSnapshotAPI(serverInterface, &config)
+	systemAPI := system.NewConfigApi(serverInterface)
 
 	announceAPI.Ready(client)
 	authAPI.Ready(client)
@@ -97,6 +99,7 @@ func main() {
 	localeAPI.Ready()
 	healthAPI.Ready()
 	snapShotAPI.Ready()
+	systemAPI.Ready()
 
 	// server config
 	s := &http.Server{
