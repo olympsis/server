@@ -9,7 +9,7 @@ import (
 
 // Insert new event into database
 func (s *Service) InsertEvent(ctx context.Context, event *models.EventDao) (*primitive.ObjectID, error) {
-	resp, err := s.Database.EventCol.InsertOne(ctx, event)
+	resp, err := s.Database.EventsCollection.InsertOne(ctx, event)
 	if err != nil {
 		return nil, err
 	}
@@ -20,7 +20,7 @@ func (s *Service) InsertEvent(ctx context.Context, event *models.EventDao) (*pri
 // Get event from database
 func (s *Service) FindEvent(ctx context.Context, filter interface{}) (*models.EventDao, error) {
 	var event models.EventDao
-	err := s.Database.EventCol.FindOne(ctx, filter).Decode(&event)
+	err := s.Database.EventsCollection.FindOne(ctx, filter).Decode(&event)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (s *Service) FindEvent(ctx context.Context, filter interface{}) (*models.Ev
 // get events from database
 func (s *Service) FindEvents(ctx context.Context, filter interface{}) (*[]models.EventDao, error) {
 	var events []models.EventDao
-	cursor, err := s.Database.EventCol.Find(ctx, filter)
+	cursor, err := s.Database.EventsCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (s *Service) FindEvents(ctx context.Context, filter interface{}) (*[]models
 func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}) error {
 
 	// update user
-	_, err := s.Database.EventCol.UpdateOne(ctx, filter, update)
+	_, err := s.Database.EventsCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update in
 func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}) error {
 
 	// update event
-	_, err := s.Database.EventCol.UpdateMany(ctx, filter, update)
+	_, err := s.Database.EventsCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update i
 func (s *Service) DeleteEvent(ctx context.Context, filter interface{}) error {
 
 	// delete user
-	_, err := s.Database.EventCol.DeleteOne(ctx, filter)
+	_, err := s.Database.EventsCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (s *Service) DeleteEvent(ctx context.Context, filter interface{}) error {
 func (s *Service) DeleteEvents(ctx context.Context, filter interface{}) error {
 
 	// delete users
-	_, err := s.Database.EventCol.DeleteMany(ctx, filter)
+	_, err := s.Database.EventsCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

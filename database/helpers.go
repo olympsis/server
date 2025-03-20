@@ -56,12 +56,84 @@ func (d *Database) SetUpUserCollections(db *mongo.Database, config *utils.Collec
 
 // Sets up all of the events collections
 func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.EventCol = db.Collection(config.EventCollection)
-	d.EventInvitationCol = db.Collection(config.EventInvitationCollection)
+	// Helper function to check if a collection exists
+	collectionExists := func(name string) bool {
+		collections, err := db.ListCollectionNames(context.Background(), bson.M{"name": name})
+		if err != nil {
+			// If there's an error, assume the collection doesn't exist
+			return false
+		}
+		return len(collections) > 0
+	}
 
-	// Create indexes in a more structured way with error handling
-	indexes := []mongo.IndexModel{
-		// 1. Basic Indexes
+	// Helper function to create a time series collection
+	createTimeSeriesCollection := func(name string, timeField string) error {
+		opts := options.CreateCollection().SetTimeSeriesOptions(
+			options.TimeSeries().
+				SetTimeField(timeField).
+				SetGranularity("seconds"),
+		)
+		err := db.CreateCollection(context.Background(), name, opts)
+		if err != nil {
+			return fmt.Errorf("could not create time series collection %s: %v", name, err)
+		}
+		return nil
+	}
+
+	// Helper function to create a regular collection
+	createRegularCollection := func(name string) error {
+		err := db.CreateCollection(context.Background(), name)
+		if err != nil {
+			return fmt.Errorf("could not create collection %s: %v", name, err)
+		}
+		return nil
+	}
+
+	// Collection configurations (name, whether it's a time series, and if so, what's the time field)
+	collections := []struct {
+		name         string
+		isTimeSeries bool
+		timeField    string
+	}{
+		{config.EventsCollection, false, ""},
+		{config.EventLogsCollection, true, "timestamp"},
+		{config.EventViewsCollection, true, "view_time"},
+		{config.EventTeamsCollection, false, ""},
+		{config.EventCommentsCollection, false, ""},
+		{config.EventInvitationsCollection, false, ""},
+		{config.EventParticipantsCollection, false, ""},
+		{config.EventTeamsWaitlistCollection, false, ""},
+		{config.EventParticipantsWaitlistCollection, false, ""},
+	}
+
+	// Create collections if they don't exist
+	for _, col := range collections {
+		if !collectionExists(col.name) {
+			if col.isTimeSeries {
+				if err := createTimeSeriesCollection(col.name, col.timeField); err != nil {
+					return err
+				}
+			} else {
+				if err := createRegularCollection(col.name); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Assign collections to the Database struct
+	d.EventsCollection = db.Collection(config.EventsCollection)
+	d.EventLogsCollection = db.Collection(config.EventLogsCollection)
+	d.EventViewsCollection = db.Collection(config.EventViewsCollection)
+	d.EventTeamsCollection = db.Collection(config.EventTeamsCollection)
+	d.EventCommentsCollection = db.Collection(config.EventCommentsCollection)
+	d.EventInvitationsCollection = db.Collection(config.EventInvitationsCollection)
+	d.EventParticipantsCollection = db.Collection(config.EventParticipantsCollection)
+	d.EventTeamsWaitlistCollection = db.Collection(config.EventTeamsWaitlistCollection)
+	d.EventParticipantsWaitlistCollection = db.Collection(config.EventParticipantsWaitlistCollection)
+
+	// Create indexes for EventsCollection
+	eventIndexes := []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "start_time", Value: 1}},
 			Options: options.Index().SetName("start_time_index"),
@@ -71,11 +143,9 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 			Options: options.Index().SetName("sports_index"),
 		},
 		{
-			Keys:    bson.D{{Key: "poster", Value: 1}},
+			Keys:    bson.D{{Key: "poster.id", Value: 1}},
 			Options: options.Index().SetName("poster_index"),
 		},
-
-		// 2. Compound Indexes
 		{
 			Keys: bson.D{
 				{Key: "sports", Value: 1},
@@ -85,7 +155,7 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 		},
 		{
 			Keys: bson.D{
-				{Key: "parent_event_id", Value: 1},
+				{Key: "recurrence_config.parent_event_id", Value: 1},
 				{Key: "start_time", Value: 1},
 			},
 			Options: options.Index().SetName("parent_event_start_time_index"),
@@ -97,51 +167,339 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 			},
 			Options: options.Index().SetName("visibility_start_time_index"),
 		},
-
-		// 3. Geospatial Index
 		{
 			Keys:    bson.D{{Key: "venues.location", Value: "2dsphere"}},
 			Options: options.Index().SetName("venues_location_index"),
 		},
-
-		// 4. Specialized Indexes
 		{
-			Keys:    bson.D{{Key: "participants.uuid", Value: 1}},
-			Options: options.Index().SetName("participants_uuid_index"),
+			Keys:    bson.D{{Key: "title", Value: "text"}, {Key: "body", Value: "text"}},
+			Options: options.Index().SetName("content_text_index"),
 		},
 	}
 
-	// Create all indexes
-	_, err := d.EventCol.Indexes().CreateMany(context.Background(), indexes)
-	if err != nil {
-		return fmt.Errorf("could not create indexes for events: %v", err)
+	// Create indexes for EventLogsCollection
+	eventLogsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "user_id", Value: 1}},
+			Options: options.Index().SetName("user_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "timestamp", Value: -1}},
+			Options: options.Index().SetName("timestamp_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "event_id", Value: 1},
+				{Key: "timestamp", Value: -1},
+			},
+			Options: options.Index().SetName("event_id_timestamp_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "action", Value: 1}},
+			Options: options.Index().SetName("action_index"),
+		},
+	}
+
+	// Create indexes for EventViewsCollection
+	eventViewsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "user_id", Value: 1}},
+			Options: options.Index().SetName("user_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "view_time", Value: -1}},
+			Options: options.Index().SetName("view_time_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "event_id", Value: 1},
+				{Key: "view_time", Value: -1},
+			},
+			Options: options.Index().SetName("event_id_view_time_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "platform", Value: 1}},
+			Options: options.Index().SetName("platform_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "source", Value: 1}},
+			Options: options.Index().SetName("source_index"),
+		},
+	}
+
+	// Create indexes for EventTeamsCollection
+	eventTeamsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "name", Value: "text"}},
+			Options: options.Index().SetName("name_text_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "members.user", Value: 1}},
+			Options: options.Index().SetName("members_user_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "created_at", Value: -1}},
+			Options: options.Index().SetName("created_at_index"),
+		},
+	}
+
+	// Create indexes for EventCommentsCollection
+	eventCommentsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "user", Value: 1}},
+			Options: options.Index().SetName("user_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "created_at", Value: -1}},
+			Options: options.Index().SetName("created_at_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "event_id", Value: 1},
+				{Key: "created_at", Value: -1},
+			},
+			Options: options.Index().SetName("event_id_created_at_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "text", Value: "text"}},
+			Options: options.Index().SetName("text_index"),
+		},
+	}
+
+	// Create indexes for EventInvitationsCollection
+	eventInvitationsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "invitee_id", Value: 1}},
+			Options: options.Index().SetName("invitee_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "status", Value: 1}},
+			Options: options.Index().SetName("status_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "event_id", Value: 1},
+				{Key: "status", Value: 1},
+			},
+			Options: options.Index().SetName("event_id_status_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "invitee_id", Value: 1},
+				{Key: "status", Value: 1},
+			},
+			Options: options.Index().SetName("invitee_id_status_index"),
+		},
+	}
+
+	// Create indexes for EventParticipantsCollection
+	eventParticipantsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "user", Value: 1}},
+			Options: options.Index().SetName("user_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "status", Value: 1}},
+			Options: options.Index().SetName("status_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "event_id", Value: 1},
+				{Key: "status", Value: 1},
+			},
+			Options: options.Index().SetName("event_id_status_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "created_at", Value: -1}},
+			Options: options.Index().SetName("created_at_index"),
+		},
+	}
+
+	// Create indexes for EventTeamsWaitlistCollection
+	eventTeamsWaitlistIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "created_at", Value: -1}},
+			Options: options.Index().SetName("created_at_index"),
+		},
+	}
+
+	// Create indexes for EventParticipantsWaitlistCollection
+	eventParticipantsWaitlistIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "user.id", Value: 1}},
+			Options: options.Index().SetName("user_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "created_at", Value: -1}},
+			Options: options.Index().SetName("created_at_index"),
+		},
+	}
+
+	// Create all indexes for each collection
+	collectionsIndexes := map[string]struct {
+		collection *mongo.Collection
+		indexes    []mongo.IndexModel
+	}{
+		"events":                    {d.EventsCollection, eventIndexes},
+		"eventLogs":                 {d.EventLogsCollection, eventLogsIndexes},
+		"eventViews":                {d.EventViewsCollection, eventViewsIndexes},
+		"eventTeams":                {d.EventTeamsCollection, eventTeamsIndexes},
+		"eventComments":             {d.EventCommentsCollection, eventCommentsIndexes},
+		"eventInvitations":          {d.EventInvitationsCollection, eventInvitationsIndexes},
+		"eventParticipants":         {d.EventParticipantsCollection, eventParticipantsIndexes},
+		"eventTeamsWaitlist":        {d.EventTeamsWaitlistCollection, eventTeamsWaitlistIndexes},
+		"eventParticipantsWaitlist": {d.EventParticipantsWaitlistCollection, eventParticipantsWaitlistIndexes},
+	}
+
+	for name, info := range collectionsIndexes {
+		if err := createIndexes(info.collection, info.indexes, name); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 // Sets up all of the venue collections
-func (d *Database) SetUpVenueCollection(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.VenueCol = db.Collection(config.VenueCollection)
-	geoModel := mongo.IndexModel{
-		Keys: bson.M{"location": "2dsphere"},
-	}
-	_, err := d.VenueCol.Indexes().CreateOne(context.Background(), geoModel)
-	if err != nil {
-		return errors.New(fmt.Sprintf("Could not create geospatial index for venues: %v", err))
+func (d *Database) SetUpVenueCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
+	// Check if collection exists
+	collectionExists := func(name string) bool {
+		collections, err := db.ListCollectionNames(context.Background(), bson.M{"name": name})
+		if err != nil {
+			// If there's an error, assume the collection doesn't exist
+			return false
+		}
+		return len(collections) > 0
 	}
 
-	regionModel := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "country", Value: 1},
-			{Key: "state", Value: 1},
-			{Key: "city", Value: 1},
-		},
+	// Create the collection if it doesn't exist
+	if !collectionExists(config.VenuesCollection) {
+		err := db.CreateCollection(context.Background(), config.VenuesCollection)
+		if err != nil {
+			return fmt.Errorf("could not create venues collection: %v", err)
+		}
+
+		// Assign the collection to the Database struct
+		d.VenuesCollection = db.Collection(config.VenuesCollection)
+
+		// Define all venue indexes
+		venueIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.M{"location": "2dsphere"},
+				Options: options.Index().SetName("location_2dsphere_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "country", Value: 1},
+					{Key: "state", Value: 1},
+					{Key: "city", Value: 1},
+				},
+				Options: options.Index().SetName("region_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "sports", Value: 1}},
+				Options: options.Index().SetName("sports_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "name", Value: "text"}},
+				Options: options.Index().SetName("name_text_index"),
+			},
+		}
+
+		// Helper function to safely create indexes
+		safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
+			// First, list existing indexes
+			cursor, err := collection.Indexes().List(context.Background())
+			if err != nil {
+				return fmt.Errorf("could not list existing indexes: %v", err)
+			}
+			defer cursor.Close(context.Background())
+
+			// Extract existing index names
+			existingIndexes := make(map[string]bool)
+			var indexDoc bson.M
+			for cursor.Next(context.Background()) {
+				if err := cursor.Decode(&indexDoc); err != nil {
+					return fmt.Errorf("could not decode index document: %v", err)
+				}
+				if name, exists := indexDoc["name"].(string); exists {
+					existingIndexes[name] = true
+				}
+			}
+
+			if err := cursor.Err(); err != nil {
+				return fmt.Errorf("error during index cursor iteration: %v", err)
+			}
+
+			// Filter out indexes that already exist
+			var newIndexes []mongo.IndexModel
+			for _, idx := range indexes {
+				if idx.Options == nil || idx.Options.Name == nil {
+					// No name specified, keep the index
+					newIndexes = append(newIndexes, idx)
+					continue
+				}
+
+				indexName := *idx.Options.Name
+				if existingIndexes[indexName] {
+					// Skip this index as it already exists
+					continue
+				}
+				newIndexes = append(newIndexes, idx)
+			}
+
+			// Create only new indexes
+			if len(newIndexes) > 0 {
+				_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
+				if err != nil {
+					return fmt.Errorf("could not create indexes: %v", err)
+				}
+			}
+
+			return nil
+		}
+
+		// Create all indexes using the safe method
+		if err := safeCreateIndexes(d.VenuesCollection, venueIndexes); err != nil {
+			return fmt.Errorf("failed to create venue indexes: %v", err)
+		}
+	} else {
+		// Assign the collection to the Database struct
+		d.VenuesCollection = db.Collection(config.VenuesCollection)
 	}
-	_, err = d.VenueCol.Indexes().CreateOne(context.Background(), regionModel)
-	if err != nil {
-		return errors.New(fmt.Sprintf("Could not create region index for venues: %v", err))
-	}
+
 	return nil
 }
 
@@ -191,5 +549,57 @@ func (d *Database) SetUpLocaleCollections(db *mongo.Database, config *utils.Coll
 func (d *Database) SetUpAppConfigCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
 	d.TagsCollection = db.Collection(config.TagsCollections)
 	d.SportsCollection = db.Collection(config.SportsCollection)
+	return nil
+}
+
+func createIndexes(collection *mongo.Collection, indexes []mongo.IndexModel, collectionName string) error {
+	// First, list existing indexes
+	cursor, err := collection.Indexes().List(context.Background())
+	if err != nil {
+		return fmt.Errorf("could not list existing indexes for %s: %v", collectionName, err)
+	}
+	defer cursor.Close(context.Background())
+
+	// Extract existing index names
+	existingIndexes := make(map[string]bool)
+	var indexDoc bson.M
+	for cursor.Next(context.Background()) {
+		if err := cursor.Decode(&indexDoc); err != nil {
+			return fmt.Errorf("could not decode index document: %v", err)
+		}
+		if name, exists := indexDoc["name"].(string); exists {
+			existingIndexes[name] = true
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return fmt.Errorf("error during index cursor iteration: %v", err)
+	}
+
+	// Filter out indexes that already exist
+	var newIndexes []mongo.IndexModel
+	for _, idx := range indexes {
+		if idx.Options == nil || idx.Options.Name == nil {
+			// No name specified, keep the index
+			newIndexes = append(newIndexes, idx)
+			continue
+		}
+
+		indexName := *idx.Options.Name
+		if existingIndexes[indexName] {
+			// Skip this index as it already exists
+			continue
+		}
+		newIndexes = append(newIndexes, idx)
+	}
+
+	// Create only new indexes
+	if len(newIndexes) > 0 {
+		_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
+		if err != nil {
+			return fmt.Errorf("could not create indexes for %s: %v", collectionName, err)
+		}
+	}
+
 	return nil
 }

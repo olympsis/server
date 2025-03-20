@@ -43,9 +43,8 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	// get events
 	e.Router.Handle("/v1/events",
 		middleware.Chain(
-			e.Service.GetEventsByLocation(),
+			e.Service.GetEvents(),
 			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")

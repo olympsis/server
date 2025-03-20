@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"olympsis-server/utils"
 
 	"github.com/sirupsen/logrus"
@@ -17,21 +18,29 @@ type Database struct {
 
 	AnnouncementCol *mongo.Collection
 
-	AuthCol     *mongo.Collection
-	UserCol     *mongo.Collection
-	ClubCol     *mongo.Collection
-	OrgCol      *mongo.Collection
-	EventCol    *mongo.Collection
-	VenueCol    *mongo.Collection
-	PostCol     *mongo.Collection
-	CommentsCol *mongo.Collection
+	AuthCol          *mongo.Collection
+	UserCol          *mongo.Collection
+	ClubCol          *mongo.Collection
+	OrgCol           *mongo.Collection
+	VenuesCollection *mongo.Collection
+	PostCol          *mongo.Collection
+	CommentsCol      *mongo.Collection
+
+	EventsCollection                    *mongo.Collection
+	EventLogsCollection                 *mongo.Collection
+	EventViewsCollection                *mongo.Collection
+	EventTeamsCollection                *mongo.Collection
+	EventCommentsCollection             *mongo.Collection
+	EventInvitationsCollection          *mongo.Collection
+	EventParticipantsCollection         *mongo.Collection
+	EventTeamsWaitlistCollection        *mongo.Collection
+	EventParticipantsWaitlistCollection *mongo.Collection
 
 	ClubApplicationCol *mongo.Collection
 	OrgApplicationCol  *mongo.Collection
 
-	EventInvitationCol *mongo.Collection
-	ClubInvitationCol  *mongo.Collection
-	OrgInvitationCol   *mongo.Collection
+	ClubInvitationCol *mongo.Collection
+	OrgInvitationCol  *mongo.Collection
 
 	BugReportCol    *mongo.Collection
 	PostReportCol   *mongo.Collection
@@ -90,7 +99,10 @@ func (d *Database) EstablishConnection(config *utils.ServerConfig) {
 		d.Client = client
 	}
 
-	d.SetUpCollections(&dbConfig, &collectionConfig)
+	err := d.SetUpCollections(&dbConfig, &collectionConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to set up database collections. Error: %s", err.Error()))
+	}
 	d.Logger.Info("Database connection successful")
 }
 
@@ -117,7 +129,7 @@ func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConf
 	}
 
 	// Venue Collections Setup
-	err = d.SetUpVenueCollection(database, collectionConfig)
+	err = d.SetUpVenueCollections(database, collectionConfig)
 	if err != nil {
 		return err
 	}
