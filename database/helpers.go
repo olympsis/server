@@ -102,8 +102,6 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 		{config.EventCommentsCollection, false, ""},
 		{config.EventInvitationsCollection, false, ""},
 		{config.EventParticipantsCollection, false, ""},
-		{config.EventTeamsWaitlistCollection, false, ""},
-		{config.EventParticipantsWaitlistCollection, false, ""},
 	}
 
 	// Create collections if they don't exist
@@ -129,8 +127,6 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 	d.EventCommentsCollection = db.Collection(config.EventCommentsCollection)
 	d.EventInvitationsCollection = db.Collection(config.EventInvitationsCollection)
 	d.EventParticipantsCollection = db.Collection(config.EventParticipantsCollection)
-	d.EventTeamsWaitlistCollection = db.Collection(config.EventTeamsWaitlistCollection)
-	d.EventParticipantsWaitlistCollection = db.Collection(config.EventParticipantsWaitlistCollection)
 
 	// Create indexes for EventsCollection
 	eventIndexes := []mongo.IndexModel{
@@ -319,7 +315,7 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 			Options: options.Index().SetName("event_id_index"),
 		},
 		{
-			Keys:    bson.D{{Key: "user", Value: 1}},
+			Keys:    bson.D{{Key: "user_id", Value: 1}},
 			Options: options.Index().SetName("user_index"),
 		},
 		{
@@ -337,33 +333,12 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 			Keys:    bson.D{{Key: "created_at", Value: -1}},
 			Options: options.Index().SetName("created_at_index"),
 		},
-	}
-
-	// Create indexes for EventTeamsWaitlistCollection
-	eventTeamsWaitlistIndexes := []mongo.IndexModel{
-		{
-			Keys:    bson.D{{Key: "event_id", Value: 1}},
-			Options: options.Index().SetName("event_id_index"),
-		},
-		{
-			Keys:    bson.D{{Key: "created_at", Value: -1}},
-			Options: options.Index().SetName("created_at_index"),
-		},
-	}
-
-	// Create indexes for EventParticipantsWaitlistCollection
-	eventParticipantsWaitlistIndexes := []mongo.IndexModel{
-		{
-			Keys:    bson.D{{Key: "event_id", Value: 1}},
-			Options: options.Index().SetName("event_id_index"),
-		},
-		{
-			Keys:    bson.D{{Key: "user.id", Value: 1}},
-			Options: options.Index().SetName("user_id_index"),
-		},
-		{
-			Keys:    bson.D{{Key: "created_at", Value: -1}},
-			Options: options.Index().SetName("created_at_index"),
+		{ // A participant can only RSVP to an event once
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "event_id", Value: 1},
+			},
+			Options: options.Index().SetUnique(true),
 		},
 	}
 
@@ -372,15 +347,13 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 		collection *mongo.Collection
 		indexes    []mongo.IndexModel
 	}{
-		"events":                    {d.EventsCollection, eventIndexes},
-		"eventLogs":                 {d.EventLogsCollection, eventLogsIndexes},
-		"eventViews":                {d.EventViewsCollection, eventViewsIndexes},
-		"eventTeams":                {d.EventTeamsCollection, eventTeamsIndexes},
-		"eventComments":             {d.EventCommentsCollection, eventCommentsIndexes},
-		"eventInvitations":          {d.EventInvitationsCollection, eventInvitationsIndexes},
-		"eventParticipants":         {d.EventParticipantsCollection, eventParticipantsIndexes},
-		"eventTeamsWaitlist":        {d.EventTeamsWaitlistCollection, eventTeamsWaitlistIndexes},
-		"eventParticipantsWaitlist": {d.EventParticipantsWaitlistCollection, eventParticipantsWaitlistIndexes},
+		"events":            {d.EventsCollection, eventIndexes},
+		"eventLogs":         {d.EventLogsCollection, eventLogsIndexes},
+		"eventViews":        {d.EventViewsCollection, eventViewsIndexes},
+		"eventTeams":        {d.EventTeamsCollection, eventTeamsIndexes},
+		"eventComments":     {d.EventCommentsCollection, eventCommentsIndexes},
+		"eventInvitations":  {d.EventInvitationsCollection, eventInvitationsIndexes},
+		"eventParticipants": {d.EventParticipantsCollection, eventParticipantsIndexes},
 	}
 
 	for name, info := range collectionsIndexes {

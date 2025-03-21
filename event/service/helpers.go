@@ -3,10 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"olympsis-server/utils"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/olympsis/models"
@@ -239,121 +236,6 @@ func generateNewParticipantNotification(id string, title string, status string) 
 			"id":   id,
 		},
 	}
-}
-
-// Query parameters structure for cleaner handling
-type eventQueryParams struct {
-	Location *models.GeoJSON
-	Sports   []string
-	VenueIDs []primitive.ObjectID
-	Radius   int
-	Skip     int
-	Limit    int
-}
-
-// Parse and validate query parameters
-func parseAndValidateQueryParams(r *http.Request) (*eventQueryParams, error) {
-	query := r.URL.Query()
-	params := &eventQueryParams{}
-
-	// Required: either location or venues
-	locationStr := query.Get("location")
-	venuesStr := query.Get("venues")
-
-	if locationStr == "" && venuesStr == "" {
-		return nil, fmt.Errorf("location (long,lat) or venues ids required")
-	}
-
-	// Parse location if provided
-	if locationStr != "" {
-		coords := strings.Split(locationStr, ",")
-		if len(coords) != 2 {
-			return nil, fmt.Errorf("invalid location format, expected 'long,lat'")
-		}
-
-		long, err := strconv.ParseFloat(coords[0], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid longitude value: %s", coords[0])
-		}
-
-		lat, err := strconv.ParseFloat(coords[1], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid latitude value: %s", coords[1])
-		}
-
-		params.Location = &models.GeoJSON{
-			Type:        "Point",
-			Coordinates: []float64{long, lat},
-		}
-	}
-
-	// Parse venues if provided
-	if venuesStr != "" {
-		venueStrings := strings.Split(venuesStr, ",")
-		params.VenueIDs = make([]primitive.ObjectID, 0, len(venueStrings))
-
-		for _, id := range venueStrings {
-			if id == "" {
-				continue
-			}
-
-			oid, err := primitive.ObjectIDFromHex(id)
-			if err != nil {
-				return nil, fmt.Errorf("invalid venue ID: %s", id)
-			}
-			params.VenueIDs = append(params.VenueIDs, oid)
-		}
-	}
-
-	// Parse sports
-	sportsStr := query.Get("sports")
-	if sportsStr != "" && sportsStr != "all" {
-		params.Sports = strings.Split(sportsStr, ",")
-	} else {
-		// Use empty slice instead of nil
-		params.Sports = []string{}
-	}
-
-	// Parse radius with default
-	radiusStr := query.Get("radius")
-	if radiusStr != "" {
-		radius, err := strconv.ParseInt(radiusStr, 10, 32)
-		if err != nil {
-			params.Radius = 16095 // Default radius in meters
-		} else {
-			params.Radius = int(radius)
-		}
-	} else {
-		params.Radius = 16095 // Default radius
-	}
-
-	// Parse skip with default
-	skipStr := query.Get("skip")
-	if skipStr != "" {
-		skip, err := strconv.ParseInt(skipStr, 10, 32)
-		if err != nil {
-			params.Skip = 0
-		} else {
-			params.Skip = int(skip)
-		}
-	} else {
-		params.Skip = 0
-	}
-
-	// Parse limit with default
-	limitStr := query.Get("limit")
-	if limitStr != "" {
-		limit, err := strconv.ParseInt(limitStr, 10, 32)
-		if err != nil {
-			params.Limit = 50
-		} else {
-			params.Limit = int(limit)
-		}
-	} else {
-		params.Limit = 50
-	}
-
-	return params, nil
 }
 
 // Find nearby venues based on location, sports, and radius

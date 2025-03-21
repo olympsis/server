@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -18,7 +19,7 @@ func (s *Service) InsertEvent(ctx context.Context, event *models.EventDao) (*pri
 }
 
 // Get event from database
-func (s *Service) FindEvent(ctx context.Context, filter interface{}) (*models.EventDao, error) {
+func (s *Service) FindEvent(ctx context.Context, filter bson.M) (*models.EventDao, error) {
 	var event models.EventDao
 	err := s.Database.EventsCollection.FindOne(ctx, filter).Decode(&event)
 	if err != nil {
@@ -28,7 +29,7 @@ func (s *Service) FindEvent(ctx context.Context, filter interface{}) (*models.Ev
 }
 
 // get events from database
-func (s *Service) FindEvents(ctx context.Context, filter interface{}) (*[]models.EventDao, error) {
+func (s *Service) FindEvents(ctx context.Context, filter bson.M) (*[]models.EventDao, error) {
 	var events []models.EventDao
 	cursor, err := s.Database.EventsCollection.Find(ctx, filter)
 	if err != nil {
@@ -47,7 +48,7 @@ func (s *Service) FindEvents(ctx context.Context, filter interface{}) (*[]models
 }
 
 // update user in database
-func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update interface{}) error {
+func (s *Service) UpdateEvent(ctx context.Context, filter bson.M, update bson.M) error {
 
 	// update user
 	_, err := s.Database.EventsCollection.UpdateOne(ctx, filter, update)
@@ -59,7 +60,7 @@ func (s *Service) UpdateEvent(ctx context.Context, filter interface{}, update in
 }
 
 // update event in database
-func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update interface{}) error {
+func (s *Service) UpdateEvents(ctx context.Context, filter bson.M, update bson.M) error {
 
 	// update event
 	_, err := s.Database.EventsCollection.UpdateMany(ctx, filter, update)
@@ -71,7 +72,7 @@ func (s *Service) UpdateEvents(ctx context.Context, filter interface{}, update i
 }
 
 // delete event in database
-func (s *Service) DeleteEvent(ctx context.Context, filter interface{}) error {
+func (s *Service) DeleteEvent(ctx context.Context, filter bson.M) error {
 
 	// delete user
 	_, err := s.Database.EventsCollection.DeleteOne(ctx, filter)
@@ -82,7 +83,7 @@ func (s *Service) DeleteEvent(ctx context.Context, filter interface{}) error {
 }
 
 // delete users in database
-func (s *Service) DeleteEvents(ctx context.Context, filter interface{}) error {
+func (s *Service) DeleteEvents(ctx context.Context, filter bson.M) error {
 
 	// delete users
 	_, err := s.Database.EventsCollection.DeleteMany(ctx, filter)

@@ -11,219 +11,29 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-/*
-Find an event's data
-*/
+// AggregateEvent gets a single event by ID with all related data
 func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models.Event, error) {
-
 	ctx := context.Background()
 
-	// filter out all docs by our ID
+	// Create ID filter pipeline stage
 	idPipeline := bson.M{
 		"$match": bson.M{
 			"_id": id,
 		},
 	}
 
-	// find poster data
-	posterPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "poster",
-			"foreignField": "uuid",
-			"as":           "_poster",
-		},
-	}
+	// Get the core pipeline stages
+	corePipeline := BuildEventCorePipeline()
 
-	// add poster data correctly to document
-	addPosterPipeline := bson.M{
-		"$addFields": bson.M{
-			"poster": bson.M{
-				"$arrayElemAt": bson.A{
-					"$_poster",
-					0,
-				},
-			},
-		},
-	}
+	// Insert the ID filter at the beginning of the pipeline
+	completePipeline := append(bson.A{idPipeline}, corePipeline...)
 
-	// find participants data
-	participantsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "participants.uuid",
-			"foreignField": "uuid",
-			"as":           "_participants",
-		},
-	}
-
-	// add participants data to document correctly
-	addParticipantsPipeline := bson.M{
-		"$addFields": bson.M{
-			"participants": bson.M{
-				"$map": bson.M{
-					"input": "$participants",
-					"as":    "participant",
-					"in": bson.M{
-						"$mergeObjects": bson.A{
-							"$$participant",
-							bson.M{
-								"user": bson.M{
-									"$arrayElemAt": bson.A{
-										bson.M{
-											"$filter": bson.M{
-												"input": "$_participants",
-												"as":    "pa",
-												"cond": bson.M{
-													"$eq": bson.A{
-														"$$pa.uuid",
-														"$$participant.uuid",
-													},
-												},
-											},
-										},
-										0,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// New wait_list pipelines
-	waitListPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "wait_list.uuid",
-			"foreignField": "uuid",
-			"as":           "_wait_list",
-		},
-	}
-
-	// Add wait-listed participants data to document
-	addWaitListPipeline := bson.M{
-		"$addFields": bson.M{
-			"wait_list": bson.M{
-				"$map": bson.M{
-					"input": "$wait_list",
-					"as":    "wait_list_participant",
-					"in": bson.M{
-						"$mergeObjects": bson.A{
-							"$$wait_list_participant",
-							bson.M{
-								"user": bson.M{
-									"$arrayElemAt": bson.A{
-										bson.M{
-											"$filter": bson.M{
-												"input": "$_wait_list",
-												"as":    "wl",
-												"cond": bson.M{
-													"$eq": bson.A{
-														"$$wl.uuid",
-														"$$wait_list_participant.uuid",
-													},
-												},
-											},
-										},
-										0,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// find field data
-	fieldPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "fields",
-			"localField":   "field._id",
-			"foreignField": "_id",
-			"as":           "field_data",
-		},
-	}
-
-	// add field data to document correctly
-	addFieldPipeline := bson.M{
-		"$addFields": bson.M{
-			"field_data": bson.M{
-				"$arrayElemAt": bson.A{
-					"$field_data",
-					0,
-				},
-			},
-		},
-	}
-
-	// find clubs data
-	clubsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "clubs",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "clubs",
-		},
-	}
-
-	// find orgs data
-	orgsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "organizations",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "organizations",
-		},
-	}
-
-	// clean up data
-	projectPipeline := bson.M{
-		"$project": bson.M{
-			"_poster":                         0,
-			"poster._id":                      0,
-			"poster.clubs":                    0,
-			"poster.sports":                   0,
-			"poster.visibility":               0,
-			"poster.device_token":             0,
-			"poster.organizations":            0,
-			"participants.uuid":               0,
-			"participants.user._id":           0,
-			"participants.user.clubs":         0,
-			"participants.user.sports":        0,
-			"participants.user.visibility":    0,
-			"participants.user.device_token":  0,
-			"participants.user.organizations": 0,
-			"_participants":                   0,
-			"clubs.members":                   0,
-			"organizations.managers":          0,
-		},
-	}
-
-	// complete pipeline
-	pipeline := bson.A{
-		idPipeline,
-		posterPipeline,
-		addPosterPipeline,
-		participantsPipeline,
-		addParticipantsPipeline,
-		waitListPipeline,
-		addWaitListPipeline,
-		fieldPipeline,
-		addFieldPipeline,
-		clubsPipeline,
-		orgsPipeline,
-		projectPipeline,
-	}
-
-	cur, err := database.EventsCollection.Aggregate(ctx, pipeline)
+	// Execute the aggregation
+	cur, err := database.EventsCollection.Aggregate(ctx, completePipeline)
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
 
 	var event models.Event
 	if cur.Next(ctx) {
@@ -238,6 +48,7 @@ func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models
 	return &event, nil
 }
 
+// AggregateEvents fetches multiple events based on filter criteria
 func AggregateEvents(
 	userID *string,
 	sports *[]string,
@@ -277,54 +88,30 @@ func AggregateEvents(
 	return &response, nil
 }
 
-/*
-Find event data by field id
-*/
-func AggregateEventsByField(id primitive.ObjectID, limit int, database *database.Database) (*[]models.Event, error) {
-
-	ctx := context.Background()
-
-	// filter out all docs by our ID
-	idPipeline := bson.M{
-		"$match": bson.M{
-			"venues._id": id,
+// Builds a pipeline for handling the event object itself
+func BuildEventCorePipeline() bson.A {
+	// Lookup for participants
+	participantsLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "eventParticipants",
+			"localField":   "_id",
+			"foreignField": "event_id",
+			"as":           "participants",
 		},
 	}
 
-	// find poster data
-	posterPipeline := bson.M{
+	// Lookup user data for participants
+	participantUsersLookupPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "poster",
+			"localField":   "participants.user_id",
 			"foreignField": "uuid",
-			"as":           "_poster",
+			"as":           "_participant_users",
 		},
 	}
 
-	// add poster data correctly to document
-	addPosterPipeline := bson.M{
-		"$addFields": bson.M{
-			"poster": bson.M{
-				"$arrayElemAt": bson.A{
-					"$_poster",
-					0,
-				},
-			},
-		},
-	}
-
-	// find participants data
-	participantsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "participants.uuid",
-			"foreignField": "uuid",
-			"as":           "_participants",
-		},
-	}
-
-	// add participants data to document correctly
-	addParticipantsPipeline := bson.M{
+	// Map users to participants
+	mapParticipantsUsersPipeline := bson.M{
 		"$addFields": bson.M{
 			"participants": bson.M{
 				"$map": bson.M{
@@ -338,12 +125,12 @@ func AggregateEventsByField(id primitive.ObjectID, limit int, database *database
 									"$arrayElemAt": bson.A{
 										bson.M{
 											"$filter": bson.M{
-												"input": "$_participants",
-												"as":    "pa",
+												"input": "$_participant_users",
+												"as":    "pu",
 												"cond": bson.M{
 													"$eq": bson.A{
-														"$$pa.uuid",
-														"$$participant.uuid",
+														"$$pu.uuid",
+														"$$participant.user_id",
 													},
 												},
 											},
@@ -359,37 +146,77 @@ func AggregateEventsByField(id primitive.ObjectID, limit int, database *database
 		},
 	}
 
-	// New wait_list pipelines
-	waitListPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "wait_list.uuid",
-			"foreignField": "uuid",
-			"as":           "_wait_list",
+	// Create participants waitlist pipeline
+	participantsWaitlistPipeline := bson.M{
+		"$addFields": bson.M{
+			"participants_waitlist": bson.M{
+				"$filter": bson.M{
+					"input": "$participants",
+					"as":    "p",
+					"cond": bson.M{
+						"$eq": bson.A{"$$p.status", 2}, // Assuming 2 is waitlist status
+					},
+				},
+			},
 		},
 	}
 
-	// Add wait-listed participants data to document
-	addWaitListPipeline := bson.M{
+	// Filter regular participants to exclude waitlist
+	filterRegularParticipantsPipeline := bson.M{
 		"$addFields": bson.M{
-			"wait_list": bson.M{
+			"participants": bson.M{
+				"$filter": bson.M{
+					"input": "$participants",
+					"as":    "p",
+					"cond": bson.M{
+						"$ne": bson.A{"$$p.status", 2}, // Exclude waitlist status
+					},
+				},
+			},
+		},
+	}
+
+	// Lookup for comments
+	commentsLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "eventComments",
+			"localField":   "_id",
+			"foreignField": "event_id",
+			"as":           "comments",
+		},
+	}
+
+	// Lookup user data for comments
+	commentUsersLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "comments.user_id",
+			"foreignField": "uuid",
+			"as":           "_comment_users",
+		},
+	}
+
+	// Map users to comments
+	mapCommentsUsersPipeline := bson.M{
+		"$addFields": bson.M{
+			"comments": bson.M{
 				"$map": bson.M{
-					"input": "$wait_list",
-					"as":    "wait_list_participant",
+					"input": "$comments",
+					"as":    "comment",
 					"in": bson.M{
 						"$mergeObjects": bson.A{
-							"$$wait_list_participant",
+							"$$comment",
 							bson.M{
 								"user": bson.M{
 									"$arrayElemAt": bson.A{
 										bson.M{
 											"$filter": bson.M{
-												"input": "$_wait_list",
-												"as":    "wl",
+												"input": "$_comment_users",
+												"as":    "cu",
 												"cond": bson.M{
 													"$eq": bson.A{
-														"$$wl.uuid",
-														"$$wait_list_participant.uuid",
+														"$$cu.uuid",
+														"$$comment.user_id",
 													},
 												},
 											},
@@ -405,112 +232,66 @@ func AggregateEventsByField(id primitive.ObjectID, limit int, database *database
 		},
 	}
 
-	// find field data
-	fieldPipeline := bson.M{
+	// Lookup for teams
+	teamsLookupPipeline := bson.M{
 		"$lookup": bson.M{
-			"from":         "fields",
-			"localField":   "field._id",
-			"foreignField": "_id",
-			"as":           "field_data",
+			"from":         "eventTeams",
+			"localField":   "_id",
+			"foreignField": "event_id",
+			"as":           "teams",
 		},
 	}
 
-	// add field data to document correctly
-	addFieldPipeline := bson.M{
-		"$addFields": bson.M{
-			"field_data": bson.M{
-				"$arrayElemAt": bson.A{
-					"$field_data",
-					0,
-				},
-			},
-		},
-	}
-
-	// find clubs data
-	clubsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "clubs",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "clubs",
-		},
-	}
-
-	// find orgs data
-	orgsPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "organizations",
-			"localField":   "organizers._id",
-			"foreignField": "_id",
-			"as":           "organizations",
-		},
-	}
-
-	// clean up data
+	// Project the result structure
 	projectPipeline := bson.M{
 		"$project": bson.M{
-			"_poster":                         0,
-			"poster._id":                      0,
-			"poster.clubs":                    0,
-			"poster.sports":                   0,
-			"poster.visibility":               0,
-			"poster.device_token":             0,
-			"poster.organizations":            0,
-			"participants.uuid":               0,
-			"participants.user._id":           0,
-			"participants.user.clubs":         0,
-			"participants.user.sports":        0,
-			"participants.user.visibility":    0,
-			"participants.user.device_token":  0,
-			"participants.user.organizations": 0,
-			"_participants":                   0,
-			"clubs.members":                   0,
-			"organizations.managers":          0,
+			"_id":                   1,
+			"poster":                1,
+			"organizers":            1,
+			"venues":                1,
+			"media_url":             1,
+			"media_type":            1,
+			"title":                 1,
+			"body":                  1,
+			"sports":                1,
+			"tags":                  1,
+			"format_config":         1,
+			"start_time":            1,
+			"stop_time":             1,
+			"participants":          1,
+			"participants_waitlist": 1,
+			"participants_count":    1,
+			"participants_config":   1,
+			"teams":                 1,
+			"teams_waitlist":        bson.M{"$literal": []any{}}, // Placeholder
+			"teams_count":           1,
+			"teams_config":          1,
+			"comments":              1,
+			"visibility":            1,
+			"external_link":         1,
+			"is_sensitive":          1,
+			"created_at":            1,
+			"updated_at":            1,
+			"cancelled_at":          1,
+			"recurrence_config":     1,
 		},
 	}
 
-	// limit documents returned
-	limitPipeline := bson.M{
-		"$limit": limit,
-	}
-
-	// complete pipeline
-	pipeline := bson.A{
-		idPipeline,
-		limitPipeline,
-		posterPipeline,
-		addPosterPipeline,
-		participantsPipeline,
-		addParticipantsPipeline,
-		waitListPipeline,
-		addWaitListPipeline,
-		fieldPipeline,
-		addFieldPipeline,
-		clubsPipeline,
-		orgsPipeline,
+	return bson.A{
+		participantsLookupPipeline,
+		participantUsersLookupPipeline,
+		mapParticipantsUsersPipeline,
+		participantsWaitlistPipeline,
+		filterRegularParticipantsPipeline,
+		teamsLookupPipeline,
+		commentsLookupPipeline,
+		commentUsersLookupPipeline,
+		mapCommentsUsersPipeline,
 		projectPipeline,
 	}
-
-	cur, err := database.EventsCollection.Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, err
-	}
-
-	var response []models.Event
-	for cur.Next(context.TODO()) {
-		var event models.Event
-		err := cur.Decode(&event)
-		if err != nil {
-			database.Logger.Error(err)
-		}
-
-		response = append(response, event)
-	}
-
-	return &response, nil
 }
 
+// Builds a pipeline for filtering and returning multiple events
 func BuildEventsAggregation(
 	userID *string,
 	sports *[]string,
@@ -630,39 +411,11 @@ func BuildEventsAggregation(
 		})
 	}
 
-	// Lookup for participants - separate collection now
-	participantsLookupPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "eventParticipants",
-			"localField":   "_id",
-			"foreignField": "event_id",
-			"as":           "event_participants",
-		},
-	}
-
-	// Lookup for teams - separate collection
-	teamsLookupPipeline := bson.M{
-		"$lookup": bson.M{
-			"from":         "eventTeams",
-			"localField":   "_id",
-			"foreignField": "event_id",
-			"as":           "event_teams",
-		},
-	}
-
-	// Calculate counts and add to document
-	addCountsPipeline := bson.M{
-		"$addFields": bson.M{
-			"participants_count": bson.M{"$size": "$event_participants"},
-			"teams_count":        bson.M{"$size": "$event_teams"},
-		},
-	}
-
 	// Private events where user is participant (only if userID is provided)
 	if userID != nil && *userID != "" {
 		visibilityConditions = append(visibilityConditions, bson.M{
-			"visibility":                 2,
-			"event_participants.user_id": *userID,
+			"visibility":           2,
+			"participants.user_id": *userID,
 		})
 	}
 
@@ -681,48 +434,26 @@ func BuildEventsAggregation(
 		"$limit": limit,
 	}
 
-	// Enhanced project pipeline to shape the final document
-	projectPipeline := bson.M{
-		"$project": bson.M{
-			"_id":                 1,
-			"poster_id":           1,
-			"organizers":          1,
-			"venues":              1,
-			"media_url":           1,
-			"media_type":          1,
-			"title":               1,
-			"body":                1,
-			"sports":              1,
-			"format_config":       1,
-			"start_time":          1,
-			"stop_time":           1,
-			"participants_count":  1,
-			"participants_config": 1,
-			"teams_count":         1,
-			"teams_config":        1,
-			"visibility":          1,
-			"external_link":       1,
-			"is_sensitive":        1,
-			"created_at":          1,
-			"updated_at":          1,
-			"cancelled_at":        1,
-			"recurrence_config":   1,
-		},
-	}
+	// Get the core pipeline stages
+	corePipeline := BuildEventCorePipeline()
 
-	// complete pipeline
-	pipeline := bson.A{
+	// Complete pipeline with filtering and pagination
+	// First add the pre-lookup filters
+	completePipeline := bson.A{
 		timePipeline,
 		cancelledPipeline,
 		filterPipeline,
-		participantsLookupPipeline, // Add participants lookup early
-		teamsLookupPipeline,        // Add teams lookup early
-		addCountsPipeline,          // Calculate counts
-		visibilityPipeline,         // Apply visibility filter after lookups
-		skipPipeline,
-		limitPipeline,
-		projectPipeline,
 	}
 
-	return pipeline
+	// Then add the core lookups
+	completePipeline = append(completePipeline, corePipeline...)
+
+	// Finally add the post-lookup stages (visibility filtering and pagination)
+	completePipeline = append(completePipeline,
+		visibilityPipeline,
+		skipPipeline,
+		limitPipeline,
+	)
+
+	return completePipeline
 }

@@ -49,26 +49,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("GET", "OPTIONS")
 
-	// get events by field
-	e.Router.Handle("/v1/events/field/{id}",
-		middleware.Chain(
-			e.Service.GetEventsByField(),
-			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
-		),
-	).Methods("GET", "OPTIONS")
-
-	// get events by field
-	e.Router.Handle("/v1/events/venue/{id}",
-		middleware.Chain(
-			e.Service.GetEventsByField(),
-			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
-		),
-	).Methods("GET", "OPTIONS")
-
 	// get an event
 	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
@@ -136,6 +116,30 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	e.Router.Handle("/v1/events/{id}/participants/{participantID}",
 		middleware.Chain(
 			e.Service.RemoveParticipant(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("DELETE", "OPTIONS")
+
+	/*
+		EVENT COMMENTS
+	*/
+
+	// add a comment
+	e.Router.Handle("/v1/events/{id}/comments",
+		middleware.Chain(
+			e.Service.AddComment(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// remove a comment
+	e.Router.Handle("/v1/events/{id}/comments/{commentID}",
+		middleware.Chain(
+			e.Service.RemoveComment(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
 			middleware.CORS(),

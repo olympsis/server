@@ -42,15 +42,13 @@ type CollectionsConfig struct {
 	OrgApplicationCollection string
 
 	// Events
-	EventsCollection                    string
-	EventLogsCollection                 string
-	EventViewsCollection                string
-	EventTeamsCollection                string
-	EventCommentsCollection             string
-	EventInvitationsCollection          string
-	EventParticipantsCollection         string
-	EventTeamsWaitlistCollection        string
-	EventParticipantsWaitlistCollection string
+	EventsCollection            string
+	EventLogsCollection         string
+	EventViewsCollection        string
+	EventTeamsCollection        string
+	EventCommentsCollection     string
+	EventInvitationsCollection  string
+	EventParticipantsCollection string
 
 	// Venues
 	VenuesCollection       string

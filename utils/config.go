@@ -163,14 +163,6 @@ func GetCollectionsConfig() CollectionsConfig {
 	if eventParticipantsCollection == "" {
 		panic("event participants collection name required in config")
 	}
-	eventTeamsWaitlistCollection := os.Getenv("EVENT_TEAMS_WAITLIST_COLLECTION")
-	if eventTeamsWaitlistCollection == "" {
-		panic("event teams waitlist collection name required in config")
-	}
-	eventParticipantsWaitlistCollection := os.Getenv("EVENT_PARTICIPANTS_WAITLIST_COLLECTION")
-	if eventParticipantsWaitlistCollection == "" {
-		panic("event participants waitlist collection name required in config")
-	}
 
 	// VENUE COLLECTIONS
 	venuesCollection := os.Getenv("VENUES_COLLECTION")
@@ -282,15 +274,13 @@ func GetCollectionsConfig() CollectionsConfig {
 		OrgInvitationCollection:  orgInvitationCollection,
 		OrgApplicationCollection: orgApplicationCollection,
 
-		EventsCollection:                    eventsCollection,
-		EventLogsCollection:                 eventLogsCollection,
-		EventViewsCollection:                eventViewsCollection,
-		EventTeamsCollection:                eventTeamsCollection,
-		EventCommentsCollection:             eventCommentsCollection,
-		EventInvitationsCollection:          eventInvitationsCollection,
-		EventParticipantsCollection:         eventParticipantsCollection,
-		EventTeamsWaitlistCollection:        eventTeamsWaitlistCollection,
-		EventParticipantsWaitlistCollection: eventParticipantsWaitlistCollection,
+		EventsCollection:            eventsCollection,
+		EventLogsCollection:         eventLogsCollection,
+		EventViewsCollection:        eventViewsCollection,
+		EventTeamsCollection:        eventTeamsCollection,
+		EventCommentsCollection:     eventCommentsCollection,
+		EventInvitationsCollection:  eventInvitationsCollection,
+		EventParticipantsCollection: eventParticipantsCollection,
 
 		VenuesCollection:       venuesCollection,
 		VenueRequestCollection: venueRequestCollection,

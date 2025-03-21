@@ -6,6 +6,7 @@ import (
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Participant Functions
@@ -47,9 +48,9 @@ func (s *Service) FindParticipant(ctx context.Context, filter bson.M) (*models.P
 }
 
 // Get participants from database
-func (s *Service) FindParticipants(ctx context.Context, filter bson.M) ([]models.ParticipantDao, error) {
+func (s *Service) FindParticipants(ctx context.Context, filter bson.M, opts *options.FindOptions) ([]models.ParticipantDao, error) {
 	var participants []models.ParticipantDao
-	cursor, err := s.Database.EventParticipantsCollection.Find(ctx, filter)
+	cursor, err := s.Database.EventParticipantsCollection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -59,12 +60,6 @@ func (s *Service) FindParticipants(ctx context.Context, filter bson.M) ([]models
 		return nil, err
 	}
 	return participants, nil
-}
-
-// Get participants for an event
-func (s *Service) FindEventParticipants(ctx context.Context, eventID primitive.ObjectID) ([]models.ParticipantDao, error) {
-	filter := bson.M{"event_id": eventID}
-	return s.FindParticipants(ctx, filter)
 }
 
 // Update participant in database
@@ -88,45 +83,5 @@ func (s *Service) DeleteParticipant(ctx context.Context, filter bson.M) error {
 // Delete multiple participants from database
 func (s *Service) DeleteParticipants(ctx context.Context, filter bson.M) error {
 	_, err := s.Database.EventParticipantsCollection.DeleteMany(ctx, filter)
-	return err
-}
-
-func (s *Service) FindWaitlistedParticipant(ctx context.Context, filter bson.M) (*models.ParticipantDao, error) {
-	var participant models.ParticipantDao
-	err := s.Database.EventParticipantsWaitlistCollection.FindOne(ctx, filter).Decode(&participant)
-	if err != nil {
-		return nil, err
-	}
-	return &participant, nil
-}
-
-// Get waitlisted participants for an event
-func (s *Service) FindWaitlistedParticipants(ctx context.Context, eventID primitive.ObjectID) ([]models.ParticipantDao, error) {
-	var participants []models.ParticipantDao
-	cursor, err := s.Database.EventParticipantsWaitlistCollection.Find(ctx, bson.M{"event_id": eventID})
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	if err := cursor.All(ctx, &participants); err != nil {
-		return nil, err
-	}
-	return participants, nil
-}
-
-// Insert new participant into database
-func (s *Service) InsertWaitlistedParticipant(ctx context.Context, participant *models.ParticipantDao) (primitive.ObjectID, error) {
-	resp, err := s.Database.EventParticipantsWaitlistCollection.InsertOne(ctx, participant)
-	if err != nil {
-		return primitive.NilObjectID, err
-	}
-	id := resp.InsertedID.(primitive.ObjectID)
-	return id, nil
-}
-
-// Delete participant from database
-func (s *Service) DeleteWaitlistedParticipant(ctx context.Context, filter bson.M) error {
-	_, err := s.Database.EventParticipantsWaitlistCollection.DeleteOne(ctx, filter)
 	return err
 }

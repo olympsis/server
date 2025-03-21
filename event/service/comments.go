@@ -22,7 +22,7 @@ func (s *Service) InsertComment(ctx context.Context, comment *models.EventCommen
 }
 
 // Insert multiple comments into database
-func (s *Service) InsertComments(ctx context.Context, comments []interface{}) ([]primitive.ObjectID, error) {
+func (s *Service) InsertComments(ctx context.Context, comments []any) ([]primitive.ObjectID, error) {
 	resp, err := s.Database.EventCommentsCollection.InsertMany(ctx, comments)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (s *Service) InsertComments(ctx context.Context, comments []interface{}) ([
 }
 
 // Get comment from database
-func (s *Service) FindComment(ctx context.Context, filter interface{}) (*models.EventCommentDao, error) {
+func (s *Service) FindComment(ctx context.Context, filter bson.M) (*models.EventCommentDao, error) {
 	var comment models.EventCommentDao
 	err := s.Database.EventCommentsCollection.FindOne(ctx, filter).Decode(&comment)
 	if err != nil {
@@ -48,7 +48,7 @@ func (s *Service) FindComment(ctx context.Context, filter interface{}) (*models.
 }
 
 // Get comments from database
-func (s *Service) FindComments(ctx context.Context, filter interface{}, limit int64, skip int64) ([]models.EventCommentDao, error) {
+func (s *Service) FindComments(ctx context.Context, filter bson.M, limit int64, skip int64) ([]models.EventCommentDao, error) {
 	opts := options.Find()
 	if limit > 0 {
 		opts.SetLimit(limit)
@@ -57,7 +57,7 @@ func (s *Service) FindComments(ctx context.Context, filter interface{}, limit in
 		opts.SetSkip(skip)
 	}
 	// Sort by creation time, newest first
-	opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
+	opts.SetSort(bson.M{"created_at": -1})
 
 	var comments []models.EventCommentDao
 	cursor, err := s.Database.EventCommentsCollection.Find(ctx, filter, opts)
@@ -72,43 +72,26 @@ func (s *Service) FindComments(ctx context.Context, filter interface{}, limit in
 	return comments, nil
 }
 
-// Get all comments for an event
-func (s *Service) FindEventComments(ctx context.Context, eventID primitive.ObjectID, limit int64, skip int64) ([]models.EventCommentDao, error) {
-	filter := bson.M{"event_id": eventID}
-	return s.FindComments(ctx, filter, limit, skip)
-}
-
-// Count comments for an event
-func (s *Service) CountEventComments(ctx context.Context, eventID primitive.ObjectID) (int64, error) {
-	filter := bson.M{"event_id": eventID}
-	count, err := s.Database.EventCommentsCollection.CountDocuments(ctx, filter)
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
-// Get comments by a specific user
-func (s *Service) FindUserComments(ctx context.Context, userUUID string, limit int64, skip int64) ([]models.EventCommentDao, error) {
-	filter := bson.M{"uuid": userUUID}
-	return s.FindComments(ctx, filter, limit, skip)
-}
-
 // Update comment in database
-func (s *Service) UpdateComment(ctx context.Context, filter interface{}, update interface{}) error {
+func (s *Service) UpdateComment(ctx context.Context, filter bson.M, update bson.M) error {
 	_, err := s.Database.EventCommentsCollection.UpdateOne(ctx, filter, update)
 	return err
 }
 
+// Update many comments in database
+func (s *Service) UpdateComments(ctx context.Context, filter bson.M, update bson.M) error {
+	_, err := s.Database.EventCommentsCollection.UpdateMany(ctx, filter, update)
+	return err
+}
+
 // Delete comment from database
-func (s *Service) DeleteComment(ctx context.Context, filter interface{}) error {
+func (s *Service) DeleteComment(ctx context.Context, filter bson.M) error {
 	_, err := s.Database.EventCommentsCollection.DeleteOne(ctx, filter)
 	return err
 }
 
-// Delete all comments for an event
-func (s *Service) DeleteEventComments(ctx context.Context, eventID primitive.ObjectID) (int64, error) {
-	filter := bson.M{"event_id": eventID}
+// Delete many comments from database
+func (s *Service) DeleteComments(ctx context.Context, filter bson.M) (int64, error) {
 	result, err := s.Database.EventCommentsCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return 0, err
