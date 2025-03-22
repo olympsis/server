@@ -55,7 +55,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			e.Service.GetOrganization(),
 			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
