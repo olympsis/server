@@ -90,6 +90,33 @@ func AggregateEvents(
 
 // Builds a pipeline for handling the event object itself
 func BuildEventCorePipeline() bson.A {
+	// Lookup for poster user data
+	posterLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "poster_id",
+			"foreignField": "uuid",
+			"as":           "_poster_user",
+		},
+	}
+
+	// Create poster user snippet
+	createPosterSnippetPipeline := bson.M{
+		"$addFields": bson.M{
+			"poster": bson.M{
+				"$cond": bson.A{
+					bson.M{"$gt": bson.A{bson.M{"$size": "$_poster_user"}, 0}},
+					bson.M{
+						"uuid":     bson.M{"$arrayElemAt": bson.A{"$_poster_user.uuid", 0}},
+						"username": bson.M{"$arrayElemAt": bson.A{"$_poster_user.username", 0}},
+						"imageURL": bson.M{"$arrayElemAt": bson.A{"$_poster_user.image_url", 0}},
+					},
+					nil,
+				},
+			},
+		},
+	}
+
 	// Lookup for participants
 	participantsLookupPipeline := bson.M{
 		"$lookup": bson.M{
@@ -278,6 +305,8 @@ func BuildEventCorePipeline() bson.A {
 	}
 
 	return bson.A{
+		posterLookupPipeline,
+		createPosterSnippetPipeline,
 		participantsLookupPipeline,
 		participantUsersLookupPipeline,
 		mapParticipantsUsersPipeline,
