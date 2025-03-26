@@ -180,7 +180,7 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 
 		// find organization data in database
 		oid, _ := primitive.ObjectIDFromHex(id)
-		org, err := aggregations.AggregateOrganization(&oid, e.Database)
+		org, err := aggregations.AggregateOrganization(oid, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				e.Logger.Error(fmt.Sprintf("Organization not found ID: %s", id))
@@ -224,7 +224,7 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		}
 
 		// fetch organizations
-		orgs, err := aggregations.AggregateOrganizations(filter, e.Database)
+		orgs, err := aggregations.AggregateOrganizations(filter, 100, 0, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNoContent)

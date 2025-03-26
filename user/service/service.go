@@ -516,64 +516,58 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+		defer cancel()
 
 		uuid := r.Header.Get("UUID")
 		response := models.CheckIn{}
 
-		// find user data
-		user, err := aggregations.AggregateUser(&uuid, s.Database)
-		if err != nil {
-			s.Log.Error(fmt.Sprintf("Failed to check user in: %s\n", err.Error()))
-			http.Error(w, `{ "msg": "failed to check user in" }`, http.StatusInternalServerError)
-			return
-		}
-		if user == nil {
-			s.Log.Error("Failed to get user. user object is nill")
-			http.Error(w, `{ "msg": "failed to get user" }`, http.StatusNotFound)
-			return
-		}
-		response.User = *user
+		var wgError error
 		var wg sync.WaitGroup
 
-		if user.Clubs != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				filter := bson.M{
-					"$match": bson.M{
-						"_id": bson.M{
-							"$in": user.Clubs,
-						},
-					},
-				}
-				clubs, err := aggregations.AggregateClubs(filter, s.Database)
-				if err != nil {
-					s.Log.Error("failed to check user in: ", err.Error())
-				}
-				response.Clubs = clubs
-			}()
-		}
+		// Find user thread
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			user, err := aggregations.AggregateUser(&uuid, s.Database)
+			if err != nil {
+				s.Log.Error("Failed to find user. Error: ", err.Error())
+				wgError = err
+			}
 
-		if user.Organizations != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				filter := bson.M{
-					"$match": bson.M{
-						"_id": bson.M{
-							"$in": user.Organizations,
-						},
-					},
-				}
-				orgs, err := aggregations.AggregateOrganizations(filter, s.Database)
-				if err != nil {
-					s.Log.Error("failed to check user in: ", err.Error())
-				}
-				response.Organizations = orgs
-			}()
-		}
+			response.User = *user
+		}()
+
+		// Find clubs thread
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			clubs, err := aggregations.FindUserClubs(ctx, uuid, s.Database)
+			if err != nil {
+				s.Log.Error("Failed to find clubs. Error: ", err.Error())
+				wgError = err
+			}
+			response.Clubs = clubs
+		}()
+
+		// Find organizations thread
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			orgs, err := aggregations.FindUserOrganizations(ctx, uuid, s.Database)
+			if err != nil {
+				s.Log.Error("Failed to find organizations. Error: ", err.Error())
+				wgError = err
+			}
+			response.Organizations = orgs
+		}()
 
 		wg.Wait()
+
+		if wgError != nil {
+			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
