@@ -36,7 +36,7 @@ func (s *Service) CreatePostReport() http.HandlerFunc {
 		// set necessary data
 		id := primitive.NewObjectID()
 		status := "pending"
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		options := options.InsertOneOptions{}
 		req.ID = &id
 		req.Status = &status

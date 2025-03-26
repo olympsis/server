@@ -125,7 +125,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		if err != nil {
 			// If we have no existing events create a new one
 			if err == mongo.ErrNoDocuments {
-				timeStamp := time.Now().Unix()
+				timeStamp := primitive.NewDateTimeFromTime(time.Now())
 				status := "pending"
 				app := models.ClubApplicationDao{
 					Applicant: &uuid,
@@ -269,10 +269,10 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				}
 
 				member := models.MemberDao{ // member object to put in club
-					ID:       primitive.NewObjectID(), // unique member identifier
-					UUID:     *app.Applicant,          // user uuid
-					Role:     "member",                // user role
-					JoinedAt: time.Now().Unix(),       // joined date
+					ID:       primitive.NewObjectID(),                   // unique member identifier
+					UserID:   *app.Applicant,                            // user uuid
+					Role:     "member",                                  // user role
+					JoinedAt: primitive.NewDateTimeFromTime(time.Now()), // joined date
 				}
 
 				// update club information by adding member in the list

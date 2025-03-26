@@ -478,17 +478,461 @@ func (d *Database) SetUpVenueCollections(db *mongo.Database, config *utils.Colle
 
 // Sets up all of the club collections
 func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.ClubCol = db.Collection(config.ClubCollection)
-	d.ClubInvitationCol = db.Collection(config.ClubInvitationCollection)
-	d.ClubApplicationCol = db.Collection(config.ClubApplicationCollection)
+	// Check if collection exists
+	collectionExists := func(name string) bool {
+		collections, err := db.ListCollectionNames(context.Background(), bson.M{"name": name})
+		if err != nil {
+			// If there's an error, assume the collection doesn't exist
+			return false
+		}
+		return len(collections) > 0
+	}
+
+	// Helper function to safely create indexes
+	safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
+		// First, list existing indexes
+		cursor, err := collection.Indexes().List(context.Background())
+		if err != nil {
+			return fmt.Errorf("could not list existing indexes: %v", err)
+		}
+		defer cursor.Close(context.Background())
+
+		// Extract existing index names
+		existingIndexes := make(map[string]bool)
+		var indexDoc bson.M
+		for cursor.Next(context.Background()) {
+			if err := cursor.Decode(&indexDoc); err != nil {
+				return fmt.Errorf("could not decode index document: %v", err)
+			}
+			if name, exists := indexDoc["name"].(string); exists {
+				existingIndexes[name] = true
+			}
+		}
+
+		if err := cursor.Err(); err != nil {
+			return fmt.Errorf("error during index cursor iteration: %v", err)
+		}
+
+		// Filter out indexes that already exist
+		var newIndexes []mongo.IndexModel
+		for _, idx := range indexes {
+			if idx.Options == nil || idx.Options.Name == nil {
+				// No name specified, keep the index
+				newIndexes = append(newIndexes, idx)
+				continue
+			}
+
+			indexName := *idx.Options.Name
+			if existingIndexes[indexName] {
+				// Skip this index as it already exists
+				continue
+			}
+			newIndexes = append(newIndexes, idx)
+		}
+
+		// Create only new indexes
+		if len(newIndexes) > 0 {
+			_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
+			if err != nil {
+				return fmt.Errorf("could not create indexes: %v", err)
+			}
+		}
+
+		return nil
+	}
+
+	// Set up Club Collection
+	if !collectionExists(config.ClubCollection) {
+		err := db.CreateCollection(context.Background(), config.ClubCollection)
+		if err != nil {
+			return fmt.Errorf("could not create club collection: %v", err)
+		}
+
+		d.ClubCol = db.Collection(config.ClubCollection)
+
+		// Define all club indexes
+		clubIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "name", Value: "text"}},
+				Options: options.Index().SetName("name_text_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "country", Value: 1},
+					{Key: "state", Value: 1},
+					{Key: "city", Value: 1},
+				},
+				Options: options.Index().SetName("region_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "sports", Value: 1}},
+				Options: options.Index().SetName("sports_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "tags", Value: 1}},
+				Options: options.Index().SetName("tags_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "visibility", Value: 1}},
+				Options: options.Index().SetName("visibility_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "is_verified", Value: 1}},
+				Options: options.Index().SetName("verified_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "parent_id", Value: 1}},
+				Options: options.Index().SetName("parent_id_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.ClubCol, clubIndexes); err != nil {
+			return fmt.Errorf("failed to create club indexes: %v", err)
+		}
+	} else {
+		d.ClubCol = db.Collection(config.ClubCollection)
+	}
+
+	// Set up Club Invitation Collection
+	if !collectionExists(config.ClubInvitationCollection) {
+		err := db.CreateCollection(context.Background(), config.ClubInvitationCollection)
+		if err != nil {
+			return fmt.Errorf("could not create club invitation collection: %v", err)
+		}
+
+		d.ClubInvitationCol = db.Collection(config.ClubInvitationCollection)
+
+		// Define club invitation indexes
+		invitationIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "club_id", Value: 1}},
+				Options: options.Index().SetName("club_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "email", Value: 1}},
+				Options: options.Index().SetName("email_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "status", Value: 1}},
+				Options: options.Index().SetName("status_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.ClubInvitationCol, invitationIndexes); err != nil {
+			return fmt.Errorf("failed to create club invitation indexes: %v", err)
+		}
+	} else {
+		d.ClubInvitationCol = db.Collection(config.ClubInvitationCollection)
+	}
+
+	// Set up Club Members Collection
+	if !collectionExists(config.ClubMembersCollection) {
+		err := db.CreateCollection(context.Background(), config.ClubMembersCollection)
+		if err != nil {
+			return fmt.Errorf("could not create club members collection: %v", err)
+		}
+
+		d.ClubMembersCollection = db.Collection(config.ClubMembersCollection)
+
+		// Define club members indexes
+		membersIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "club_id", Value: 1}},
+				Options: options.Index().SetName("club_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "user_id", Value: 1}},
+				Options: options.Index().SetName("user_id_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "club_id", Value: 1},
+					{Key: "user_id", Value: 1},
+				},
+				Options: options.Index().SetName("club_user_compound_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "role", Value: 1}},
+				Options: options.Index().SetName("role_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.ClubMembersCollection, membersIndexes); err != nil {
+			return fmt.Errorf("failed to create club members indexes: %v", err)
+		}
+	} else {
+		d.ClubMembersCollection = db.Collection(config.ClubMembersCollection)
+	}
+
+	// Set up Club Application Collection
+	if !collectionExists(config.ClubApplicationCollection) {
+		err := db.CreateCollection(context.Background(), config.ClubApplicationCollection)
+		if err != nil {
+			return fmt.Errorf("could not create club application collection: %v", err)
+		}
+
+		d.ClubApplicationCol = db.Collection(config.ClubApplicationCollection)
+
+		// Define club application indexes
+		applicationIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "club_id", Value: 1}},
+				Options: options.Index().SetName("club_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "user_id", Value: 1}},
+				Options: options.Index().SetName("user_id_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "club_id", Value: 1},
+					{Key: "user_id", Value: 1},
+				},
+				Options: options.Index().SetName("club_user_compound_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "status", Value: 1}},
+				Options: options.Index().SetName("status_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.ClubApplicationCol, applicationIndexes); err != nil {
+			return fmt.Errorf("failed to create club application indexes: %v", err)
+		}
+	} else {
+		d.ClubApplicationCol = db.Collection(config.ClubApplicationCollection)
+	}
+
 	return nil
 }
 
 // Sets up all of the organization collections
 func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.OrgCol = db.Collection(config.OrgCollection)
-	d.OrgInvitationCol = db.Collection(config.OrgInvitationCollection)
-	d.OrgApplicationCol = db.Collection(config.OrgApplicationCollection)
+	// Check if collection exists
+	collectionExists := func(name string) bool {
+		collections, err := db.ListCollectionNames(context.Background(), bson.M{"name": name})
+		if err != nil {
+			// If there's an error, assume the collection doesn't exist
+			return false
+		}
+		return len(collections) > 0
+	}
+
+	// Helper function to safely create indexes
+	safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
+		// First, list existing indexes
+		cursor, err := collection.Indexes().List(context.Background())
+		if err != nil {
+			return fmt.Errorf("could not list existing indexes: %v", err)
+		}
+		defer cursor.Close(context.Background())
+
+		// Extract existing index names
+		existingIndexes := make(map[string]bool)
+		var indexDoc bson.M
+		for cursor.Next(context.Background()) {
+			if err := cursor.Decode(&indexDoc); err != nil {
+				return fmt.Errorf("could not decode index document: %v", err)
+			}
+			if name, exists := indexDoc["name"].(string); exists {
+				existingIndexes[name] = true
+			}
+		}
+
+		if err := cursor.Err(); err != nil {
+			return fmt.Errorf("error during index cursor iteration: %v", err)
+		}
+
+		// Filter out indexes that already exist
+		var newIndexes []mongo.IndexModel
+		for _, idx := range indexes {
+			if idx.Options == nil || idx.Options.Name == nil {
+				// No name specified, keep the index
+				newIndexes = append(newIndexes, idx)
+				continue
+			}
+
+			indexName := *idx.Options.Name
+			if existingIndexes[indexName] {
+				// Skip this index as it already exists
+				continue
+			}
+			newIndexes = append(newIndexes, idx)
+		}
+
+		// Create only new indexes
+		if len(newIndexes) > 0 {
+			_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
+			if err != nil {
+				return fmt.Errorf("could not create indexes: %v", err)
+			}
+		}
+
+		return nil
+	}
+
+	// Set up Organization Collection
+	if !collectionExists(config.OrgCollection) {
+		err := db.CreateCollection(context.Background(), config.OrgCollection)
+		if err != nil {
+			return fmt.Errorf("could not create organization collection: %v", err)
+		}
+
+		d.OrgCol = db.Collection(config.OrgCollection)
+
+		// Define all organization indexes
+		orgIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "name", Value: "text"}},
+				Options: options.Index().SetName("name_text_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "country", Value: 1},
+					{Key: "state", Value: 1},
+					{Key: "city", Value: 1},
+				},
+				Options: options.Index().SetName("region_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "sports", Value: 1}},
+				Options: options.Index().SetName("sports_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "tags", Value: 1}},
+				Options: options.Index().SetName("tags_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "is_verified", Value: 1}},
+				Options: options.Index().SetName("verified_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.OrgCol, orgIndexes); err != nil {
+			return fmt.Errorf("failed to create organization indexes: %v", err)
+		}
+	} else {
+		d.OrgCol = db.Collection(config.OrgCollection)
+	}
+
+	// Set up Organization Invitation Collection
+	if !collectionExists(config.OrgInvitationCollection) {
+		err := db.CreateCollection(context.Background(), config.OrgInvitationCollection)
+		if err != nil {
+			return fmt.Errorf("could not create organization invitation collection: %v", err)
+		}
+
+		d.OrgInvitationCol = db.Collection(config.OrgInvitationCollection)
+
+		// Define organization invitation indexes
+		invitationIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "org_id", Value: 1}},
+				Options: options.Index().SetName("org_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "email", Value: 1}},
+				Options: options.Index().SetName("email_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "status", Value: 1}},
+				Options: options.Index().SetName("status_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.OrgInvitationCol, invitationIndexes); err != nil {
+			return fmt.Errorf("failed to create organization invitation indexes: %v", err)
+		}
+	} else {
+		d.OrgInvitationCol = db.Collection(config.OrgInvitationCollection)
+	}
+
+	// Set up Organization Application Collection
+	if !collectionExists(config.OrgApplicationCollection) {
+		err := db.CreateCollection(context.Background(), config.OrgApplicationCollection)
+		if err != nil {
+			return fmt.Errorf("could not create organization application collection: %v", err)
+		}
+
+		d.OrgApplicationCol = db.Collection(config.OrgApplicationCollection)
+
+		// Define organization application indexes
+		applicationIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "org_id", Value: 1}},
+				Options: options.Index().SetName("org_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "user_id", Value: 1}},
+				Options: options.Index().SetName("user_id_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "org_id", Value: 1},
+					{Key: "user_id", Value: 1},
+				},
+				Options: options.Index().SetName("org_user_compound_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "status", Value: 1}},
+				Options: options.Index().SetName("status_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.OrgApplicationCol, applicationIndexes); err != nil {
+			return fmt.Errorf("failed to create organization application indexes: %v", err)
+		}
+	} else {
+		d.OrgApplicationCol = db.Collection(config.OrgApplicationCollection)
+	}
+
+	// Set up Organization Members Collection
+	if !collectionExists(config.OrganizationMembersCollection) {
+		err := db.CreateCollection(context.Background(), config.OrganizationMembersCollection)
+		if err != nil {
+			return fmt.Errorf("could not create organization members collection: %v", err)
+		}
+
+		d.OrganizationMembersCollection = db.Collection(config.OrganizationMembersCollection)
+
+		// Define organization members indexes
+		membersIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "org_id", Value: 1}},
+				Options: options.Index().SetName("org_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "user_id", Value: 1}},
+				Options: options.Index().SetName("user_id_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "org_id", Value: 1},
+					{Key: "user_id", Value: 1},
+				},
+				Options: options.Index().SetName("org_user_compound_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "role", Value: 1}},
+				Options: options.Index().SetName("role_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.OrganizationMembersCollection, membersIndexes); err != nil {
+			return fmt.Errorf("failed to create organization members indexes: %v", err)
+		}
+	} else {
+		d.OrganizationMembersCollection = db.Collection(config.OrganizationMembersCollection)
+	}
+
 	return nil
 }
 
@@ -525,6 +969,7 @@ func (d *Database) SetUpAppConfigCollections(db *mongo.Database, config *utils.C
 	return nil
 }
 
+// Safely creates the indexes for a collection
 func createIndexes(collection *mongo.Collection, indexes []mongo.IndexModel, collectionName string) error {
 	// First, list existing indexes
 	cursor, err := collection.Indexes().List(context.Background())

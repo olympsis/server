@@ -182,7 +182,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			// Create map of incoming devices by ID for quick lookup
 			incomingDevices := make(map[string]models.NotificationDevice)
 			for _, device := range *req.NotificationDevices {
-				timestamp := time.Now().Unix()
+				timestamp := primitive.NewDateTimeFromTime(time.Now())
 				device.UpdatedAt = &timestamp
 				incomingDevices[device.DeviceID] = device
 			}
@@ -250,6 +250,9 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		if req.NotificationPreference != nil {
 			changes["notification_preference"] = req.NotificationPreference
 		}
+
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		changes["updated_at"] = timestamp
 
 		update := bson.M{"$set": changes}
 

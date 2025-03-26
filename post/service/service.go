@@ -212,6 +212,10 @@ Http handler
 func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		// Context setup
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
 
@@ -224,12 +228,10 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			return
 		}
 
-		// add additional data to post model
-		id := primitive.NewObjectID()
-		timeStamp := time.Now().Unix()
-		req.CreatedAt = &timeStamp
+		// Add additional data to post model
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		req.CreatedAt = &timestamp
 		post := models.PostDao{
-			ID:           &id,
 			Type:         req.Type,
 			Poster:       &uuid,
 			GroupID:      req.GroupID,
@@ -238,19 +240,24 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			Images:       req.Images,
 			IsSensitive:  req.IsSensitive,
 			ExternalLink: req.ExternalLink,
-			CreatedAt:    &timeStamp,
+			CreatedAt:    &timestamp,
 		}
 
-		// create post in database
-		_, err = p.Database.PostCol.InsertOne(context.TODO(), post)
+		// Create post in database
+		id, err := p.InsertPost(context.TODO(), &post, nil)
 		if err != nil {
 			p.Logger.Error("failed to create post: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to create post"}`, http.StatusInternalServerError)
 			return
 		}
+		if id == nil {
+			p.Logger.Error("inserted post id is null")
+			http.Error(rw, `{"msg": "failed to add post to database"}`, http.StatusInternalServerError)
+			return
+		}
 
-		// create post notif topic
-		postID := post.ID.Hex()
+		// Create post notification topic
+		postID := id.Hex()
 		topic := models.NotificationTopicDao{
 			Name:  &postID,
 			Users: &[]string{uuid},
@@ -268,7 +275,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		if err != nil {
 			p.Logger.Error("failed to fetch user data: ", err.Error())
 			rw.WriteHeader(http.StatusCreated)
-			rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+			rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
 			return
 		}
 
@@ -277,6 +284,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			var memberUUIDs []string
 			var org models.OrganizationDao
 
+			// Find organization data
 			filter := bson.M{"_id": post.GroupID}
 			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
 			if err != nil {
@@ -285,10 +293,15 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				return
 			}
 
-			for _, v := range *org.Members {
-				memberUUIDs = append(memberUUIDs, v.UUID)
+			// Find organization members to add to the post notification topic
+			members, err := findOrganizationMembers(&ctx, post.GroupID, p.Database)
+			if err != nil {
+				p.Logger.Error("Failed to find organization members. Error: ", err.Error())
 			}
-			err := p.Notification.ModifyTopic(r.Header.Get("Authorization"), org.ID.Hex(), models.NotificationTopicUpdateRequest{
+			for _, v := range *members {
+				memberUUIDs = append(memberUUIDs, v.UserID)
+			}
+			err = p.Notification.ModifyTopic(r.Header.Get("Authorization"), org.ID.Hex(), models.NotificationTopicUpdateRequest{
 				Action: "subscribe",
 				Users:  memberUUIDs,
 			})
@@ -296,15 +309,15 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				p.Logger.Error("Failed to add organization members to new announcement topic.")
 			}
 
-			// find child clubs
+			// Find child clubs
 			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": post.GroupID})
 			if err != nil {
 				p.Logger.Error("No children found")
 				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+				rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, post.ID.Hex()))
 			}
 
-			// send a notification to all of them
+			// Send a notification to all of them
 			for cur.Next(context.TODO()) {
 				var club models.Club
 				err := cur.Decode(&club)
@@ -328,7 +341,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error("failed to fetch club data: ", err.Error())
 				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+				rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
 			}
 
 			clubID := club.ID.Hex()
@@ -340,7 +353,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
 	}
 }
 
@@ -495,10 +508,11 @@ func (p *Service) AddLike() http.HandlerFunc {
 			return
 		}
 
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		like := models.Like{
 			ID:        primitive.NewObjectID(),
 			UUID:      uuid,
-			CreatedAt: time.Now().Unix(),
+			CreatedAt: timestamp,
 		}
 
 		oid, _ := primitive.ObjectIDFromHex(id)
@@ -609,10 +623,10 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 
 		newID := primitive.NewObjectID()
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 
 		req.ID = &newID
-		req.UUID = &uuid
+		req.UserID = &uuid
 		req.CreatedAt = &timestamp
 
 		oid, _ := primitive.ObjectIDFromHex(id)
@@ -627,7 +641,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, req.ID.Hex())))
+		rw.Write(fmt.Appendf(nil, `{ "id": "%s" }`, req.ID.Hex()))
 	}
 }
 

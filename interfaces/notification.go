@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type NotificationInterface struct {
@@ -66,7 +67,7 @@ func (n *NotificationInterface) GetNotificationTopic(topic string) (*models.Noti
 // Create a new notification topic
 func (n *NotificationInterface) CreateNotificationTopic(topic string, topicType string, users []string) error {
 	isActive := true
-	timeStamp := time.Now().Unix()
+	timeStamp := primitive.NewDateTimeFromTime(time.Now())
 	newTopic := models.NotificationTopicDao{
 		Name:      &topic,
 		Type:      &topicType,

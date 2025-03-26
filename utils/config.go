@@ -111,6 +111,10 @@ func GetCollectionsConfig() CollectionsConfig {
 	if clubCollection == "" {
 		panic("club collection name required in config")
 	}
+	clubMembersCollection := os.Getenv("CLUB_MEMBERS_COLLECTION")
+	if clubMembersCollection == "" {
+		panic("club members collection name required in config")
+	}
 	clubInvitationCollection := os.Getenv("CLUB_INVITATION_COL")
 	if clubInvitationCollection == "" {
 		panic("club invitation collection name required in config")
@@ -132,6 +136,10 @@ func GetCollectionsConfig() CollectionsConfig {
 	orgApplicationCollection := os.Getenv("ORG_APPLICATION_COL")
 	if orgApplicationCollection == "" {
 		panic("organization application name collection required in config")
+	}
+	organizationMembersCollection := os.Getenv("ORGANIZATION_MEMBERS_COLLECTION")
+	if organizationMembersCollection == "" {
+		panic("organization members name collection required in config")
 	}
 
 	// EVENT COLLECTIONS
@@ -267,12 +275,14 @@ func GetCollectionsConfig() CollectionsConfig {
 		UserCollection: userCollection,
 
 		ClubCollection:            clubCollection,
+		ClubMembersCollection:     clubMembersCollection,
 		ClubInvitationCollection:  clubInvitationCollection,
 		ClubApplicationCollection: clubApplicationCollection,
 
-		OrgCollection:            orgCollection,
-		OrgInvitationCollection:  orgInvitationCollection,
-		OrgApplicationCollection: orgApplicationCollection,
+		OrgCollection:                 orgCollection,
+		OrgInvitationCollection:       orgInvitationCollection,
+		OrgApplicationCollection:      orgApplicationCollection,
+		OrganizationMembersCollection: organizationMembersCollection,
 
 		EventsCollection:            eventsCollection,
 		EventLogsCollection:         eventLogsCollection,

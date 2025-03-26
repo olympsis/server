@@ -20,11 +20,19 @@ type Database struct {
 
 	AuthCol          *mongo.Collection
 	UserCol          *mongo.Collection
-	ClubCol          *mongo.Collection
-	OrgCol           *mongo.Collection
 	VenuesCollection *mongo.Collection
 	PostCol          *mongo.Collection
 	CommentsCol      *mongo.Collection
+
+	ClubCol               *mongo.Collection
+	ClubInvitationCol     *mongo.Collection
+	ClubApplicationCol    *mongo.Collection
+	ClubMembersCollection *mongo.Collection
+
+	OrgCol                        *mongo.Collection
+	OrgInvitationCol              *mongo.Collection
+	OrgApplicationCol             *mongo.Collection
+	OrganizationMembersCollection *mongo.Collection
 
 	EventsCollection                    *mongo.Collection
 	EventLogsCollection                 *mongo.Collection
@@ -35,12 +43,6 @@ type Database struct {
 	EventParticipantsCollection         *mongo.Collection
 	EventTeamsWaitlistCollection        *mongo.Collection
 	EventParticipantsWaitlistCollection *mongo.Collection
-
-	ClubApplicationCol *mongo.Collection
-	OrgApplicationCol  *mongo.Collection
-
-	ClubInvitationCol *mongo.Collection
-	OrgInvitationCol  *mongo.Collection
 
 	BugReportCol    *mongo.Collection
 	PostReportCol   *mongo.Collection

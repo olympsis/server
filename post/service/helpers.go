@@ -1,6 +1,13 @@
 package service
 
-import "github.com/olympsis/models"
+import (
+	"context"
+	"olympsis-server/database"
+
+	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 func generateNewPostNotification(id string, title string, username string) models.PushNotification {
 	return models.PushNotification{
@@ -26,4 +33,34 @@ func generateNewAnnouncementNotification(id string, title string) models.PushNot
 			"id":   id,
 		},
 	}
+}
+
+func findClubMembers(ctx *context.Context, id *primitive.ObjectID, db *database.Database) (*[]models.MemberDao, error) {
+	var members []models.MemberDao
+	cur, err := db.ClubMembersCollection.Find(*ctx, bson.M{"club_id": id})
+	if err != nil {
+		return nil, err
+	}
+
+	err = cur.All(*ctx, members)
+	if err != nil {
+		return nil, err
+	}
+
+	return &members, nil
+}
+
+func findOrganizationMembers(ctx *context.Context, id *primitive.ObjectID, db *database.Database) (*[]models.MemberDao, error) {
+	var members []models.MemberDao
+	cur, err := db.ClubMembersCollection.Find(*ctx, bson.M{"org_id": id})
+	if err != nil {
+		return nil, err
+	}
+
+	err = cur.All(*ctx, members)
+	if err != nil {
+		return nil, err
+	}
+
+	return &members, nil
 }

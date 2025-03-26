@@ -71,7 +71,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		// New AuthUser
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		user := &models.AuthUser{
 			UUID:      &token.UID,
 			FirstName: request.FirstName,

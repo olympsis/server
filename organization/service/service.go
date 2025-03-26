@@ -61,6 +61,9 @@ Create a new organization
 */
 func (e *Service) CreateOrganization() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		uuid := r.Header.Get("UUID")
 
 		// decode request
@@ -72,16 +75,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			return
 		}
 
-		timeStamp := time.Now().Unix()
-
-		// creator of the organization
-		member := models.MemberDao{
-			ID:       primitive.NewObjectID(),
-			UUID:     uuid,
-			Role:     "owner",
-			JoinedAt: timeStamp,
-		}
-		members := []models.MemberDao{member}
+		timeStamp := primitive.NewDateTimeFromTime(time.Now())
 		verification := false
 
 		// new organization model
@@ -94,7 +88,6 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			Country:     req.Country,
 			Logo:        req.Logo,
 			Banner:      req.Banner,
-			Members:     &members,
 			BlackList:   req.BlackList,
 			IsVerified:  &verification,
 			CreatedAt:   &timeStamp,
@@ -108,7 +101,30 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			return
 		}
 
+		// Creator of the organization
+		member := models.MemberDao{
+			ID:       primitive.NewObjectID(),
+			UserID:   uuid,
+			OrgID:    id,
+			Role:     "owner",
+			JoinedAt: timeStamp,
+		}
+
+		_, err = e.InsertMember(ctx, &member)
+		if err != nil {
+			e.Logger.Error("Failed to insert owner into organization. Error: ", err.Error())
+
+			// Try again and http error if failed again
+			_, err = e.InsertMember(ctx, &member)
+			if err != nil {
+				e.Logger.Error("Failed to insert owner into organization x2. Error: ", err.Error())
+				http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+				return
+			}
+		}
+
 		// update user data
+		// NOTICE: - WILL REMOVE THIS SOON
 		update := bson.M{
 			"$push": bson.M{
 				"organizations": id,
@@ -118,6 +134,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		if err != nil {
 			e.Logger.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
 		}
+		// NOTICE: END
 
 		// create notification topics
 		topicName := id.Hex()
@@ -141,9 +158,8 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			e.Logger.Error("Failed to create organization admin topic: ", err.Error())
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s"}`, id.Hex())))
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, id.Hex()))
 	}
 }
 
@@ -310,43 +326,46 @@ Delete an organization
 */
 func (e *Service) DeleteOrganization() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		// grab id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
-			e.Logger.Error("No/Bad organization ID in request")
 			http.Error(rw, `{ "msg": "bad organization id" }`, http.StatusBadRequest)
 			return
 		}
 		id := vars["id"]
-
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		org, err := e.FindAnOrganization(context.Background(), filter)
+
+		// Delete organization members
+		err := e.DeleteMembers(ctx, bson.M{"organization_id": oid})
 		if err != nil {
-			e.Logger.Error(fmt.Sprintf(`Failed to find org: %s`, err.Error()))
-			http.Error(rw, `{ "msg": "Failed to find organization" }`, http.StatusNotFound)
+			e.Logger.Error(fmt.Sprintf("Failed to delete organization members: %s", err.Error()))
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 			return
 		}
-		members := *org.Members
 
-		// delete org from users data
-		for i := 0; i < len(members); i++ {
-			filter := bson.M{"uuid": members[i].UUID}
-			update := bson.M{"$pull": bson.M{"organizations": oid}}
-			e.Database.UserCol.UpdateOne(context.Background(), filter, update)
-		}
-		err = e.DeleteAnOrganization(context.Background(), filter)
+		// Delete organization
+		err = e.DeleteAnOrganization(context.Background(), bson.M{"_id": oid})
 		if err != nil {
 			e.Logger.Error(fmt.Sprintf("Failed to delete organization: %s", err.Error()))
-			http.Error(rw, `{ "msg": "Failed to delete organization" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
+			return
 		}
 
-		// delete notification topic
+		// Delete notification topics
 		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
 		if err != nil {
 			e.Logger.Error("Failed to delete topic: ", err.Error())
 		}
+		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id+"_admin")
+		if err != nil {
+			e.Logger.Error("Failed to delete topic: ", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -385,7 +404,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 
 		// insert application into database
 		status := "pending"
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
@@ -396,12 +415,12 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 			return
 		}
 
-		// notify org members
+		// Notify organization members
 		notification := models.PushNotification{
 			Title: "New Application",
 			Body:  "You've received an application",
 			Data: map[string]interface{}{
-				"org_id": application.OrganizationID.Hex(),
+				"organization_id": application.OrganizationID.Hex(),
 			},
 		}
 
@@ -413,7 +432,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 		e.Notification.SendNotification(r.Header.Get("Authorization"), request)
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(models.CreateResponse{ID: id.Hex()})
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, id.Hex()))
 	}
 }
 
@@ -592,22 +611,13 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 
 		// insert application into database
 		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
+		req.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
 		err = e.InsertAnInvitation(context.TODO(), &req)
 		if err != nil {
 			e.Logger.Error(err.Error())
 			http.Error(w, `{ "msg": "failed to create invitation" }`, http.StatusInternalServerError)
 			return
 		}
-
-		// fetch user data
-		// user, err := e.SearchService.SearchUserByUUID(req.Recipient)
-		// if err != nil {
-		// 	e.Logger.Error("Failed to fetch user data: " + err.Error())
-		// 	w.WriteHeader(http.StatusCreated)
-		// 	json.NewEncoder(w).Encode(req)
-		// 	return
-		// }
 
 		// fetch organization data
 		var org models.Organization
@@ -618,19 +628,6 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 			json.NewEncoder(w).Encode(req)
 			return
 		}
-
-		// notify user
-		// note := models.Notification{
-		// 	Title: "New Invitation",
-		// 	Body:  "You've been invited to join the " + org.Name + " organization",
-		// 	Data:  org,
-		// }
-
-		// for i := range *user.DeviceTokens {
-		// 	tokens := *user.DeviceTokens
-		// 	token := tokens[i]
-		// 	utils.SendNotificationToToken(token, &note)
-		// }
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(req)
@@ -742,9 +739,9 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		if req.Status == "accepted" {
 			member := models.MemberDao{
 				ID:       primitive.NewObjectID(),
-				UUID:     req.Recipient,
+				UserID:   req.Recipient,
 				Role:     "manager",
-				JoinedAt: time.Now().Unix(),
+				JoinedAt: primitive.NewDateTimeFromTime(time.Now()),
 			}
 			changes := bson.M{
 				"$push": bson.M{"members": member},

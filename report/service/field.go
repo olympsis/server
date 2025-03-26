@@ -33,7 +33,7 @@ func (s *Service) CreateFieldReport() http.HandlerFunc {
 		id := primitive.NewObjectID()
 		uuid := r.Header.Get("UUID")
 		status := "pending"
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		options := options.InsertOneOptions{}
 		req.ID = &id
 		req.User = &uuid

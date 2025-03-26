@@ -9,6 +9,7 @@ import (
 	"github.com/olympsis/models"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -21,9 +22,13 @@ type Service struct {
 }
 
 // Insert one post into database
-func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *options.InsertOneOptions) error {
-	_, err := s.Database.PostCol.InsertOne(ctx, post, opts)
-	return err
+func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *options.InsertOneOptions) (*primitive.ObjectID, error) {
+	id, err := s.Database.PostCol.InsertOne(ctx, post, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return id.InsertedID.(*primitive.ObjectID), nil
 }
 
 // Update one post in the database
