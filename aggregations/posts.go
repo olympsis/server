@@ -111,7 +111,7 @@ func BuildPostCorePipeline() bson.A {
 	posterLookupPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "poster_id",
+			"localField":   "poster",
 			"foreignField": "uuid",
 			"as":           "_poster_user",
 		},
@@ -121,7 +121,7 @@ func BuildPostCorePipeline() bson.A {
 	posterAuthLookupPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "auth",
-			"localField":   "poster_id",
+			"localField":   "poster",
 			"foreignField": "uuid",
 			"as":           "_poster_auth",
 		},
@@ -374,7 +374,6 @@ func BuildPostCorePipeline() bson.A {
 			"_reactions":      0,
 			"_reaction_users": 0,
 			"_reaction_auth":  0,
-			"poster_id":       0,
 			"event_id":        0,
 		},
 	}
