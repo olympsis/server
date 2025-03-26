@@ -85,14 +85,9 @@ func AggregateClubs(
 
 	// Process the results
 	response := make([]models.Club, 0, limit)
-	for cur.Next(ctx) {
-		var club models.Club
-		err := cur.Decode(&club)
-		if err != nil {
-			database.Logger.Error("Failed to decode club. Error: ", err.Error())
-			continue
-		}
-		response = append(response, club)
+	err = cur.All(ctx, &response)
+	if err != nil {
+		database.Logger.Error("Failed to decode club model. Error: ", err.Error())
 	}
 
 	return &response, nil
@@ -411,7 +406,17 @@ func BuildClubCorePipeline() bson.A {
 		},
 	}
 
-	// Map users to members
+	// Lookup auth data for members to get first/last name
+	memberAuthLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "_club_members.user_id",
+			"foreignField": "uuid",
+			"as":           "_member_auth",
+		},
+	}
+
+	// Map users to members with auth data
 	mapMembersUsersPipeline := bson.M{
 		"$addFields": bson.M{
 			"members": bson.M{
@@ -419,24 +424,57 @@ func BuildClubCorePipeline() bson.A {
 					"input": "$_club_members",
 					"as":    "member",
 					"in": bson.M{
-						"id":        "$$member._id",
+						// Use _id instead of id to match Member struct
+						"_id":       "$$member._id",
 						"role":      "$$member.role",
 						"joined_at": "$$member.joined_at",
 						"user": bson.M{
-							"$arrayElemAt": bson.A{
-								bson.M{
-									"$filter": bson.M{
-										"input": "$_member_users",
-										"as":    "mu",
-										"cond": bson.M{
-											"$eq": bson.A{
-												"$$mu.uuid",
-												"$$member.user_id",
+							"$let": bson.M{
+								"vars": bson.M{
+									"userData": bson.M{
+										"$arrayElemAt": bson.A{
+											bson.M{
+												"$filter": bson.M{
+													"input": "$_member_users",
+													"as":    "mu",
+													"cond": bson.M{
+														"$eq": bson.A{
+															"$$mu.uuid",
+															"$$member.user_id",
+														},
+													},
+												},
 											},
+											0,
+										},
+									},
+									"authData": bson.M{
+										"$arrayElemAt": bson.A{
+											bson.M{
+												"$filter": bson.M{
+													"input": "$_member_auth",
+													"as":    "ma",
+													"cond": bson.M{
+														"$eq": bson.A{
+															"$$ma.uuid",
+															"$$member.user_id",
+														},
+													},
+												},
+											},
+											0,
 										},
 									},
 								},
-								0,
+								"in": bson.M{
+									"$mergeObjects": bson.A{
+										"$$userData",
+										bson.M{
+											"first_name": "$$authData.first_name",
+											"last_name":  "$$authData.last_name",
+										},
+									},
+								},
 							},
 						},
 					},
@@ -446,41 +484,91 @@ func BuildClubCorePipeline() bson.A {
 	}
 
 	// If parent organization exists, lookup its members
-	managersPipeline := bson.M{
+	parentMembersLookupPipeline := bson.M{
 		"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "parent.members.uuid",
-			"foreignField": "uuid",
-			"as":           "managers",
+			"from":         "organizationMembers",
+			"localField":   "parent_id",
+			"foreignField": "organization_id",
+			"as":           "_parent_members",
 		},
 	}
 
-	// Add member user data to parent organization's members
-	addManagersPipeline := bson.M{
+	// Lookup user data for parent organization members
+	parentMemberUsersLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "users",
+			"localField":   "_parent_members.user_id",
+			"foreignField": "uuid",
+			"as":           "_parent_member_users",
+		},
+	}
+
+	// Lookup auth data for parent organization members
+	parentMemberAuthLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "_parent_members.user_id",
+			"foreignField": "uuid",
+			"as":           "_parent_member_auth",
+		},
+	}
+
+	// Add parent.members field with user data
+	addParentMembersPipeline := bson.M{
 		"$addFields": bson.M{
 			"parent.members": bson.M{
 				"$map": bson.M{
-					"input": "$parent.members",
-					"as":    "manager",
+					"input": "$_parent_members",
+					"as":    "pm",
 					"in": bson.M{
-						"$mergeObjects": bson.A{
-							"$$manager",
-							bson.M{
-								"user": bson.M{
-									"$arrayElemAt": bson.A{
-										bson.M{
-											"$filter": bson.M{
-												"input": "$managers",
-												"as":    "m",
-												"cond": bson.M{
-													"$eq": bson.A{
-														"$$m.uuid",
-														"$$manager.uuid",
+						"_id":       "$$pm._id",
+						"role":      "$$pm.role",
+						"joined_at": "$$pm.joined_at",
+						"user": bson.M{
+							"$let": bson.M{
+								"vars": bson.M{
+									"userData": bson.M{
+										"$arrayElemAt": bson.A{
+											bson.M{
+												"$filter": bson.M{
+													"input": "$_parent_member_users",
+													"as":    "pmu",
+													"cond": bson.M{
+														"$eq": bson.A{
+															"$$pmu.uuid",
+															"$$pm.user_id",
+														},
 													},
 												},
 											},
+											0,
 										},
-										0,
+									},
+									"authData": bson.M{
+										"$arrayElemAt": bson.A{
+											bson.M{
+												"$filter": bson.M{
+													"input": "$_parent_member_auth",
+													"as":    "pma",
+													"cond": bson.M{
+														"$eq": bson.A{
+															"$$pma.uuid",
+															"$$pm.user_id",
+														},
+													},
+												},
+											},
+											0,
+										},
+									},
+								},
+								"in": bson.M{
+									"$mergeObjects": bson.A{
+										"$$userData",
+										bson.M{
+											"first_name": "$$authData.first_name",
+											"last_name":  "$$authData.last_name",
+										},
 									},
 								},
 							},
@@ -496,10 +584,11 @@ func BuildClubCorePipeline() bson.A {
 		"$project": bson.M{
 			"_club_members":                     0,
 			"_member_users":                     0,
-			"users":                             0,
-			"managers":                          0,
+			"_member_auth":                      0,
+			"_parent_members":                   0,
+			"_parent_member_users":              0,
+			"_parent_member_auth":               0,
 			"organizations":                     0,
-			"parent.members.uuid":               0,
 			"parent.members.user._id":           0,
 			"parent.members.user.clubs":         0,
 			"parent.members.user.sports":        0,
@@ -514,9 +603,12 @@ func BuildClubCorePipeline() bson.A {
 		addParentPipeline,
 		membersLookupPipeline,
 		memberUsersLookupPipeline,
+		memberAuthLookupPipeline,
 		mapMembersUsersPipeline,
-		managersPipeline,
-		addManagersPipeline,
+		parentMembersLookupPipeline,
+		parentMemberUsersLookupPipeline,
+		parentMemberAuthLookupPipeline,
+		addParentMembersPipeline,
 		projectPipeline,
 	}
 }

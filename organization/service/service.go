@@ -103,11 +103,11 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 
 		// Creator of the organization
 		member := models.MemberDao{
-			ID:       primitive.NewObjectID(),
-			UserID:   uuid,
-			OrgID:    id,
-			Role:     "owner",
-			JoinedAt: timeStamp,
+			ID:             primitive.NewObjectID(),
+			UserID:         uuid,
+			OrganizationID: id,
+			Role:           "owner",
+			JoinedAt:       timeStamp,
 		}
 
 		_, err = e.InsertMember(ctx, &member)

@@ -23,7 +23,7 @@ type Service struct {
 
 // Insert one post into database
 func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *options.InsertOneOptions) (*primitive.ObjectID, error) {
-	id, err := s.Database.PostCol.InsertOne(ctx, post, opts)
+	id, err := s.Database.PostsCollection.InsertOne(ctx, post, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *op
 // Update one post in the database
 func (s *Service) UpdatePost(ctx context.Context, filter interface{}, update interface{}) error {
 	// update user
-	_, err := s.Database.PostCol.UpdateOne(ctx, filter, update)
+	_, err := s.Database.PostsCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (s *Service) UpdatePost(ctx context.Context, filter interface{}, update int
 // Update many posts in the database
 func (s *Service) UpdatePosts(ctx context.Context, filter interface{}, update interface{}) error {
 	// update event
-	_, err := s.Database.PostCol.UpdateMany(ctx, filter, update)
+	_, err := s.Database.PostsCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (s *Service) UpdatePosts(ctx context.Context, filter interface{}, update in
 // Delete one post in the database
 func (s *Service) RemovePost(ctx context.Context, filter interface{}) error {
 	// delete user
-	_, err := s.Database.PostCol.DeleteOne(ctx, filter)
+	_, err := s.Database.PostsCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (s *Service) RemovePost(ctx context.Context, filter interface{}) error {
 // Delete many posts in the database
 func (s *Service) RemovePosts(ctx context.Context, filter interface{}) error {
 	// delete users
-	_, err := s.Database.PostCol.DeleteMany(ctx, filter)
+	_, err := s.Database.PostsCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

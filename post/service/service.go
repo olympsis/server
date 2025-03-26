@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/server"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -48,98 +48,36 @@ Get Posts (GET)
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// TODO - THIS SHOULD NO LONGER WORK
-		// LOOK FOR A WORKAROUND
-		uuid := r.Header.Get("UUID")
-
-		// grab query parameters
-		group := r.URL.Query().Get("groupID")
-		parent := r.URL.Query().Get("parentID")
-		if group == "" {
-			http.Error(rw, `{ "msg" : "no group id found in request"}`, http.StatusBadRequest)
-			return
+		params, err := parsePostQueryParams(r)
+		if err != nil {
+			p.Logger.Error("Failed to parse request. Error: ", err.Error())
+			http.Error(rw, `{"msg": "bad request"}`, http.StatusBadRequest)
 		}
 
-		// convert ids found to objectIDs
-		var ids []primitive.ObjectID
-		groupID, err := primitive.ObjectIDFromHex(group)
+		filter := bson.M{}
+		groupID, err := primitive.ObjectIDFromHex(params.GroupID)
 		if err != nil {
 			p.Logger.Error("Failed to encode group id to object id: ", err.Error())
 			http.Error(rw, `{ "msg" : "bad group id found in request"}`, http.StatusBadRequest)
 			return
-		} else {
-			ids = append(ids, groupID)
-		}
-		if parent != "" {
-			parentID, _ := primitive.ObjectIDFromHex(parent)
-			ids = append(ids, parentID)
 		}
 
-		var wg sync.WaitGroup
-		var user *models.UserDao
-		var posts *[]models.Post
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			p.Database.UserCol.FindOne(r.Context(), bson.M{"uuid": uuid}).Decode(&user)
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			// run aggregation pipeline
-			posts, err = FindPosts(ids, p.Database, 100)
-			if err != nil {
-				if err == mongo.ErrNoDocuments {
-					http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
-					return
-				} else {
-					p.Logger.Error("Failed to get posts: ", err.Error())
-					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
-					return
-				}
+		if params.ParentID != nil && *params.ParentID != "" {
+			parentID, _ := primitive.ObjectIDFromHex(*params.ParentID)
+			filter["$or"] = bson.A{
+				bson.M{"group_id": groupID},
+				bson.M{"group_id": parentID},
 			}
-		}()
+		} else {
+			filter["group_id"] = groupID
+		}
 
-		wg.Wait()
+		posts, err := aggregations.AggregatePosts(filter, 20, 0, p.Database)
 
 		if posts == nil || len(*posts) == 0 {
 			http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
 			return
 		}
-
-		// if user == nil {
-		// 	http.Error(rw, `{ "msg": "user not found!" }`, http.StatusInternalServerError)
-		// 	return
-		// }
-
-		// if user.BlockedUsers != nil {
-		// 	blockedList := *user.BlockedUsers
-		// 	_posts := utils.RemovePostsByPosterUUIDs(posts, blockedList)
-
-		// 	if _posts == nil || len(*_posts) == 0 {
-		// 		http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
-		// 		return
-		// 	}
-
-		// 	resp := models.PostsResponse{
-		// 		TotalPosts: len(*_posts),
-		// 		Posts:      *_posts,
-		// 	}
-
-		// 	rw.WriteHeader(http.StatusOK)
-		// 	json.NewEncoder(rw).Encode(resp)
-
-		// } else {
-		// 	resp := models.PostsResponse{
-		// 		TotalPosts: len(*posts),
-		// 		Posts:      *posts,
-		// 	}
-
-		// 	rw.WriteHeader(http.StatusOK)
-		// 	json.NewEncoder(rw).Encode(resp)
-		// }
 
 		resp := models.PostsResponse{
 			TotalPosts: len(*posts),
@@ -178,7 +116,7 @@ func (p *Service) GetPost() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 
 		// run aggregation pipeline to fetch post
-		post, err := FindPost(oid, p.Database)
+		post, err := aggregations.AggregatePost(oid, p.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{"msg": "post not found"}`, http.StatusNotFound)
@@ -416,7 +354,7 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		}
 
 		// update post
-		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, update)
+		_, err = p.Database.PostsCollection.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
 			p.Logger.Error("failed to update post: ", err.Error())
 			http.Error(rw, `{ "msg" : "failed to update post" }`, http.StatusInternalServerError)
@@ -461,7 +399,7 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		filter := bson.M{"_id": oid}
-		_, err = p.Database.PostCol.DeleteOne(context.TODO(), filter)
+		_, err = p.Database.PostsCollection.DeleteOne(context.TODO(), filter)
 		if err != nil {
 			p.Logger.Debug("failed to delete post: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to delete post" }`, http.StatusInternalServerError)
@@ -496,6 +434,8 @@ Returns:
 */
 func (p *Service) AddLike() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
 
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
@@ -509,32 +449,27 @@ func (p *Service) AddLike() http.HandlerFunc {
 		}
 
 		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		like := models.Like{
-			ID:        primitive.NewObjectID(),
-			UUID:      uuid,
-			CreatedAt: timestamp,
-		}
-
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid, "likes.uuid": bson.M{"$ne": uuid}}
-		change := bson.M{
-			"$push": bson.M{
-				"likes": like,
-			},
+		like := models.ReactionDao{
+			UserID:    &uuid,
+			PostID:    &oid,
+			CreatedAt: &timestamp,
 		}
 
-		resp, err := p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
+		rid, err := p.InsertReaction(ctx, &like, nil)
 		if err != nil { // unexpected error
-			p.Logger.Error("failed to add like: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to add like" }`, http.StatusInternalServerError)
+			p.Logger.Error("Failed to add reaction: ", err.Error())
+			http.Error(rw, `{ "msg" : "something went wrong" }`, http.StatusInternalServerError)
 			return
-		} else if resp.ModifiedCount != 1 { // the like already exits
-			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
-		} else { // newly created like
-			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
 		}
+		if rid == nil {
+			p.Logger.Error("Failed to insert reaction. Inserted ID nil.")
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, rid.Hex()))
 	}
 }
 
@@ -573,7 +508,7 @@ func (p *Service) RemoveLike() http.HandlerFunc {
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"likes": bson.M{"_id": loid}}}
 
-		_, err := p.Database.PostCol.UpdateOne(context.TODO(), match, change)
+		_, err := p.Database.PostsCollection.UpdateOne(context.TODO(), match, change)
 		if err != nil {
 			p.Logger.Error("failed to remove like: ", err.Error())
 			http.Error(rw, `{ "msg" : "failed to remove like" }`, http.StatusInternalServerError)
@@ -602,6 +537,9 @@ Returns:
 func (p *Service) AddComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
+
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
 
@@ -613,35 +551,34 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req models.CommentDao
-		// decode request
+		var req models.PostCommentDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			p.Logger.Error("failed to decode comments: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to decode comments" }`, http.StatusBadRequest)
+			p.Logger.Error("failed to decode comment: ", err.Error())
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusBadRequest)
 			return
 		}
 
-		newID := primitive.NewObjectID()
 		timestamp := primitive.NewDateTimeFromTime(time.Now())
-
-		req.ID = &newID
+		oid, _ := primitive.ObjectIDFromHex(id)
 		req.UserID = &uuid
+		req.PostID = &oid
 		req.CreatedAt = &timestamp
 
-		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		change := bson.M{"$push": bson.M{"comments": req}}
-
-		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
+		cid, err := p.InsertComment(ctx, &req, nil)
 		if err != nil {
-			p.Logger.Error("failed to update post: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to update post" }`, http.StatusInternalServerError)
+			p.Logger.Error("Failed to insert comment. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
+			return
+		}
+		if cid == nil {
+			p.Logger.Error("Failed to insert comment. Inserted ID nil.")
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write(fmt.Appendf(nil, `{ "id": "%s" }`, req.ID.Hex()))
+		rw.Write(fmt.Appendf(nil, `{ "id": "%s" }`, cid.Hex()))
 	}
 }
 
@@ -659,8 +596,11 @@ Returns:
 	Http handler
 		- Writes back OK to client
 */
-func (p *Service) RemoveComment() http.HandlerFunc {
+func (p *Service) DeleteComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
+
 		// grab id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
@@ -677,13 +617,10 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 		coid, _ := primitive.ObjectIDFromHex(cId)
 
-		match := bson.M{"_id": oid}
-		change := bson.M{"$pull": bson.M{"comments": bson.M{"_id": coid}}}
-
-		_, err := p.Database.PostCol.UpdateOne(context.TODO(), match, change)
+		err := p.RemoveComment(ctx, bson.M{"_id": coid, "post_id": oid})
 		if err != nil {
-			p.Logger.Error("failed to remove comment: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to remove comment" }`, http.StatusInternalServerError)
+			p.Logger.Error("failed to remove comment. Error: ", err.Error())
+			http.Error(rw, `{ "msg" : "something went wrong" }`, http.StatusInternalServerError)
 			return
 		}
 

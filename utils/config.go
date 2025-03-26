@@ -183,13 +183,18 @@ func GetCollectionsConfig() CollectionsConfig {
 	// }
 
 	// POST COLLECTIONS
-	postCollection := os.Getenv("POST_COL")
+	postCollection := os.Getenv("POSTS_COLLECTION")
 	if postCollection == "" {
-		panic("post collection name required in config")
+		panic("posts collection name required in config")
 	}
-	commentCollection := os.Getenv("COMMENT_COL")
-	if commentCollection == "" {
-		panic("comment collection name required in config")
+	postCommentsCollection := os.Getenv("POST_COMMENTS_COLLECTION")
+	if postCommentsCollection == "" {
+		panic("post comments collection name required in config")
+	}
+
+	postReactionsCollection := os.Getenv("POST_REACTIONS_COLLECTION")
+	if postReactionsCollection == "" {
+		panic("post reactions collection name required in config")
 	}
 
 	// REPORT COLLECTIONS
@@ -295,8 +300,9 @@ func GetCollectionsConfig() CollectionsConfig {
 		VenuesCollection:       venuesCollection,
 		VenueRequestCollection: venueRequestCollection,
 
-		PostCollection:    postCollection,
-		CommentCollection: commentCollection,
+		PostCollection:          postCollection,
+		PostCommentsCollection:  postCommentsCollection,
+		PostReactionsCollection: postReactionsCollection,
 
 		BugReportCollection:    bugReportCollection,
 		VenueReportCollection:  venueReportCollection,

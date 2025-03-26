@@ -9,6 +9,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/server"
 	"olympsis-server/utils"
+	"regexp"
 	"strings"
 	"time"
 
@@ -59,13 +60,13 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 
 		// Location Query
 		if state == "" {
-			filter["country"] = country
+			filter["country"] = bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(country) + "$", Options: "i"}}
 		} else if city != "" {
-			filter["country"] = country
+			filter["country"] = bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(country) + "$", Options: "i"}}
 			filter["state"] = state
 			filter["city"] = city
 		} else {
-			filter["country"] = country
+			filter["country"] = bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(country) + "$", Options: "i"}}
 			filter["state"] = state
 		}
 
@@ -82,6 +83,7 @@ func (s *Service) GetClubsByLocation() http.HandlerFunc {
 		if err != nil {
 			s.Logger.Error("failed to find clubs: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find clubs" }`, http.StatusInternalServerError)
+			return
 		}
 
 		// no content

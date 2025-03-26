@@ -57,8 +57,9 @@ type CollectionsConfig struct {
 	VenueRequestCollection string
 
 	// Posts
-	PostCollection    string
-	CommentCollection string
+	PostCollection          string
+	PostCommentsCollection  string
+	PostReactionsCollection string
 
 	// Reports
 	BugReportCollection    string

@@ -938,8 +938,194 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 
 // Sets up all of the post collections
 func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.PostCol = db.Collection(config.PostCollection)
-	d.CommentsCol = db.Collection(config.CommentCollection)
+	collectionExists := func(name string) bool {
+		collections, err := db.ListCollectionNames(context.Background(), bson.M{"name": name})
+		if err != nil {
+			// If there's an error, assume the collection doesn't exist
+			return false
+		}
+		return len(collections) > 0
+	}
+
+	// Helper function to safely create indexes
+	safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
+		// First, list existing indexes
+		cursor, err := collection.Indexes().List(context.Background())
+		if err != nil {
+			return fmt.Errorf("could not list existing indexes: %v", err)
+		}
+		defer cursor.Close(context.Background())
+
+		// Extract existing index names
+		existingIndexes := make(map[string]bool)
+		var indexDoc bson.M
+		for cursor.Next(context.Background()) {
+			if err := cursor.Decode(&indexDoc); err != nil {
+				return fmt.Errorf("could not decode index document: %v", err)
+			}
+			if name, exists := indexDoc["name"].(string); exists {
+				existingIndexes[name] = true
+			}
+		}
+
+		if err := cursor.Err(); err != nil {
+			return fmt.Errorf("error during index cursor iteration: %v", err)
+		}
+
+		// Filter out indexes that already exist
+		var newIndexes []mongo.IndexModel
+		for _, idx := range indexes {
+			if idx.Options == nil || idx.Options.Name == nil {
+				// No name specified, keep the index
+				newIndexes = append(newIndexes, idx)
+				continue
+			}
+
+			indexName := *idx.Options.Name
+			if existingIndexes[indexName] {
+				// Skip this index as it already exists
+				continue
+			}
+			newIndexes = append(newIndexes, idx)
+		}
+
+		// Create only new indexes
+		if len(newIndexes) > 0 {
+			_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
+			if err != nil {
+				return fmt.Errorf("could not create indexes: %v", err)
+			}
+		}
+
+		return nil
+	}
+
+	// Set up Posts Collection
+	if !collectionExists(config.PostCollection) {
+		err := db.CreateCollection(context.Background(), config.PostCollection)
+		if err != nil {
+			return fmt.Errorf("could not create posts collection: %v", err)
+		}
+
+		d.PostsCollection = db.Collection(config.PostCollection)
+
+		// Define all post indexes
+		postIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "poster._id", Value: 1}},
+				Options: options.Index().SetName("poster_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "type", Value: 1}},
+				Options: options.Index().SetName("type_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "group_id", Value: 1}},
+				Options: options.Index().SetName("group_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "event_id", Value: 1}},
+				Options: options.Index().SetName("event_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "body", Value: "text"}},
+				Options: options.Index().SetName("body_text_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "created_at", Value: -1}},
+				Options: options.Index().SetName("created_at_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "is_sensitive", Value: 1}},
+				Options: options.Index().SetName("is_sensitive_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.PostsCollection, postIndexes); err != nil {
+			return fmt.Errorf("failed to create post indexes: %v", err)
+		}
+	} else {
+		d.PostsCollection = db.Collection(config.PostCollection)
+	}
+
+	// Set up Post Reactions Collection
+	if !collectionExists(config.PostReactionsCollection) {
+		err := db.CreateCollection(context.Background(), config.PostReactionsCollection)
+		if err != nil {
+			return fmt.Errorf("could not create post reactions collection: %v", err)
+		}
+
+		d.PostReactionsCollection = db.Collection(config.PostReactionsCollection)
+
+		// Define post reactions indexes
+		reactionIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "post_id", Value: 1}},
+				Options: options.Index().SetName("post_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "user_id", Value: 1}},
+				Options: options.Index().SetName("user_id_index"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "post_id", Value: 1},
+					{Key: "user_id", Value: 1},
+				},
+				Options: options.Index().SetName("post_user_compound_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "created_at", Value: -1}},
+				Options: options.Index().SetName("created_at_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.PostReactionsCollection, reactionIndexes); err != nil {
+			return fmt.Errorf("failed to create post reactions indexes: %v", err)
+		}
+	} else {
+		d.PostReactionsCollection = db.Collection(config.PostReactionsCollection)
+	}
+
+	// Set up Post Comments Collection
+	if !collectionExists(config.PostCommentsCollection) {
+		err := db.CreateCollection(context.Background(), config.PostCommentsCollection)
+		if err != nil {
+			return fmt.Errorf("could not create post comments collection: %v", err)
+		}
+
+		d.PostCommentsCollection = db.Collection(config.PostCommentsCollection)
+
+		// Define post comments indexes
+		commentsIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "post_id", Value: 1}},
+				Options: options.Index().SetName("post_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "user_id", Value: 1}},
+				Options: options.Index().SetName("user_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "created_at", Value: -1}},
+				Options: options.Index().SetName("created_at_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "text", Value: "text"}},
+				Options: options.Index().SetName("text_search_index"),
+			},
+		}
+
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.PostCommentsCollection, commentsIndexes); err != nil {
+			return fmt.Errorf("failed to create post comments indexes: %v", err)
+		}
+	} else {
+		d.PostCommentsCollection = db.Collection(config.PostCommentsCollection)
+	}
+
 	return nil
 }
 

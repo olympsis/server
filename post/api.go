@@ -109,7 +109,7 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	// remove a comment
 	p.Router.Handle("/v1/posts/{id}/comments/{commentID}",
 		middleware.Chain(
-			p.Service.RemoveComment(),
+			p.Service.DeleteComment(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
 			middleware.CORS(),

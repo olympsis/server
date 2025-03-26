@@ -309,7 +309,17 @@ func BuildOrganizationCorePipeline() bson.A {
 		},
 	}
 
-	// Map users to members
+	// Lookup auth data for members to get first/last name
+	memberAuthLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "_organization_members.user_id",
+			"foreignField": "uuid",
+			"as":           "_member_auth",
+		},
+	}
+
+	// Map users to members with auth data
 	mapMembersUsersPipeline := bson.M{
 		"$addFields": bson.M{
 			"members": bson.M{
@@ -317,24 +327,57 @@ func BuildOrganizationCorePipeline() bson.A {
 					"input": "$_organization_members",
 					"as":    "member",
 					"in": bson.M{
-						"id":        "$$member._id",
+						// Use _id instead of id to match Member struct
+						"_id":       "$$member._id",
 						"role":      "$$member.role",
 						"joined_at": "$$member.joined_at",
 						"user": bson.M{
-							"$arrayElemAt": bson.A{
-								bson.M{
-									"$filter": bson.M{
-										"input": "$_member_users",
-										"as":    "mu",
-										"cond": bson.M{
-											"$eq": bson.A{
-												"$$mu.uuid",
-												"$$member.user_id",
+							"$let": bson.M{
+								"vars": bson.M{
+									"userData": bson.M{
+										"$arrayElemAt": bson.A{
+											bson.M{
+												"$filter": bson.M{
+													"input": "$_member_users",
+													"as":    "mu",
+													"cond": bson.M{
+														"$eq": bson.A{
+															"$$mu.uuid",
+															"$$member.user_id",
+														},
+													},
+												},
 											},
+											0,
+										},
+									},
+									"authData": bson.M{
+										"$arrayElemAt": bson.A{
+											bson.M{
+												"$filter": bson.M{
+													"input": "$_member_auth",
+													"as":    "ma",
+													"cond": bson.M{
+														"$eq": bson.A{
+															"$$ma.uuid",
+															"$$member.user_id",
+														},
+													},
+												},
+											},
+											0,
 										},
 									},
 								},
-								0,
+								"in": bson.M{
+									"$mergeObjects": bson.A{
+										"$$userData",
+										bson.M{
+											"first_name": "$$authData.first_name",
+											"last_name":  "$$authData.last_name",
+										},
+									},
+								},
 							},
 						},
 					},
@@ -358,6 +401,7 @@ func BuildOrganizationCorePipeline() bson.A {
 		"$project": bson.M{
 			"_organization_members":      0,
 			"_member_users":              0,
+			"_member_auth":               0,
 			"users":                      0,
 			"members.user._id":           0,
 			"members.user.token":         0,
@@ -372,6 +416,7 @@ func BuildOrganizationCorePipeline() bson.A {
 	return bson.A{
 		membersLookupPipeline,
 		memberUsersLookupPipeline,
+		memberAuthLookupPipeline,
 		mapMembersUsersPipeline,
 		childrenPipeline,
 		projectPipeline,

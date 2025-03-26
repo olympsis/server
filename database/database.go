@@ -21,8 +21,10 @@ type Database struct {
 	AuthCol          *mongo.Collection
 	UserCol          *mongo.Collection
 	VenuesCollection *mongo.Collection
-	PostCol          *mongo.Collection
-	CommentsCol      *mongo.Collection
+
+	PostsCollection         *mongo.Collection
+	PostCommentsCollection  *mongo.Collection
+	PostReactionsCollection *mongo.Collection
 
 	ClubCol               *mongo.Collection
 	ClubInvitationCol     *mongo.Collection
