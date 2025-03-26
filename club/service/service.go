@@ -170,6 +170,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		club := models.ClubDao{
 			Name:        req.Name,
 			Description: req.Description,
+			Tags:        req.Tags,
 			Sports:      req.Sports,
 			City:        req.City,
 			State:       req.State,
