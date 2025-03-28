@@ -155,6 +155,16 @@ func BuildEventCorePipeline() bson.A {
 		},
 	}
 
+	// Lookup auth data for participants to get first/last name
+	participantAuthLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "participants.user_id",
+			"foreignField": "uuid",
+			"as":           "_participant_auth",
+		},
+	}
+
 	// Map users to participants
 	mapParticipantsUsersPipeline := bson.M{
 		"$addFields": bson.M{
@@ -167,20 +177,62 @@ func BuildEventCorePipeline() bson.A {
 							"$$participant",
 							bson.M{
 								"user": bson.M{
-									"$arrayElemAt": bson.A{
+									"$mergeObjects": bson.A{
 										bson.M{
-											"$filter": bson.M{
-												"input": "$_participant_users",
-												"as":    "pu",
-												"cond": bson.M{
-													"$eq": bson.A{
-														"$$pu.uuid",
-														"$$participant.user_id",
+											"$arrayElemAt": bson.A{
+												bson.M{
+													"$filter": bson.M{
+														"input": "$_participant_users",
+														"as":    "pu",
+														"cond": bson.M{
+															"$eq": bson.A{
+																"$$pu.uuid",
+																"$$participant.user_id",
+															},
+														},
 													},
+												},
+												0,
+											},
+										},
+										bson.M{
+											"first_name": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_participant_auth",
+															"as":    "pa",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$pa.uuid",
+																	"$$participant.user_id",
+																},
+															},
+														},
+													},
+													0,
+													"first_name",
+												},
+											},
+											"last_name": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_participant_auth",
+															"as":    "pa",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$pa.uuid",
+																	"$$participant.user_id",
+																},
+															},
+														},
+													},
+													0,
+													"last_name",
 												},
 											},
 										},
-										0,
 									},
 								},
 							},
@@ -241,6 +293,16 @@ func BuildEventCorePipeline() bson.A {
 		},
 	}
 
+	// Lookup auth data for comment users to get first/last name
+	commentAuthLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "comments.user_id",
+			"foreignField": "uuid",
+			"as":           "_comment_auth",
+		},
+	}
+
 	// Map users to comments
 	mapCommentsUsersPipeline := bson.M{
 		"$addFields": bson.M{
@@ -253,20 +315,62 @@ func BuildEventCorePipeline() bson.A {
 							"$$comment",
 							bson.M{
 								"user": bson.M{
-									"$arrayElemAt": bson.A{
+									"$mergeObjects": bson.A{
 										bson.M{
-											"$filter": bson.M{
-												"input": "$_comment_users",
-												"as":    "cu",
-												"cond": bson.M{
-													"$eq": bson.A{
-														"$$cu.uuid",
-														"$$comment.user_id",
+											"$arrayElemAt": bson.A{
+												bson.M{
+													"$filter": bson.M{
+														"input": "$_comment_users",
+														"as":    "cu",
+														"cond": bson.M{
+															"$eq": bson.A{
+																"$$cu.uuid",
+																"$$comment.user_id",
+															},
+														},
 													},
+												},
+												0,
+											},
+										},
+										bson.M{
+											"first_name": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_comment_auth",
+															"as":    "ca",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$ca.uuid",
+																	"$$comment.user_id",
+																},
+															},
+														},
+													},
+													0,
+													"first_name",
+												},
+											},
+											"last_name": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_comment_auth",
+															"as":    "ca",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$ca.uuid",
+																	"$$comment.user_id",
+																},
+															},
+														},
+													},
+													0,
+													"last_name",
 												},
 											},
 										},
-										0,
 									},
 								},
 							},
@@ -328,12 +432,14 @@ func BuildEventCorePipeline() bson.A {
 		createPosterSnippetPipeline,
 		participantsLookupPipeline,
 		participantUsersLookupPipeline,
+		participantAuthLookupPipeline,
 		mapParticipantsUsersPipeline,
 		participantsWaitlistPipeline,
 		filterRegularParticipantsPipeline,
 		teamsLookupPipeline,
 		commentsLookupPipeline,
 		commentUsersLookupPipeline,
+		commentAuthLookupPipeline,
 		mapCommentsUsersPipeline,
 		projectPipeline,
 	}
