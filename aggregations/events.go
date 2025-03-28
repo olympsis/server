@@ -94,7 +94,7 @@ func BuildEventCorePipeline() bson.A {
 	posterLookupPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "poster",
+			"localField":   "poster_id",
 			"foreignField": "uuid",
 			"as":           "_poster_user",
 		},
@@ -104,7 +104,7 @@ func BuildEventCorePipeline() bson.A {
 	posterAuthLookupPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "auth",
-			"localField":   "poster",
+			"localField":   "poster_id",
 			"foreignField": "uuid",
 			"as":           "_poster_auth",
 		},
@@ -113,25 +113,49 @@ func BuildEventCorePipeline() bson.A {
 	// Create poster user snippet
 	createPosterSnippetPipeline := bson.M{
 		"$addFields": bson.M{
-			"poster": bson.M{
+			"_temp_poster": bson.M{
 				"$cond": bson.A{
 					bson.M{"$gt": bson.A{bson.M{"$size": "$_poster_user"}, 0}},
 					bson.M{
-						"$mergeObjects": bson.A{
-							bson.M{
-								"uuid":      bson.M{"$arrayElemAt": bson.A{"$_poster_user.uuid", 0}},
-								"username":  bson.M{"$arrayElemAt": bson.A{"$_poster_user.username", 0}},
-								"image_url": bson.M{"$arrayElemAt": bson.A{"$_poster_user.image_url", 0}},
+						"$let": bson.M{
+							"vars": bson.M{
+								"user_data": bson.M{"$arrayElemAt": bson.A{"$_poster_user", 0}},
+								"auth_data": bson.M{"$arrayElemAt": bson.A{"$_poster_auth", 0}},
 							},
-							bson.M{
-								"first_name": bson.M{"$arrayElemAt": bson.A{"$_poster_auth.first_name", 0}},
-								"last_name":  bson.M{"$arrayElemAt": bson.A{"$_poster_auth.last_name", 0}},
+							"in": bson.M{
+								"uuid":       "$$user_data.uuid",
+								"username":   "$$user_data.username",
+								"image_url":  "$$user_data.image_url",
+								"first_name": "$$auth_data.first_name",
+								"last_name":  "$$auth_data.last_name",
 							},
 						},
 					},
 					nil,
 				},
 			},
+		},
+	}
+
+	// Check if poster has valid username and set poster accordingly
+	checkPosterUUIDPipeline := bson.M{
+		"$addFields": bson.M{
+			"poster": bson.M{
+				"$cond": bson.A{
+					bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$_temp_poster.username", ""}}, ""}},
+					nil,
+					"$_temp_poster",
+				},
+			},
+		},
+	}
+
+	// Clean up temporary fields
+	cleanupTempFieldsPipeline := bson.M{
+		"$project": bson.M{
+			"_poster_user": 0,
+			"_poster_auth": 0,
+			"_temp_poster": 0,
 		},
 	}
 
@@ -177,59 +201,49 @@ func BuildEventCorePipeline() bson.A {
 							"$$participant",
 							bson.M{
 								"user": bson.M{
-									"$mergeObjects": bson.A{
-										bson.M{
-											"$arrayElemAt": bson.A{
-												bson.M{
-													"$filter": bson.M{
-														"input": "$_participant_users",
-														"as":    "pu",
-														"cond": bson.M{
-															"$eq": bson.A{
-																"$$pu.uuid",
-																"$$participant.user_id",
+									"$let": bson.M{
+										"vars": bson.M{
+											"user_data": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_participant_users",
+															"as":    "pu",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$pu.uuid",
+																	"$$participant.user_id",
+																},
 															},
 														},
 													},
+													0,
 												},
-												0,
+											},
+											"auth_data": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_participant_auth",
+															"as":    "pa",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$pa.uuid",
+																	"$$participant.user_id",
+																},
+															},
+														},
+													},
+													0,
+												},
 											},
 										},
-										bson.M{
-											"first_name": bson.M{
-												"$arrayElemAt": bson.A{
-													bson.M{
-														"$filter": bson.M{
-															"input": "$_participant_auth",
-															"as":    "pa",
-															"cond": bson.M{
-																"$eq": bson.A{
-																	"$$pa.uuid",
-																	"$$participant.user_id",
-																},
-															},
-														},
-													},
-													0,
-													"first_name",
-												},
-											},
-											"last_name": bson.M{
-												"$arrayElemAt": bson.A{
-													bson.M{
-														"$filter": bson.M{
-															"input": "$_participant_auth",
-															"as":    "pa",
-															"cond": bson.M{
-																"$eq": bson.A{
-																	"$$pa.uuid",
-																	"$$participant.user_id",
-																},
-															},
-														},
-													},
-													0,
-													"last_name",
+										"in": bson.M{
+											"$mergeObjects": bson.A{
+												"$$user_data",
+												bson.M{
+													"first_name": "$$auth_data.first_name",
+													"last_name":  "$$auth_data.last_name",
 												},
 											},
 										},
@@ -315,59 +329,49 @@ func BuildEventCorePipeline() bson.A {
 							"$$comment",
 							bson.M{
 								"user": bson.M{
-									"$mergeObjects": bson.A{
-										bson.M{
-											"$arrayElemAt": bson.A{
-												bson.M{
-													"$filter": bson.M{
-														"input": "$_comment_users",
-														"as":    "cu",
-														"cond": bson.M{
-															"$eq": bson.A{
-																"$$cu.uuid",
-																"$$comment.user_id",
+									"$let": bson.M{
+										"vars": bson.M{
+											"user_data": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_comment_users",
+															"as":    "cu",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$cu.uuid",
+																	"$$comment.user_id",
+																},
 															},
 														},
 													},
+													0,
 												},
-												0,
+											},
+											"auth_data": bson.M{
+												"$arrayElemAt": bson.A{
+													bson.M{
+														"$filter": bson.M{
+															"input": "$_comment_auth",
+															"as":    "ca",
+															"cond": bson.M{
+																"$eq": bson.A{
+																	"$$ca.uuid",
+																	"$$comment.user_id",
+																},
+															},
+														},
+													},
+													0,
+												},
 											},
 										},
-										bson.M{
-											"first_name": bson.M{
-												"$arrayElemAt": bson.A{
-													bson.M{
-														"$filter": bson.M{
-															"input": "$_comment_auth",
-															"as":    "ca",
-															"cond": bson.M{
-																"$eq": bson.A{
-																	"$$ca.uuid",
-																	"$$comment.user_id",
-																},
-															},
-														},
-													},
-													0,
-													"first_name",
-												},
-											},
-											"last_name": bson.M{
-												"$arrayElemAt": bson.A{
-													bson.M{
-														"$filter": bson.M{
-															"input": "$_comment_auth",
-															"as":    "ca",
-															"cond": bson.M{
-																"$eq": bson.A{
-																	"$$ca.uuid",
-																	"$$comment.user_id",
-																},
-															},
-														},
-													},
-													0,
-													"last_name",
+										"in": bson.M{
+											"$mergeObjects": bson.A{
+												"$$user_data",
+												bson.M{
+													"first_name": "$$auth_data.first_name",
+													"last_name":  "$$auth_data.last_name",
 												},
 											},
 										},
@@ -430,6 +434,8 @@ func BuildEventCorePipeline() bson.A {
 		posterLookupPipeline,
 		posterAuthLookupPipeline,
 		createPosterSnippetPipeline,
+		checkPosterUUIDPipeline,
+		cleanupTempFieldsPipeline,
 		participantsLookupPipeline,
 		participantUsersLookupPipeline,
 		participantAuthLookupPipeline,
