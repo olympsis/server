@@ -166,6 +166,7 @@ func (e *Service) GetEvent() http.HandlerFunc {
 		if err != nil {
 			e.Logger.Error("Failed to find event. Error: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
+			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
