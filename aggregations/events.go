@@ -94,9 +94,19 @@ func BuildEventCorePipeline() bson.A {
 	posterLookupPipeline := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "poster_id",
+			"localField":   "poster",
 			"foreignField": "uuid",
 			"as":           "_poster_user",
+		},
+	}
+
+	// Lookup auth data for poster to get first/last name
+	posterAuthLookupPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "auth",
+			"localField":   "poster",
+			"foreignField": "uuid",
+			"as":           "_poster_auth",
 		},
 	}
 
@@ -107,9 +117,17 @@ func BuildEventCorePipeline() bson.A {
 				"$cond": bson.A{
 					bson.M{"$gt": bson.A{bson.M{"$size": "$_poster_user"}, 0}},
 					bson.M{
-						"uuid":      bson.M{"$arrayElemAt": bson.A{"$_poster_user.uuid", 0}},
-						"username":  bson.M{"$arrayElemAt": bson.A{"$_poster_user.username", 0}},
-						"image_url": bson.M{"$arrayElemAt": bson.A{"$_poster_user.image_url", 0}},
+						"$mergeObjects": bson.A{
+							bson.M{
+								"uuid":      bson.M{"$arrayElemAt": bson.A{"$_poster_user.uuid", 0}},
+								"username":  bson.M{"$arrayElemAt": bson.A{"$_poster_user.username", 0}},
+								"image_url": bson.M{"$arrayElemAt": bson.A{"$_poster_user.image_url", 0}},
+							},
+							bson.M{
+								"first_name": bson.M{"$arrayElemAt": bson.A{"$_poster_auth.first_name", 0}},
+								"last_name":  bson.M{"$arrayElemAt": bson.A{"$_poster_auth.last_name", 0}},
+							},
+						},
 					},
 					nil,
 				},
@@ -306,6 +324,7 @@ func BuildEventCorePipeline() bson.A {
 
 	return bson.A{
 		posterLookupPipeline,
+		posterAuthLookupPipeline,
 		createPosterSnippetPipeline,
 		participantsLookupPipeline,
 		participantUsersLookupPipeline,
