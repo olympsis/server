@@ -9,8 +9,6 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/server"
 	"olympsis-server/utils"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -44,50 +42,62 @@ func NewClubService(i *server.ServerInterface) *Service {
 }
 
 // Fetches all of the clubs in a given location
-func (s *Service) GetClubsByLocation() http.HandlerFunc {
+func (s *Service) GetClubs() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-
-		city := r.URL.Query().Get("city")
-		state := r.URL.Query().Get("state")
-		country := r.URL.Query().Get("country")
-		sports := r.URL.Query().Get("sports")
-		if country == "" {
-			http.Error(rw, `{ "msg": "you need at least a country to query with" }`, http.StatusBadRequest)
+		params, err := parseQueryParams(r)
+		if err != nil {
+			http.Error(rw, `{"msg": "bad request"}`, http.StatusBadRequest)
+			s.Logger.Error("Bad request. Error: ", err.Error())
 			return
 		}
 
 		filter := bson.M{}
 
-		// Location Query
-		if state == "" {
-			filter["country"] = bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(country) + "$", Options: "i"}}
-		} else if city != "" {
-			filter["country"] = bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(country) + "$", Options: "i"}}
-			filter["state"] = state
-			filter["city"] = city
-		} else {
-			filter["country"] = bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(country) + "$", Options: "i"}}
-			filter["state"] = state
-		}
+		// Location Query - Only add if we have enough info
+		if params.Country != "" {
+			filter["country"] = params.Country
 
-		// Sports Query
-		if sports != "" {
-			splicedSports := strings.Split(sports, ",")
-			filter["sports"] = bson.M{
-				"$in": splicedSports,
+			if params.State != "" {
+				filter["state"] = params.State
+
+				if params.City != "" {
+					filter["city"] = params.City
+				}
 			}
 		}
 
-		// get all of the clubs data
-		clubs, err := aggregations.AggregateClubs(filter, 100, 0, s.Database)
+		// Sports Query
+		if len(params.Sports) > 0 {
+			filter["sports"] = bson.M{
+				"$in": params.Sports,
+			}
+		}
+
+		// Default values for radius if needed
+		radiusValue := 16000 // Default radius in meters
+		if params.Radius != nil {
+			radiusValue = *params.Radius
+		}
+
+		// Get all of the clubs data
+		clubs, err := aggregations.AggregateClubs(
+			filter,          // Regular filter for country/state/city/sports
+			params.Location, // GeoJSON location if provided
+			radiusValue,     // Radius (with default)
+			params.Limit,    // Use the limit from params
+			params.Skip,     // Use the skip from params
+			s.Database,
+		)
+
 		if err != nil {
-			s.Logger.Error("failed to find clubs: ", err.Error())
+			s.Logger.Error("Failed to find clubs: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to find clubs" }`, http.StatusInternalServerError)
 			return
 		}
 
-		// no content
+		// No content
 		if len(*clubs) == 0 {
+			s.Logger.Error("No clubs found matching criteria")
 			http.Error(rw, `{ "msg": "no clubs found" }`, http.StatusNoContent)
 			return
 		}
@@ -175,6 +185,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 			City:        req.City,
 			State:       req.State,
 			Country:     req.Country,
+			Location:    req.Location,
 			Logo:        req.Logo,
 			Banner:      req.Banner,
 			Visibility:  req.Visibility,

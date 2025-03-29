@@ -50,6 +50,8 @@ func AggregateClub(id primitive.ObjectID, database *database.Database) (*models.
 // AggregateClubs fetches multiple clubs based on filter criteria
 func AggregateClubs(
 	filter bson.M,
+	location *models.GeoJSON,
+	radius int,
 	limit int,
 	skip int,
 	database *database.Database,
@@ -59,25 +61,50 @@ func AggregateClubs(
 	// Get the core pipeline stages
 	corePipeline := BuildClubCorePipeline()
 
-	// Add filter and pagination
-	filterPipeline := bson.M{
-		"$match": filter,
+	// Use a valid default filter if none provided
+	if filter == nil {
+		filter = bson.M{}
 	}
 
-	skipPipeline := bson.M{
-		"$skip": skip,
+	// Add location filter if provided
+	var pipeline bson.A
+	if location != nil && radius > 0 {
+		// Create a separate geospatial pipeline stage rather than combining with the filter
+		geoFilter := bson.M{
+			"$match": bson.M{
+				"location": bson.M{
+					"$geoWithin": bson.M{
+						"$center": bson.A{
+							location.Coordinates,
+							radius / 6371000.0, // Convert meters to radians (Earth radius is ~6371km)
+						},
+					},
+				},
+			},
+		}
+
+		// First apply regular filters, then geo filter
+		filterPipeline := bson.M{
+			"$match": filter,
+		}
+
+		pipeline = append(bson.A{filterPipeline, geoFilter}, corePipeline...)
+	} else {
+		// Just use the regular filter if no location
+		filterPipeline := bson.M{
+			"$match": filter,
+		}
+		pipeline = append(bson.A{filterPipeline}, corePipeline...)
 	}
 
-	limitPipeline := bson.M{
-		"$limit": limit,
-	}
-
-	// Complete pipeline with filtering and pagination
-	completePipeline := append(bson.A{filterPipeline}, corePipeline...)
-	completePipeline = append(completePipeline, skipPipeline, limitPipeline)
+	// Add pagination stages
+	pipeline = append(pipeline,
+		bson.M{"$skip": skip},
+		bson.M{"$limit": limit},
+	)
 
 	// Execute the aggregation
-	cur, err := database.ClubCol.Aggregate(ctx, completePipeline)
+	cur, err := database.ClubCol.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}

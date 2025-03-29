@@ -32,7 +32,7 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 	// get clubs
 	s.Router.Handle("/v1/clubs",
 		middleware.Chain(
-			s.Service.GetClubsByLocation(),
+			s.Service.GetClubs(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
