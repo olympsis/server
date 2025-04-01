@@ -25,7 +25,7 @@ type EventQueryParams struct {
 	Location *models.GeoJSON
 	Sports   []string
 	VenueIDs []primitive.ObjectID
-	Radius   int
+	Radius   float64
 	Skip     int
 	Limit    int
 }
@@ -34,7 +34,7 @@ type EventQueryParams struct {
 type LocationQueryParams struct {
 	Longitude float64
 	Latitude  float64
-	Radius    int
+	Radius    float64
 	Sports    []string
 	Status    string
 	Skip      int

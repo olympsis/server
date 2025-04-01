@@ -76,11 +76,11 @@ func parseEventsQueryParams(r *http.Request) (*EventQueryParams, error) {
 	// Parse radius with default
 	radiusStr := query.Get("radius")
 	if radiusStr != "" {
-		radius, err := strconv.ParseInt(radiusStr, 10, 32)
+		radius, err := strconv.ParseFloat(radiusStr, 64)
 		if err != nil {
 			params.Radius = 16095 // Default radius in meters
 		} else {
-			params.Radius = int(radius)
+			params.Radius = radius
 		}
 	} else {
 		params.Radius = 16095 // Default radius
@@ -155,14 +155,14 @@ func parseLocationQueryParams(r *http.Request) (*LocationQueryParams, error) {
 	if radiusStr == "" {
 		return nil, fmt.Errorf("missing required parameter: radius")
 	}
-	radius, err := strconv.ParseInt(radiusStr, 10, 32)
+	radius, err := strconv.ParseFloat(radiusStr, 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid radius value: %s", radiusStr)
 	}
 	if radius <= 0 {
 		return nil, fmt.Errorf("radius must be greater than 0")
 	}
-	params.Radius = int(radius)
+	params.Radius = radius
 
 	// Parse sports
 	sportsStr := query.Get("sports")

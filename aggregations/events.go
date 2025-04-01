@@ -56,7 +56,7 @@ func AggregateEvents(
 	venues *[]primitive.ObjectID,
 	clubs *[]primitive.ObjectID,
 	orgs *[]primitive.ObjectID,
-	radius int,
+	radius float64,
 	limit int,
 	skip int,
 	database *database.Database,
@@ -459,7 +459,7 @@ func BuildEventsAggregation(
 	venues *[]primitive.ObjectID,
 	clubs *[]primitive.ObjectID,
 	orgs *[]primitive.ObjectID,
-	radius int,
+	radius float64,
 	limit int,
 	skip int,
 ) bson.A {

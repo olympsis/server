@@ -239,18 +239,21 @@ func generateNewParticipantNotification(id string, title string, status string) 
 }
 
 // Find nearby venues based on location, sports, and radius
-func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius int) (*[]models.Venue, []primitive.ObjectID, error) {
+func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []primitive.ObjectID, error) {
+	// Convert radius from miles to meters (1 mile = 1609.34 meters)
+	radiusInMeters := radius * 1609.34
+
 	// Create filter for geospatial query
 	filter := bson.M{
 		"location": bson.M{
 			"$near": bson.M{
 				"$geometry":    location,
-				"$maxDistance": radius,
+				"$maxDistance": radiusInMeters,
 			},
 		},
 	}
 
-	// Execute query
+	// Rest of the function remains the same
 	cursor, err := s.Database.VenuesCollection.Find(ctx, filter)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
