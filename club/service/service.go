@@ -74,7 +74,7 @@ func (s *Service) GetClubs() http.HandlerFunc {
 		}
 
 		// Default values for radius if needed
-		radiusValue := 16000 // Default radius in meters
+		radiusValue := float64(16000) // Default radius in meters
 		if params.Radius != nil {
 			radiusValue = *params.Radius
 		}

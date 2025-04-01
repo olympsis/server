@@ -12,7 +12,7 @@ import (
 // LocationQueryParams holds validated query parameters for the Location endpoint
 type ClubsQueryParams struct {
 	Location *models.GeoJSON
-	Radius   *int
+	Radius   *float64
 	City     string
 	State    string
 	Country  string
@@ -75,10 +75,10 @@ func parseQueryParams(r *http.Request) (*ClubsQueryParams, error) {
 			return nil, fmt.Errorf("radius must be greater than 0")
 		}
 
-		tempRadius := int(radius)
+		tempRadius := float64(radius)
 		params.Radius = &tempRadius
 	} else {
-		tempRadius := int(16000)
+		tempRadius := float64(10)
 		params.Radius = &tempRadius
 	}
 

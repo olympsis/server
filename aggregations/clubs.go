@@ -51,7 +51,7 @@ func AggregateClub(id primitive.ObjectID, database *database.Database) (*models.
 func AggregateClubs(
 	filter bson.M,
 	location *models.GeoJSON,
-	radius int,
+	radius float64,
 	limit int,
 	skip int,
 	database *database.Database,
@@ -74,9 +74,9 @@ func AggregateClubs(
 			"$match": bson.M{
 				"location": bson.M{
 					"$geoWithin": bson.M{
-						"$center": bson.A{
+						"$centerSphere": bson.A{
 							location.Coordinates,
-							radius / 6371000.0, // Convert meters to radians (Earth radius is ~6371km)
+							radius / 3963.2, // miles to radians
 						},
 					},
 				},
