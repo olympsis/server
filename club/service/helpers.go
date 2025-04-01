@@ -67,7 +67,7 @@ func parseQueryParams(r *http.Request) (*ClubsQueryParams, error) {
 	// Parse and validate radius
 	radiusStr := query.Get("radius")
 	if radiusStr != "" {
-		radius, err := strconv.ParseInt(radiusStr, 10, 32)
+		radius, err := strconv.ParseFloat(radiusStr, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid radius value: %s", radiusStr)
 		}
