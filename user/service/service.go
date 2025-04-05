@@ -438,8 +438,8 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
-				users[i].FirstName = *auth.FirstName
-				users[i].LastName = *auth.LastName
+				users[i].FirstName = auth.FirstName
+				users[i].LastName = auth.LastName
 			}
 		}
 
@@ -494,8 +494,8 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 			UUID:                   user.UUID,
 			Bio:                    user.Bio,
 			Username:               user.UserName,
-			FirstName:              *auth.FirstName,
-			LastName:               *auth.LastName,
+			FirstName:              auth.FirstName,
+			LastName:               auth.LastName,
 			ImageURL:               imageURL,
 			Visibility:             user.Visibility,
 			NotificationDevices:    user.NotificationDevices,

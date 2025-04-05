@@ -38,6 +38,15 @@ func (s *AuthAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("POST", "OPTIONS")
 
+	s.Router.Handle("/v1/auth/modify",
+		middleware.Chain(
+			s.Service.Modify(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("PUT", "OPTIONS")
+
 	s.Router.Handle("/v1/auth/delete",
 		middleware.Chain(
 			s.Service.Delete(),
