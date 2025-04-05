@@ -48,6 +48,29 @@ func (a *Service) Register() http.HandlerFunc {
 			return
 		}
 
+		// Check for duplicates
+		existing, err := a.FindUser(ctx, bson.M{"uuid": token.UID})
+		if err == nil {
+			if existing != nil {
+				response := models.AuthResponse{
+					UUID:      existing.UUID,
+					FirstName: existing.FirstName,
+					LastName:  existing.LastName,
+					Email:     existing.Email,
+				}
+
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+
+		if err != mongo.ErrNoDocuments {
+			a.Log.Error("Failed to check user data. Error: ", err.Error())
+			http.Error(w, `{"msg": "something went wrong."}`, http.StatusInternalServerError)
+			return
+		}
+
 		// New AuthUser
 		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		user := &models.AuthUserDao{
