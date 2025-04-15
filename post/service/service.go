@@ -283,7 +283,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			}
 
 			clubID := club.ID.Hex()
-			note = generateNewPostNotification(post.ID.Hex(), club.Name, user.Username)
+			note = generateNewPostNotification(postID, club.Name, user.Username)
 			p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 				Topic:        &clubID,
 				Notification: note,
