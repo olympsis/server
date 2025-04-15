@@ -28,7 +28,8 @@ func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *op
 		return nil, err
 	}
 
-	return id.InsertedID.(*primitive.ObjectID), nil
+	oid := id.InsertedID.(primitive.ObjectID)
+	return &oid, nil
 }
 
 // Update one post in the database
