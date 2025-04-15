@@ -617,3 +617,223 @@ func BuildEventsAggregation(
 
 	return completePipeline
 }
+
+// AggregateUserPastEvents fetches past events for a specific user
+func AggregateUserPastEvents(
+	userID string,
+	limit int,
+	skip int,
+	database *database.Database,
+) (*[]models.Event, error) {
+	ctx := context.TODO()
+
+	// Build the aggregation pipeline
+	pipeline := BuildUserPastEventsAggregation(userID, limit, skip)
+
+	// Execute the aggregation
+	cur, err := database.EventsCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	// Process the results
+	response := make([]models.Event, 0, limit)
+	for cur.Next(ctx) {
+		var event models.Event
+		err := cur.Decode(&event)
+		if err != nil {
+			database.Logger.Error("Failed to decode event. Error: ", err.Error())
+			continue
+		}
+		response = append(response, event)
+	}
+
+	return &response, nil
+}
+
+// AggregateGroupPastEvents fetches past events for a specific group (club or org)
+func AggregateGroupPastEvents(
+	groupID primitive.ObjectID,
+	limit int,
+	skip int,
+	database *database.Database,
+) (*[]models.Event, error) {
+	ctx := context.TODO()
+
+	// Build the aggregation pipeline
+	pipeline := BuildGroupPastEventsAggregation(groupID, limit, skip)
+
+	// Execute the aggregation
+	cur, err := database.EventsCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	// Process the results
+	response := make([]models.Event, 0, limit)
+	for cur.Next(ctx) {
+		var event models.Event
+		err := cur.Decode(&event)
+		if err != nil {
+			database.Logger.Error("Failed to decode event. Error: ", err.Error())
+			continue
+		}
+		response = append(response, event)
+	}
+
+	return &response, nil
+}
+
+// Builds a pipeline for filtering and returning a user's past events
+func BuildUserPastEventsAggregation(
+	userID string,
+	limit int,
+	skip int,
+) bson.A {
+	// Get current time as primitive.DateTime for comparison
+	currentTime := primitive.NewDateTimeFromTime(time.Now())
+
+	// Pipeline to get events that have already ended (past events)
+	timePipeline := bson.M{
+		"$match": bson.M{
+			"stop_time": bson.M{
+				"$lt": currentTime,
+			},
+		},
+	}
+
+	// Pipeline to find events where the user was a participant
+	userParticipantPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "eventParticipants",
+			"localField":   "_id",
+			"foreignField": "event_id",
+			"as":           "_temp_participants",
+			"pipeline": bson.A{
+				bson.M{
+					"$match": bson.M{
+						"user_id": userID,
+					},
+				},
+			},
+		},
+	}
+
+	// Filter to only include events where the user was a participant
+	filterUserParticipantPipeline := bson.M{
+		"$match": bson.M{
+			"$expr": bson.M{
+				"$gt": bson.A{bson.M{"$size": "$_temp_participants"}, 0},
+			},
+		},
+	}
+
+	// Pagination pipelines
+	skipPipeline := bson.M{
+		"$skip": skip,
+	}
+
+	limitPipeline := bson.M{
+		"$limit": limit,
+	}
+
+	// Sort events by most recent first
+	sortPipeline := bson.M{
+		"$sort": bson.M{
+			"stop_time": -1, // Descending order (most recent first)
+		},
+	}
+
+	// Get the core pipeline stages
+	corePipeline := BuildEventCorePipeline()
+
+	// Complete pipeline with filtering and pagination
+	// First add the pre-lookup filters
+	completePipeline := bson.A{
+		timePipeline,
+		userParticipantPipeline,
+		filterUserParticipantPipeline,
+		sortPipeline,
+	}
+
+	// Then add the core lookups
+	completePipeline = append(completePipeline, corePipeline...)
+
+	// Finally add the pagination stages
+	completePipeline = append(completePipeline,
+		skipPipeline,
+		limitPipeline,
+	)
+
+	return completePipeline
+}
+
+// Builds a pipeline for filtering and returning a group's past events
+func BuildGroupPastEventsAggregation(
+	groupID primitive.ObjectID,
+	limit int,
+	skip int,
+) bson.A {
+	// Get current time as primitive.DateTime for comparison
+	currentTime := primitive.NewDateTimeFromTime(time.Now())
+
+	// Pipeline to get events that have already ended (past events)
+	timePipeline := bson.M{
+		"$match": bson.M{
+			"stop_time": bson.M{
+				"$lt": currentTime,
+			},
+		},
+	}
+
+	// Filter for events organized by the specified group
+	groupOrganizerPipeline := bson.M{
+		"$match": bson.M{
+			"organizers": bson.M{
+				"$elemMatch": bson.M{
+					"_id": groupID,
+				},
+			},
+		},
+	}
+
+	// Pagination pipelines
+	skipPipeline := bson.M{
+		"$skip": skip,
+	}
+
+	limitPipeline := bson.M{
+		"$limit": limit,
+	}
+
+	// Sort events by most recent first
+	sortPipeline := bson.M{
+		"$sort": bson.M{
+			"stop_time": -1, // Descending order (most recent first)
+		},
+	}
+
+	// Get the core pipeline stages
+	corePipeline := BuildEventCorePipeline()
+
+	// Complete pipeline with filtering and pagination
+	// First add the pre-lookup filters
+	completePipeline := bson.A{
+		timePipeline,
+		groupOrganizerPipeline,
+		sortPipeline,
+	}
+
+	// Then add the core lookups
+	completePipeline = append(completePipeline, corePipeline...)
+
+	// Finally add the pagination stages
+	completePipeline = append(completePipeline,
+		skipPipeline,
+		limitPipeline,
+	)
+
+	return completePipeline
+}

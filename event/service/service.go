@@ -285,6 +285,76 @@ func (s *Service) GetEvents() http.HandlerFunc {
 	}
 }
 
+func (s *Service) GetGroupPastEvents() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := mux.Vars(r)["id"]
+		if len(id) < 24 {
+			http.Error(w, `{ "msg": "no/bad group id found in request" }`, http.StatusBadRequest)
+			return
+		}
+
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(w, `{ "msg": "failed to encode id" }`, http.StatusInternalServerError)
+			return
+		}
+
+		events, err := aggregations.AggregateGroupPastEvents(oid, 100, 0, s.Database)
+		if err != nil {
+			s.Logger.Error("Failed to find events. Error: ", err.Error())
+			http.Error(w, `{ "msg": "failed to get past events" }`, http.StatusInternalServerError)
+			return
+		}
+
+		if events != nil {
+			eventsList := *events
+			if len(eventsList) > 0 {
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(events)
+				return
+			} else {
+				w.WriteHeader(http.StatusNoContent)
+				w.Write([]byte(`{ "msg": "no events" }`))
+				return
+			}
+		} else {
+			http.Error(w, `{ "msg": "failed to get past events" }`, http.StatusInternalServerError)
+		}
+	}
+}
+
+func (s *Service) GetUserPastEvents() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := mux.Vars(r)["uuid"]
+		if id != "" {
+			http.Error(w, `{ "msg": "no/bad group id found in request" }`, http.StatusBadRequest)
+			return
+		}
+
+		events, err := aggregations.AggregateUserPastEvents(id, 100, 0, s.Database)
+		if err != nil {
+			s.Logger.Error("Failed to find events. Error: ", err.Error())
+			http.Error(w, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
+			return
+		}
+
+		if events != nil {
+			eventsList := *events
+			if len(eventsList) > 0 {
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(events)
+				return
+			} else {
+				w.WriteHeader(http.StatusNoContent)
+				w.Write([]byte(`{ "msg": "no events" }`))
+				return
+			}
+		} else {
+			http.Error(w, `{ "msg": "failed to get past events" }`, http.StatusInternalServerError)
+		}
+	}
+}
+
 func (e *Service) UpdateAnEvent() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)

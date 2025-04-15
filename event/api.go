@@ -40,6 +40,24 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("GET", "OPTIONS")
 
+	e.Router.Handle("/v1/events/past/user/{uuid}",
+		middleware.Chain(
+			e.Service.GetUserPastEvents(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
+
+	e.Router.Handle("/v1/events/past/group/{id}",
+		middleware.Chain(
+			e.Service.GetGroupPastEvents(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
+
 	// get events
 	e.Router.Handle("/v1/events",
 		middleware.Chain(
