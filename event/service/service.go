@@ -326,7 +326,7 @@ func (s *Service) GetGroupPastEvents() http.HandlerFunc {
 func (s *Service) GetUserPastEvents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := mux.Vars(r)["uuid"]
-		if id != "" {
+		if id == "" {
 			http.Error(w, `{ "msg": "no/bad group id found in request" }`, http.StatusBadRequest)
 			return
 		}
