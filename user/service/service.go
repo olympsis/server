@@ -220,6 +220,9 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		if req.ImageURL != nil {
 			changes["image_url"] = req.ImageURL
 		}
+		if req.Gender != nil {
+			changes["gender"] = req.Gender
+		}
 		if req.Bio != nil {
 			changes["bio"] = req.Bio
 		}

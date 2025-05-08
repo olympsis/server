@@ -32,7 +32,7 @@ type Service struct {
 
 	// mux Router to complete http requests
 	Router *mux.Router
-	
+
 	// Notification service for sending notifications
 	Notification *utils.NotificationInterface
 }
@@ -42,8 +42,8 @@ Create new field service struct
 */
 func NewVenueService(i *server.ServerInterface) *Service {
 	return &Service{
-		Log:          i.Logger, 
-		Router:       i.Router, 
+		Log:          i.Logger,
+		Router:       i.Router,
 		Database:     i.Database,
 		Notification: i.Notification,
 	}
@@ -86,6 +86,9 @@ func (f *Service) InsertAField() http.HandlerFunc {
 			City:        req.City,
 			State:       req.State,
 			Country:     req.Country,
+
+			RequiresBooking: req.RequiresBooking,
+			BookingURL:      req.BookingURL,
 		}
 
 		// create auth user in database
