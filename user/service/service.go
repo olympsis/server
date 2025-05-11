@@ -538,7 +538,9 @@ func (s *Service) CheckIn() http.HandlerFunc {
 				wgError = err
 			}
 
-			response.User = *user
+			if user != nil {
+				response.User = *user
+			}
 		}()
 
 		// Find clubs thread
@@ -550,7 +552,10 @@ func (s *Service) CheckIn() http.HandlerFunc {
 				s.Log.Error("Failed to find clubs. Error: ", err.Error())
 				wgError = err
 			}
-			response.Clubs = clubs
+
+			if clubs != nil {
+				response.Clubs = clubs
+			}
 		}()
 
 		// Find organizations thread
@@ -562,7 +567,10 @@ func (s *Service) CheckIn() http.HandlerFunc {
 				s.Log.Error("Failed to find organizations. Error: ", err.Error())
 				wgError = err
 			}
-			response.Organizations = orgs
+
+			if orgs != nil {
+				response.Organizations = orgs
+			}
 		}()
 
 		wg.Wait()
