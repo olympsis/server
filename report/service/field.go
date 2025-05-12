@@ -18,13 +18,13 @@ func (s *Service) CreateFieldReport() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// decode request
-		var req models.FieldReportDao
+		var req models.VenueReportDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
-		if req.FieldID == nil || req.FieldID == &primitive.NilObjectID {
+		if req.VenueID == nil || req.VenueID == &primitive.NilObjectID {
 			http.Error(rw, `{ "msg": "field ID not found in body" }`, http.StatusBadRequest)
 			return
 		}
@@ -33,7 +33,7 @@ func (s *Service) CreateFieldReport() http.HandlerFunc {
 		id := primitive.NewObjectID()
 		uuid := r.Header.Get("UUID")
 		status := "pending"
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		options := options.InsertOneOptions{}
 		req.ID = &id
 		req.User = &uuid

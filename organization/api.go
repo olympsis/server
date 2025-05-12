@@ -1,13 +1,12 @@
 package organization
 
 import (
-	"olympsis-server/database"
 	"olympsis-server/middleware"
 	"olympsis-server/organization/service"
+	"olympsis-server/server"
 
-	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,12 @@ type OrganizationAPI struct {
 	Service *service.Service
 }
 
-func NewOrganizationAPI(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *OrganizationAPI {
-	return &OrganizationAPI{Logger: l, Router: r, Service: service.NewOrganizationService(l, r, d, sh)}
+func NewOrganizationAPI(i *server.ServerInterface) *OrganizationAPI {
+	return &OrganizationAPI{
+		Logger:  i.Logger,
+		Router:  i.Router,
+		Service: service.NewOrgService(i),
+	}
 }
 
 func (e *OrganizationAPI) Ready(firebase *auth.Client) {
@@ -33,8 +36,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateOrganization(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// get organizations
 	e.Router.Handle("/v1/organizations",
@@ -42,17 +46,18 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetOrganizations(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// get an organization
 	e.Router.Handle("/v1/organizations/{id}",
 		middleware.Chain(
 			e.Service.GetOrganization(),
 			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// update an organization
 	e.Router.Handle("/v1/organizations/{id}",
@@ -60,8 +65,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateOrganization(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete an organization
 	e.Router.Handle("/v1/organizations/{id}",
@@ -69,8 +75,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteOrganization(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		APPLICATION
@@ -81,8 +88,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// get applications
 	e.Router.Handle("/v1/organizations/{id}/applications",
@@ -90,8 +98,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetApplications(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// get an application
 	e.Router.Handle("/v1/organizations/applications/{id}",
@@ -99,8 +108,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// update an application
 	e.Router.Handle("/v1/organizations/applications/{id}",
@@ -108,8 +118,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete an application
 	e.Router.Handle("/v1/organizations/applications/{id}",
@@ -117,8 +128,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		INVITATION
@@ -129,8 +141,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("POST")
+	).Methods("POST", "OPTIONS")
 
 	// get invitations
 	e.Router.Handle("/v1/organizations/{id}/invitations",
@@ -138,8 +151,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetInvitations(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// get an invitation
 	e.Router.Handle("/v1/organizations/invitations/{id}",
@@ -147,8 +161,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// update an invitation
 	e.Router.Handle("/v1/organizations/invitations/{id}",
@@ -156,8 +171,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	// delete an invitation
 	e.Router.Handle("/v1/organizations/invitations/{id}",
@@ -165,8 +181,9 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	/*
 		Club Post
@@ -177,14 +194,16 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.PinOrgPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 
 	e.Router.Handle("/v1/organizations/{id}/post",
 		middleware.Chain(
 			e.Service.UnpinOrgPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
 		),
-	).Methods("PUT")
+	).Methods("PUT", "OPTIONS")
 }

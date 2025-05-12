@@ -29,7 +29,7 @@ func (s *Service) CreateBugReport() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 		id := primitive.NewObjectID()
 		status := "pending"
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		options := options.InsertOneOptions{}
 		req.ID = &id
 		req.User = &uuid

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/server"
+	"olympsis-server/utils"
 	"os"
 	"strconv"
 	"strings"
@@ -30,13 +32,21 @@ type Service struct {
 
 	// mux Router to complete http requests
 	Router *mux.Router
+
+	// Notification service for sending notifications
+	Notification *utils.NotificationInterface
 }
 
 /*
 Create new field service struct
 */
-func NewFieldService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Log: l, Router: r, Database: d}
+func NewVenueService(i *server.ServerInterface) *Service {
+	return &Service{
+		Log:          i.Logger,
+		Router:       i.Router,
+		Database:     i.Database,
+		Notification: i.Notification,
+	}
 }
 
 /*
@@ -46,7 +56,7 @@ Create Field Data (POST)
 
   - Grab request body
 
-  - Create field data in user databse
+  - Create field data in user database
 
 Returns:
 
@@ -55,7 +65,7 @@ Returns:
 */
 func (f *Service) InsertAField() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var req models.Field
+		var req models.Venue
 
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -65,7 +75,7 @@ func (f *Service) InsertAField() http.HandlerFunc {
 			return
 		}
 
-		field := models.Field{
+		field := models.Venue{
 			ID:          primitive.NewObjectID(),
 			Owner:       req.Owner,
 			Name:        req.Name,
@@ -76,6 +86,9 @@ func (f *Service) InsertAField() http.HandlerFunc {
 			City:        req.City,
 			State:       req.State,
 			Country:     req.Country,
+
+			RequiresBooking: req.RequiresBooking,
+			BookingURL:      req.BookingURL,
 		}
 
 		// create auth user in database
@@ -119,7 +132,7 @@ func (f *Service) GetFields() http.HandlerFunc {
 
 		splicedSports := strings.Split(sports, ",")
 
-		var fields []models.Field
+		var fields []models.Venue
 		loc := models.GeoJSON{
 			Type:        "Point",
 			Coordinates: []float64{longitude, latitude},
@@ -149,9 +162,9 @@ func (f *Service) GetFields() http.HandlerFunc {
 			return
 		}
 
-		resp := models.FieldsResponse{
-			TotalFields: len(fields),
-			Fields:      fields,
+		resp := models.VenuesResponse{
+			TotalVenues: len(fields),
+			Venues:      fields,
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
@@ -182,7 +195,7 @@ func (f *Service) GetAField() http.HandlerFunc {
 		id := vars["id"]
 
 		// find field data in database
-		var field models.Field
+		var field models.Venue
 		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
 		err := f.FindField(context.Background(), filter, &field)
@@ -213,7 +226,7 @@ Returns:
 */
 func (f *Service) UpdateAField() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var req models.Field
+		var req models.Venue
 
 		// decode request
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -262,7 +275,7 @@ func (f *Service) UpdateAField() http.HandlerFunc {
 			changes["country"] = req.Country
 		}
 
-		var field models.Field
+		var field models.Venue
 		err = f.UpdateField(context.Background(), filter, updates, &field)
 		if err != nil {
 			f.Log.Error(err.Error())

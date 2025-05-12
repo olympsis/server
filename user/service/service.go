@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/aggregations"
-	"olympsis-server/database"
+	"olympsis-server/server"
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,21 +18,26 @@ import (
 )
 
 /*
-Creates New Auth Service
+Creates New User Service
 
-  - Creates new instance of auth service object
+  - Creates new instance of user service object
 
 Args:
 
-	l - logrus logger (log info, errors or statuses)
-	r - mux router (handle http requests)
+	i - server interface with references to common resources
 
 Returns:
 
-	*AuthenticationService - pointer referencing to new instance of service object
+	*Service - pointer referencing to new instance of service object
 */
-func NewUserService(l *logrus.Logger, r *mux.Router, d *database.Database) *Service {
-	return &Service{Log: l, Router: r, Database: d}
+func NewUserService(i *server.ServerInterface) *Service {
+	return &Service{
+		Log:           i.Logger,
+		Router:        i.Router,
+		Database:      i.Database,
+		SearchService: i.Search,
+		Notification:  i.Notification,
+	}
 }
 
 /*
@@ -156,7 +159,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		uuid := r.Header.Get("UUID")
 
 		// decode request
-		var req models.User
+		var req models.UserDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			s.Log.Error(fmt.Sprintf("Failed to decode request: %s\n", err.Error()))
@@ -164,24 +167,69 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			return
 		}
 
+		// Special handling for notification devices
+		if req.NotificationDevices != nil && len(*req.NotificationDevices) > 0 {
+			// First get the current user to access existing devices
+			filter := bson.M{"uuid": uuid}
+			var currentUser models.User
+			err = s.Database.UserCol.FindOne(context.Background(), filter).Decode(&currentUser)
+			if err != nil {
+				s.Log.Error(fmt.Sprintf("Failed to find user: %s\n", err.Error()))
+				http.Error(w, `{ "msg": "failed to find user" }`, http.StatusInternalServerError)
+				return
+			}
+
+			// Create map of incoming devices by ID for quick lookup
+			incomingDevices := make(map[string]models.NotificationDevice)
+			for _, device := range *req.NotificationDevices {
+				timestamp := primitive.NewDateTimeFromTime(time.Now())
+				device.UpdatedAt = &timestamp
+				incomingDevices[device.DeviceID] = device
+			}
+
+			// Update existing devices or add new ones
+			updatedDevices := []models.NotificationDevice{}
+			if currentUser.NotificationDevices != nil {
+				for _, existingDevice := range *currentUser.NotificationDevices {
+					if updatedDevice, exists := incomingDevices[existingDevice.DeviceID]; exists {
+						// Update existing device
+						updatedDevices = append(updatedDevices, updatedDevice)
+						// Remove from map to track which ones are processed
+						delete(incomingDevices, existingDevice.DeviceID)
+					} else {
+						// Keep unchanged device
+						updatedDevices = append(updatedDevices, existingDevice)
+					}
+				}
+			}
+
+			// Add any remaining new devices
+			for _, device := range incomingDevices {
+				updatedDevices = append(updatedDevices, device)
+			}
+
+			// Update the request with the merged devices
+			req.NotificationDevices = &updatedDevices
+		}
+
 		filter := bson.M{"uuid": uuid}
 		changes := bson.M{}
-		if req.UserName != "" {
+		if req.UserName != nil {
 			changes["username"] = req.UserName
 		}
-		if req.ImageURL != "" {
+		if req.ImageURL != nil {
 			changes["image_url"] = req.ImageURL
 		}
-		if req.Bio != "" {
+		if req.Gender != nil {
+			changes["gender"] = req.Gender
+		}
+		if req.Bio != nil {
 			changes["bio"] = req.Bio
 		}
-		if len(req.Sports) > 0 {
+		if req.Sports != nil && len(*req.Sports) > 0 {
 			changes["sports"] = req.Sports
 		}
-		if req.DeviceToken != "" {
-			changes["device_token"] = req.DeviceToken
-		}
-		if req.Visibility != "" {
+		if req.Visibility != nil {
 			changes["visibility"] = req.Visibility
 		}
 		if req.AcceptedEULA != nil {
@@ -199,6 +247,15 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		if req.BlockedUsers != nil {
 			changes["blocked_users"] = req.BlockedUsers
 		}
+		if req.NotificationDevices != nil {
+			changes["notification_devices"] = req.NotificationDevices
+		}
+		if req.NotificationPreference != nil {
+			changes["notification_preference"] = req.NotificationPreference
+		}
+
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		changes["updated_at"] = timestamp
 
 		update := bson.M{"$set": changes}
 
@@ -362,9 +419,12 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			data.Bio = meta.Bio
 			data.UUID = meta.UUID
 			data.Username = meta.UserName
-			data.ImageURL = meta.ImageURL
+			if meta.ImageURL != nil {
+				data.ImageURL = *meta.ImageURL
+			}
 			data.Visibility = meta.Visibility
-			data.DeviceToken = meta.DeviceToken
+			data.NotificationDevices = meta.NotificationDevices
+			data.NotificationPreference = meta.NotificationPreference
 
 			if data.Visibility == "public" {
 				data.Clubs = meta.Clubs
@@ -381,8 +441,8 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
-				users[i].FirstName = *auth.FirstName
-				users[i].LastName = *auth.LastName
+				users[i].FirstName = auth.FirstName
+				users[i].LastName = auth.LastName
 			}
 		}
 
@@ -427,19 +487,25 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 			w.WriteHeader(http.StatusNotFound)
 		}
 
-		// create user data object
-		userData := models.UserData{
-			UUID:        user.UUID,
-			Bio:         user.Bio,
-			Username:    user.UserName,
-			FirstName:   *auth.FirstName,
-			LastName:    *auth.LastName,
-			ImageURL:    user.ImageURL,
-			Visibility:  user.Visibility,
-			DeviceToken: user.DeviceToken,
+		imageURL := ""
+		if user.ImageURL != nil {
+			imageURL = *user.ImageURL
 		}
 
-		// if user visibility is public display this data if not then dont
+		// create user data object
+		userData := models.UserData{
+			UUID:                   user.UUID,
+			Bio:                    user.Bio,
+			Username:               user.UserName,
+			FirstName:              auth.FirstName,
+			LastName:               auth.LastName,
+			ImageURL:               imageURL,
+			Visibility:             user.Visibility,
+			NotificationDevices:    user.NotificationDevices,
+			NotificationPreference: user.NotificationPreference,
+		}
+
+		// if user visibility is public display this data if not then don't
 		if user.Visibility == "public" {
 			userData.Clubs = user.Clubs
 			userData.Sports = user.Sports
@@ -453,64 +519,66 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+		defer cancel()
 
 		uuid := r.Header.Get("UUID")
 		response := models.CheckIn{}
 
-		// find user data
-		user, err := aggregations.AggregateUser(&uuid, s.Database)
-		if err != nil {
-			s.Log.Error(fmt.Sprintf("Failed to check user in: %s\n", err.Error()))
-			http.Error(w, `{ "msg": "failed to check user in" }`, http.StatusInternalServerError)
-			return
-		}
-		if user == nil {
-			s.Log.Error("Failed to get user. user object is nill")
-			http.Error(w, `{ "msg": "failed to get user" }`, http.StatusNotFound)
-			return
-		}
-		response.User = *user
+		var wgError error
 		var wg sync.WaitGroup
 
-		if user.Clubs != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				filter := bson.M{
-					"$match": bson.M{
-						"_id": bson.M{
-							"$in": user.Clubs,
-						},
-					},
-				}
-				clubs, err := aggregations.AggregateClubs(filter, s.Database)
-				if err != nil {
-					s.Log.Error("failed to check user in: ", err.Error())
-				}
-				response.Clubs = clubs
-			}()
-		}
+		// Find user thread
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			user, err := aggregations.AggregateUser(&uuid, s.Database)
+			if err != nil {
+				s.Log.Error("Failed to find user. Error: ", err.Error())
+				wgError = err
+			}
 
-		if user.Organizations != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				filter := bson.M{
-					"$match": bson.M{
-						"_id": bson.M{
-							"$in": user.Organizations,
-						},
-					},
-				}
-				orgs, err := aggregations.AggregateOrganizations(filter, s.Database)
-				if err != nil {
-					s.Log.Error("failed to check user in: ", err.Error())
-				}
+			if user != nil {
+				response.User = *user
+			}
+		}()
+
+		// Find clubs thread
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			clubs, err := aggregations.FindUserClubs(ctx, uuid, s.Database)
+			if err != nil {
+				s.Log.Error("Failed to find clubs. Error: ", err.Error())
+				wgError = err
+			}
+
+			if clubs != nil {
+				response.Clubs = clubs
+			}
+		}()
+
+		// Find organizations thread
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			orgs, err := aggregations.FindUserOrganizations(ctx, uuid, s.Database)
+			if err != nil {
+				s.Log.Error("Failed to find organizations. Error: ", err.Error())
+				wgError = err
+			}
+
+			if orgs != nil {
 				response.Organizations = orgs
-			}()
-		}
+			}
+		}()
 
 		wg.Wait()
+
+		if wgError != nil {
+			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)

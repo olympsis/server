@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/database"
+	"olympsis-server/server"
 	"olympsis-server/utils"
 	"time"
 
@@ -33,13 +34,22 @@ type Service struct {
 
 	// search service
 	SearchService *search.Service
+
+	// notification service
+	Notification *utils.NotificationInterface
 }
 
 /*
-Create new field service struct
+Create new organization service struct
 */
-func NewOrganizationService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
+func NewOrgService(i *server.ServerInterface) *Service {
+	return &Service{
+		Logger:        i.Logger,
+		Router:        i.Router,
+		Database:      i.Database,
+		SearchService: i.Search,
+		Notification:  i.Notification,
+	}
 }
 
 /*
@@ -51,6 +61,8 @@ Create a new organization
 */
 func (e *Service) CreateOrganization() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
 
 		uuid := r.Header.Get("UUID")
 
@@ -63,16 +75,8 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			return
 		}
 
-		timeStamp := time.Now().Unix()
-
-		// creator of the organization
-		member := models.MemberDao{
-			ID:       primitive.NewObjectID(),
-			UUID:     uuid,
-			Role:     "owner",
-			JoinedAt: timeStamp,
-		}
-		members := []models.MemberDao{member}
+		timeStamp := primitive.NewDateTimeFromTime(time.Now())
+		verification := false
 
 		// new organization model
 		organization := models.OrganizationDao{
@@ -84,8 +88,8 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			Country:     req.Country,
 			Logo:        req.Logo,
 			Banner:      req.Banner,
-			Members:     &members,
-			IsVerified:  req.IsVerified,
+			BlackList:   req.BlackList,
+			IsVerified:  &verification,
 			CreatedAt:   &timeStamp,
 		}
 
@@ -97,7 +101,30 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			return
 		}
 
+		// Creator of the organization
+		member := models.MemberDao{
+			ID:             primitive.NewObjectID(),
+			UserID:         uuid,
+			OrganizationID: id,
+			Role:           "owner",
+			JoinedAt:       timeStamp,
+		}
+
+		_, err = e.InsertMember(ctx, &member)
+		if err != nil {
+			e.Logger.Error("Failed to insert owner into organization. Error: ", err.Error())
+
+			// Try again and http error if failed again
+			_, err = e.InsertMember(ctx, &member)
+			if err != nil {
+				e.Logger.Error("Failed to insert owner into organization x2. Error: ", err.Error())
+				http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+				return
+			}
+		}
+
 		// update user data
+		// NOTICE: - WILL REMOVE THIS SOON
 		update := bson.M{
 			"$push": bson.M{
 				"organizations": id,
@@ -107,22 +134,32 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		if err != nil {
 			e.Logger.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
 		}
+		// NOTICE: END
 
-		// subscribe to notifications
-		err = utils.CreateNotificationTopic(id.Hex())
-		if err != nil {
-			e.Logger.Error("Failed to create topic: ", err.Error())
+		// create notification topics
+		topicName := id.Hex()
+		adminName := id.Hex() + "_admin"
+		orgTopic := models.NotificationTopicDao{
+			Name:  &topicName,
+			Users: &[]string{uuid},
 		}
-		err = utils.AddTokenToTopic(id.Hex(), uuid)
-		if err != nil {
-			e.Logger.Error("Failed to add token to topic: ", err.Error())
+		adminTopic := models.NotificationTopicDao{
+			Name:  &adminName,
+			Users: &[]string{uuid},
 		}
 
-		resp := models.CreateResponse{ID: id.Hex()}
+		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), orgTopic)
+		if err != nil {
+			e.Logger.Error("Failed to create organization topic: ", err.Error())
+		}
 
-		// return created organization
+		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), adminTopic)
+		if err != nil {
+			e.Logger.Error("Failed to create organization admin topic: ", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(resp)
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, id.Hex()))
 	}
 }
 
@@ -143,7 +180,7 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 
 		// find organization data in database
 		oid, _ := primitive.ObjectIDFromHex(id)
-		org, err := aggregations.AggregateOrganization(&oid, e.Database)
+		org, err := aggregations.AggregateOrganization(oid, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				e.Logger.Error(fmt.Sprintf("Organization not found ID: %s", id))
@@ -187,7 +224,7 @@ func (e *Service) GetOrganizations() http.HandlerFunc {
 		}
 
 		// fetch organizations
-		orgs, err := aggregations.AggregateOrganizations(filter, e.Database)
+		orgs, err := aggregations.AggregateOrganizations(filter, 100, 0, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{ "msg": "organization not found" }`, http.StatusNoContent)
@@ -289,43 +326,46 @@ Delete an organization
 */
 func (e *Service) DeleteOrganization() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		// grab id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) < 24 {
-			e.Logger.Error("No/Bad organization ID in request")
 			http.Error(rw, `{ "msg": "bad organization id" }`, http.StatusBadRequest)
 			return
 		}
 		id := vars["id"]
-
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		org, err := e.FindAnOrganization(context.Background(), filter)
+
+		// Delete organization members
+		err := e.DeleteMembers(ctx, bson.M{"organization_id": oid})
 		if err != nil {
-			e.Logger.Error(fmt.Sprintf(`Failed to find org: %s`, err.Error()))
-			http.Error(rw, `{ "msg": "Failed to find organization" }`, http.StatusNotFound)
+			e.Logger.Error(fmt.Sprintf("Failed to delete organization members: %s", err.Error()))
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 			return
 		}
-		members := *org.Members
 
-		// delete org from users data
-		for i := 0; i < len(members); i++ {
-			filter := bson.M{"uuid": members[i].UUID}
-			update := bson.M{"$pull": bson.M{"organizations": oid}}
-			e.Database.UserCol.UpdateOne(context.Background(), filter, update)
-		}
-		err = e.DeleteAnOrganization(context.Background(), filter)
+		// Delete organization
+		err = e.DeleteAnOrganization(context.Background(), bson.M{"_id": oid})
 		if err != nil {
 			e.Logger.Error(fmt.Sprintf("Failed to delete organization: %s", err.Error()))
-			http.Error(rw, `{ "msg": "Failed to delete organization" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
+			return
 		}
 
-		// delete notification topic
-		err = utils.DeleteNotificationTopic(id)
+		// Delete notification topics
+		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
 		if err != nil {
 			e.Logger.Error("Failed to delete topic: ", err.Error())
 		}
+		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id+"_admin")
+		if err != nil {
+			e.Logger.Error("Failed to delete topic: ", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -364,7 +404,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 
 		// insert application into database
 		status := "pending"
-		timestamp := time.Now().Unix()
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
@@ -375,16 +415,24 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 			return
 		}
 
-		// notify org members
-		note := models.Notification{
+		// Notify organization members
+		notification := models.PushNotification{
 			Title: "New Application",
 			Body:  "You've received an application",
-			Topic: application.OrganizationID.Hex(),
+			Data: map[string]interface{}{
+				"organization_id": application.OrganizationID.Hex(),
+			},
 		}
-		utils.SendNotificationToTopic(&note)
+
+		orgID := application.OrganizationID.Hex()
+		request := models.NotificationPushRequest{
+			Topic:        &orgID,
+			Notification: notification,
+		}
+		e.Notification.SendNotification(r.Header.Get("Authorization"), request)
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(models.CreateResponse{ID: id.Hex()})
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, id.Hex()))
 	}
 }
 
@@ -563,20 +611,11 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 
 		// insert application into database
 		req.ID = primitive.NewObjectID()
-		req.CreatedAt = time.Now().Unix()
+		req.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
 		err = e.InsertAnInvitation(context.TODO(), &req)
 		if err != nil {
 			e.Logger.Error(err.Error())
 			http.Error(w, `{ "msg": "failed to create invitation" }`, http.StatusInternalServerError)
-			return
-		}
-
-		// fetch user data
-		user, err := e.SearchService.SearchUserByUUID(req.Recipient)
-		if err != nil {
-			e.Logger.Error("Failed to fetch user data: " + err.Error())
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(req)
 			return
 		}
 
@@ -589,15 +628,6 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 			json.NewEncoder(w).Encode(req)
 			return
 		}
-
-		// notify user
-		note := models.Notification{
-			Title: "New Invitation",
-			Body:  "You've been invited to join the " + org.Name + " organization",
-			Data:  org,
-		}
-
-		utils.SendNotificationToToken(user.DeviceToken, &note)
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(req)
@@ -709,9 +739,9 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		if req.Status == "accepted" {
 			member := models.MemberDao{
 				ID:       primitive.NewObjectID(),
-				UUID:     req.Recipient,
+				UserID:   req.Recipient,
 				Role:     "manager",
-				JoinedAt: time.Now().Unix(),
+				JoinedAt: primitive.NewDateTimeFromTime(time.Now()),
 			}
 			changes := bson.M{
 				"$push": bson.M{"members": member},
@@ -764,19 +794,21 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		}
 
 		// notify club admins
-		note := models.Notification{
+		clubID := req.SubjectID.Hex()
+		notification := models.PushNotification{
 			Title: "Invitation Status",
 			Body:  usr.Username + " " + req.Status + " their invite.",
-			Topic: req.SubjectID.Hex(),
+			Data: map[string]interface{}{
+				"club_id": clubID,
+			},
 		}
-
-		err = utils.SendNotificationToTopic(&note)
+		request := models.NotificationPushRequest{
+			Topic:        &clubID,
+			Notification: notification,
+		}
+		err = e.Notification.SendNotification(r.Header.Get("Authorization"), request)
 		if err != nil {
 			e.Logger.Error("Failed to send notification: " + err.Error())
-		}
-		err = utils.AddTokenToTopic(req.SubjectID.Hex(), req.Recipient)
-		if err != nil {
-			e.Logger.Error("Failed to add token to topic: " + err.Error())
 		}
 		w.WriteHeader(http.StatusOK)
 	}

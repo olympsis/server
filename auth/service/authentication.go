@@ -6,44 +6,26 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/aggregations"
-	"olympsis-server/database"
+	"olympsis-server/server"
 	"time"
 
-	"firebase.google.com/go/v4/auth"
-	"github.com/gorilla/mux"
+	"github.com/google/uuid"
 	"github.com/olympsis/models"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-/*
-  - Creates new instance of auth service object
-
-Args:
-
-	l - logrus logger (log info, errors or statuses)
-	r - mux router (handle http requests)
-
-Returns:
-
-	*AuthenticationService - pointer referencing to new instance of service object
-*/
-func NewAuthService(l *logrus.Logger, r *mux.Router, d *database.Database, c *auth.Client) *Service {
-	return &Service{Log: l, Router: r, Database: d, Client: c}
+func NewAuthService(serverInterface *server.ServerInterface) *Service {
+	return &Service{
+		Log:          serverInterface.Logger,
+		Router:       serverInterface.Router,
+		Database:     serverInterface.Database,
+		Client:       serverInterface.Auth,
+		Notification: serverInterface.Notification,
+	}
 }
 
-/*
-Create User (PUT)
-  - Creates new user for olympsis (sign up)
-  - Grab request body
-  - Create AuthUser data in auth database
-
-Returns:
-
-	Http handler
-		- Writes token back to client
-*/
 func (a *Service) Register() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -66,9 +48,32 @@ func (a *Service) Register() http.HandlerFunc {
 			return
 		}
 
+		// Check for duplicates
+		existing, err := a.FindUser(ctx, bson.M{"uuid": token.UID})
+		if err == nil {
+			if existing != nil {
+				response := models.AuthResponse{
+					UUID:      existing.UUID,
+					FirstName: existing.FirstName,
+					LastName:  existing.LastName,
+					Email:     existing.Email,
+				}
+
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+
+		if err != mongo.ErrNoDocuments {
+			a.Log.Error("Failed to check user data. Error: ", err.Error())
+			http.Error(w, `{"msg": "something went wrong."}`, http.StatusInternalServerError)
+			return
+		}
+
 		// New AuthUser
-		timestamp := time.Now().Unix()
-		user := &models.AuthUser{
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		user := &models.AuthUserDao{
 			UUID:      &token.UID,
 			FirstName: request.FirstName,
 			LastName:  request.LastName,
@@ -80,15 +85,37 @@ func (a *Service) Register() http.HandlerFunc {
 		err = a.InsertUser(ctx, user)
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to insert user into the database: %s\n", err.Error()))
-			http.Error(w, `{ "msg": "failed to add user to the database" }`, http.StatusInternalServerError)
+			http.Error(w, `{ "msg": "failed to create auth user" }`, http.StatusInternalServerError)
+			return
+		}
+
+		// User Metadata
+		tempUsername := "olympsis-user-" + uuid.NewString()
+		hasOnboarded := false
+		acceptedEULA := true
+		visibility := "public"
+		meta := models.User{
+			ID:           primitive.NewObjectID(),
+			UUID:         token.UID,
+			UserName:     tempUsername,
+			Visibility:   visibility,
+			HasOnboarded: hasOnboarded,
+			AcceptedEULA: acceptedEULA,
+		}
+
+		// Insert metadata into database
+		_, err = a.Database.UserCol.InsertOne(ctx, meta)
+		if err != nil {
+			a.Log.Error(fmt.Sprintf("Failed to insert user into the database: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "failed to create user" }`, http.StatusInternalServerError)
 			return
 		}
 
 		response := models.AuthResponse{
-			UUID:      user.UUID,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Email:     user.Email,
+			UUID:      *user.UUID,
+			FirstName: *user.FirstName,
+			LastName:  *user.LastName,
+			Email:     *user.Email,
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -96,19 +123,6 @@ func (a *Service) Register() http.HandlerFunc {
 	}
 }
 
-/*
-Login User (POST)
-  - Logs user into olympsis
-  - Grab token from header
-  - Generate new JWT auth token
-  - Update AuthUser data in auth database
-
-Returns:
-
-	Http handler
-		- Writes token back to client
-		- Writes userData back to client
-*/
 func (a *Service) Login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -127,7 +141,8 @@ func (a *Service) Login() http.HandlerFunc {
 			return
 		}
 
-		user, err := aggregations.AggregateUser(&token.UID, a.Database)
+		uuid := token.UID
+		user, err := aggregations.AggregateUser(&uuid, a.Database)
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
@@ -140,23 +155,65 @@ func (a *Service) Login() http.HandlerFunc {
 	}
 }
 
-/*
-Delete User (DELETE)
-  - Deletes auth user from olympsis
+func (s *Service) Modify() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-Returns:
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
 
-	Http handler
-		- Writes bool whether sign out was successful
-*/
+		var request models.AuthUserDao
+		uuid := r.Header.Get("UUID")
+
+		err := json.NewDecoder(r.Body).Decode(&request)
+		if err != nil {
+			http.Error(w, `{"msg": "failed to decode request"}`, http.StatusBadRequest)
+			s.Log.Error("Failed to decode request. Error: ", err.Error())
+			return
+		}
+
+		changes := bson.M{}
+		if request.FirstName != nil {
+			changes["first_name"] = request.FirstName
+		}
+
+		if request.LastName != nil {
+			changes["last_name"] = request.LastName
+		}
+
+		if request.Email != nil {
+			changes["email"] = request.Email
+		}
+
+		user, err := s.UpdateUser(ctx, uuid, changes)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				http.Error(w, `{"msg": "user not found."}`, http.StatusNotFound)
+				s.Log.Error("failed to update user. Document not found: ", err.Error())
+				return
+			}
+
+			http.Error(w, `{"msg": "failed to update user."}`, http.StatusInternalServerError)
+			s.Log.Error("failed to update user. Error: ", err.Error())
+			return
+		}
+
+		if user == nil {
+			http.Error(w, `{"msg": "something went wrong."}`, http.StatusInternalServerError)
+			s.Log.Error("Failed to get user data after update.")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
+	}
+}
+
 func (a *Service) Delete() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
-		filter := bson.M{"uuid": uuid}
-
 		// DELETE USER FROM DATABASE
-		err := a.DeleteUser(context.Background(), filter)
+		uuid := r.Header.Get("UUID")
+		err := a.DeleteUser(context.Background(), bson.M{"uuid": uuid})
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
@@ -169,5 +226,6 @@ func (a *Service) Delete() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }

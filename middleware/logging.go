@@ -20,7 +20,12 @@ func Logging() Middleware {
 			start := time.Now()
 
 			defer func() {
-				log.Println(r.URL.Path, "completed in", time.Since(start))
+				log.Printf(
+					"%s %s completed in %v",
+					r.Method,
+					r.URL.Path,
+					time.Since(start),
+				)
 			}()
 
 			// call next middleware/handler in chain

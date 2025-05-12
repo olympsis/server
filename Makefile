@@ -1,7 +1,7 @@
-VERSION := v0.5.1
+VERSION := v0.6.5
 PROJECT_ID := olympsis-408521
 LOCATION := us-central1-docker.pkg.dev
-SERVICE_NAME := server
+SERVICE_NAME := olympsis-server
 REPO_NAME := main
 PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
@@ -14,7 +14,7 @@ all: build
 lint: ## Lint the files
 	golint -set_exit_status ${PKG_LIST}
 
-test: ## Run unittests
+test: ## Run unit tests
 	go test -short ${PKG_LIST}
 
 race: dep ## Run data race detector
@@ -29,24 +29,48 @@ dep: ## Get the dependencies
 build: dep ## Build the binary file
 	go build -v $(PKG) 
 
-docker:
-	docker build . -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
-	docker tag $(SERVICE_NAME) $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
-	docker push $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
-
-local:
-	docker build . -t $(SERVICE_NAME)
-	docker run -p 80:80 $(SERVICE_NAME):latest
-
 run:
 	go run -x main.go
 
-server-up:
+docker-build:
+	docker build -f ./tools/Dockerfile.http.dev . -t $(SERVICE_NAME)-unsecure
+
+docker-hub: #Publish image to gcp docker-hub
+	docker build . -f ./tools/Dockerfile.dev -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
+	docker tag $(SERVICE_NAME) $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
+	docker push $(LOCATION)/$(PROJECT_ID)/$(REPO_NAME)/$(SERVICE_NAME):$(VERSION)
+
+server: #Secure server with local CA certificates
+	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)" | xargs -I {} docker rmi {}
+	docker build -f ./tools/Dockerfile.dev --secret id=crt,src=./tools/localhost.crt --secret id=key,src=./tools/localhost.key . -t $(SERVICE_NAME)
+	docker run -p 443:443 $(SERVICE_NAME):latest
+
+unsecure-server: #Un-secure server with http
+	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)-unsecure" | xargs -I {} docker rmi -f {}
+	docker build -f ./tools/Dockerfile.http.dev . -t $(SERVICE_NAME)-unsecure
+	docker run -p 80:80 $(SERVICE_NAME)-unsecure:latest
+
+env-up: #Runs the docker-compose stack to set up local environment
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-dev-server" | xargs -I {} docker rmi {}
 	docker-compose -f tools/dev-compose.yaml up -d
 
-server-down:
+env-down: #Takes down the docker-compose stack
 	docker-compose -f tools/dev-compose.yaml down
+
+update-service: #Updates the linux service
+	make build && \
+	if [ $$? -ne 0 ]; then \
+		echo "Error: Failed to build new server binary." && \
+		exit 1; \
+	fi && \
+	rm /sbin/olympsis-server && \
+	mv olympsis-server /sbin && \
+	if [ $$? -ne 0 ]; then \
+		echo "Error: Failed to move binary." && \
+		exit 1; \
+	fi && \
+	systemctl restart olympsis-server.service && \
+	echo "Update Successful"
 
 clean: ## Remove previous build
 	rm -f $(SERVICE_NAME)

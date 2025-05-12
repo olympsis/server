@@ -16,12 +16,12 @@ type FieldReportORM struct {
 	Logger   *logrus.Logger
 }
 
-func (orm *FieldReportORM) Insert(ctx context.Context, report *models.FieldReportDao, opts *options.InsertOneOptions) error {
-	_, err := orm.Database.FieldReportCol.InsertOne(ctx, report, opts)
+func (orm *FieldReportORM) Insert(ctx context.Context, report *models.VenueReportDao, opts *options.InsertOneOptions) error {
+	_, err := orm.Database.VenueReportCol.InsertOne(ctx, report, opts)
 	return err
 }
 
-func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *options.AggregateOptions) (*[]models.FieldReport, error) {
+func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *options.AggregateOptions) (*[]models.VenueReport, error) {
 
 	pipeline0 := bson.M{
 		"$lookup": bson.M{
@@ -44,7 +44,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 	pipeline2 := bson.M{
 		"$lookup": bson.M{
 			"from":         "fields",
-			"localField":   "field_id",
+			"localField":   "venue_id",
 			"foreignField": "_id",
 			"as":           "fields",
 		},
@@ -79,7 +79,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		"$project": bson.M{
 			"users":      0,
 			"fields":     0,
-			"field_id":   0,
+			"venue_id":   0,
 			"user.token": 0,
 		},
 	}
@@ -94,14 +94,14 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		pipeline5,
 	}
 
-	cur, err := orm.Database.FieldReportCol.Aggregate(context.TODO(), pipeline, opts)
+	cur, err := orm.Database.VenueReportCol.Aggregate(context.TODO(), pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	var reports []models.FieldReport
+	var reports []models.VenueReport
 	for cur.Next(context.TODO()) {
-		var report models.FieldReport
+		var report models.VenueReport
 		err = cur.Decode(&report)
 		if err != nil {
 			orm.Logger.Error(fmt.Sprintf("failed to decode report: %s", err.Error()))
@@ -113,7 +113,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 }
 
 func (orm *FieldReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.FieldReportCol.UpdateOne(ctx, filter, update)
+	_, err := orm.Database.VenueReportCol.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (orm *FieldReportORM) Update(ctx context.Context, filter interface{}, updat
 }
 
 func (orm *FieldReportORM) Delete(ctx context.Context, filter interface{}) error {
-	_, err := orm.Database.FieldReportCol.DeleteOne(ctx, filter)
+	_, err := orm.Database.VenueReportCol.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

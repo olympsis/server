@@ -2,7 +2,8 @@ package database
 
 import (
 	"context"
-	"os"
+	"fmt"
+	"olympsis-server/utils"
 
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -15,49 +16,67 @@ type Database struct {
 	Client      *mongo.Client
 	NotifClient *mongo.Client
 
-	AuthCol      *mongo.Collection
-	UserCol      *mongo.Collection
-	ClubCol      *mongo.Collection
-	OrgCol       *mongo.Collection
-	EventCol     *mongo.Collection
-	FieldCol     *mongo.Collection
-	PostCol      *mongo.Collection
-	ClubInvCol   *mongo.Collection
-	CommentsCol  *mongo.Collection
-	FriendReqCol *mongo.Collection
+	AnnouncementCol *mongo.Collection
 
-	ClubApplicationCol *mongo.Collection
-	OrgApplicationCol  *mongo.Collection
+	AuthCol          *mongo.Collection
+	UserCol          *mongo.Collection
+	VenuesCollection *mongo.Collection
 
-	EventInvitationCol *mongo.Collection
-	ClubInvitationCol  *mongo.Collection
-	OrgInvitationCol   *mongo.Collection
+	PostsCollection         *mongo.Collection
+	PostCommentsCollection  *mongo.Collection
+	PostReactionsCollection *mongo.Collection
+
+	ClubCol               *mongo.Collection
+	ClubInvitationCol     *mongo.Collection
+	ClubApplicationCol    *mongo.Collection
+	ClubMembersCollection *mongo.Collection
+
+	OrgCol                        *mongo.Collection
+	OrgInvitationCol              *mongo.Collection
+	OrgApplicationCol             *mongo.Collection
+	OrganizationMembersCollection *mongo.Collection
+
+	EventsCollection                    *mongo.Collection
+	EventLogsCollection                 *mongo.Collection
+	EventViewsCollection                *mongo.Collection
+	EventTeamsCollection                *mongo.Collection
+	EventCommentsCollection             *mongo.Collection
+	EventInvitationsCollection          *mongo.Collection
+	EventParticipantsCollection         *mongo.Collection
+	EventTeamsWaitlistCollection        *mongo.Collection
+	EventParticipantsWaitlistCollection *mongo.Collection
 
 	BugReportCol    *mongo.Collection
 	PostReportCol   *mongo.Collection
 	MemberReportCol *mongo.Collection
-	FieldReportCol  *mongo.Collection
+	VenueReportCol  *mongo.Collection
 	EventReportCol  *mongo.Collection
+
+	CountriesCol     *mongo.Collection
+	AdminAreasCol    *mongo.Collection
+	SubAdminAreasCol *mongo.Collection
+
+	TagsCollection   *mongo.Collection
+	SportsCollection *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {
 	return &Database{Logger: l}
 }
 
-func (d *Database) EstablishConnection() {
+func (d *Database) EstablishConnection(config *utils.ServerConfig) {
 
 	d.Logger.Info("Connecting to Database...")
 
 	/*
 		Connect to Mongo Database
 	*/
-	mode := os.Getenv("MODE")
-	dbUser := os.Getenv("DB_USR")
-	dbPass := os.Getenv("DB_PASS")
-	dbLoc := os.Getenv("DB_ADDR")
+	dbConfig := utils.GetDatabaseConfig()
+	collectionConfig := utils.GetCollectionsConfig()
 
-	if mode == "PRODUCTION" {
-		opts := options.Client().ApplyURI(`mongodb+srv://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
+	switch config.Mode {
+	case "PRODUCTION":
+		opts := options.Client().ApplyURI(`mongodb+srv://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
 		client, err := mongo.Connect(context.Background(), opts)
 		if err != nil {
 			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
@@ -69,10 +88,8 @@ func (d *Database) EstablishConnection() {
 		}
 
 		d.Client = client
-
-	} else {
-
-		opts := options.Client().ApplyURI(`mongodb://` + dbUser + `:` + dbPass + `@` + dbLoc + `/?retryWrites=true&w=majority`)
+	default:
+		opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
 		client, err := mongo.Connect(context.Background(), opts)
 		if err != nil {
 			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
@@ -86,33 +103,76 @@ func (d *Database) EstablishConnection() {
 		d.Client = client
 	}
 
-	d.LinkCollections()
-	d.Logger.Info("Database connection successful.")
+	err := d.SetUpCollections(&dbConfig, &collectionConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to set up database collections. Error: %s", err.Error()))
+	}
+	d.Logger.Info("Database connection successful")
 }
 
-func (d *Database) LinkCollections() {
-	database := d.Client.Database(os.Getenv("DB_NAME"))
-	d.AuthCol = database.Collection(os.Getenv("AUTH_COL"))
-	d.UserCol = database.Collection(os.Getenv("USER_COL"))
-	d.ClubCol = database.Collection(os.Getenv("CLUB_COL"))
-	d.OrgCol = database.Collection(os.Getenv("ORG_COL"))
-	d.EventCol = database.Collection(os.Getenv("EVENT_COL"))
-	d.FieldCol = database.Collection(os.Getenv("FIELD_COL"))
-	d.PostCol = database.Collection(os.Getenv("POST_COL"))
-	d.ClubInvCol = database.Collection(os.Getenv("CLUB_INVITE_COL"))
-	d.CommentsCol = database.Collection(os.Getenv("COMMENTS_COL"))
-	d.FriendReqCol = database.Collection(os.Getenv("FRIEND_REQUEST_COL"))
+// Sets up all of the database collections
+func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConfig *utils.CollectionsConfig) error {
+	database := d.Client.Database(config.Name)
 
-	d.ClubApplicationCol = database.Collection(os.Getenv("CLUB_APPLICATIONS_COL"))
-	d.OrgApplicationCol = database.Collection(os.Getenv("ORG_APPLICATIONS_COL"))
+	// Initialize User Collections
+	err := d.SetUpUserCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
 
-	d.EventInvitationCol = database.Collection(os.Getenv("EVENT_INVITATIONS_COL"))
-	d.ClubInvitationCol = database.Collection(os.Getenv("CLUB_INVITATIONS_COL"))
-	d.OrgInvitationCol = database.Collection(os.Getenv("ORG_INVITATIONS_COL"))
+	// Initialize Announcements Collection
+	err = d.SetUpAnnouncementCollection(database, collectionConfig)
+	if err != nil {
+		return err
+	}
 
-	d.BugReportCol = database.Collection(os.Getenv("BUG_REPORT_COL"))
-	d.PostReportCol = database.Collection(os.Getenv("POST_REPORT_COL"))
-	d.FieldReportCol = database.Collection(os.Getenv("FIELD_REPORT_COL"))
-	d.EventReportCol = database.Collection(os.Getenv("EVENT_REPORT_COL"))
-	d.MemberReportCol = database.Collection(os.Getenv("MEMBER_REPORT_COL"))
+	// Event Collections Setup
+	err = d.SetUpEventCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Venue Collections Setup
+	err = d.SetUpVenueCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Club Collections
+	err = d.SetUpClubCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Organization Collections
+	err = d.SetUpOrganizationCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Post Collections
+	err = d.SetUpPostCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Reports Collection
+	err = d.SetUpReportCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Locales Collection
+	err = d.SetUpLocaleCollections(database, collectionConfig, config)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Application Config Collections
+	err = d.SetUpAppConfigCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

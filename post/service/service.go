@@ -5,15 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"olympsis-server/database"
-	"olympsis-server/utils"
-	"sync"
+	"olympsis-server/aggregations"
+	"olympsis-server/server"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/search"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,8 +21,14 @@ Create new Post service struct
 
   - Create and Returns a pointer to a new post service struct
 */
-func NewPostService(l *logrus.Logger, r *mux.Router, d *database.Database, sh *search.Service) *Service {
-	return &Service{Logger: l, Router: r, Database: d, SearchService: sh}
+func NewPostService(i *server.ServerInterface) *Service {
+	return &Service{
+		Logger:        i.Logger,
+		Router:        i.Router,
+		Database:      i.Database,
+		SearchService: i.Search,
+		Notification:  i.Notification,
+	}
 }
 
 /*
@@ -45,95 +48,44 @@ Get Posts (GET)
 func (p *Service) GetPosts() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
-
-		// grab query parameters
-		group := r.URL.Query().Get("groupID")
-		parent := r.URL.Query().Get("parentID")
-		if group == "" {
-			http.Error(rw, `{ "msg" : "no group id found in request"}`, http.StatusBadRequest)
-			return
+		params, err := parsePostQueryParams(r)
+		if err != nil {
+			p.Logger.Error("Failed to parse request. Error: ", err.Error())
+			http.Error(rw, `{"msg": "bad request"}`, http.StatusBadRequest)
 		}
 
-		// convert ids found to objectIDs
-		var ids []primitive.ObjectID
-		groupID, err := primitive.ObjectIDFromHex(group)
+		filter := bson.M{}
+		groupID, err := primitive.ObjectIDFromHex(params.GroupID)
 		if err != nil {
-			p.Logger.Error("failed to encode group id to object id: ", err.Error())
+			p.Logger.Error("Failed to encode group id to object id: ", err.Error())
 			http.Error(rw, `{ "msg" : "bad group id found in request"}`, http.StatusBadRequest)
 			return
-		} else {
-			ids = append(ids, groupID)
-		}
-		if parent != "" {
-			parentID, _ := primitive.ObjectIDFromHex(parent)
-			ids = append(ids, parentID)
 		}
 
-		var wg sync.WaitGroup
-		var user *models.UserData
-		var posts *[]models.Post
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			user, err = utils.FindUser(uuid, p.Database)
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			// run aggregation pipeline
-			posts, err = FindPosts(ids, p.Database, 100)
-			if err != nil {
-				if err == mongo.ErrNoDocuments {
-					http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
-					return
-				} else {
-					p.Logger.Error("failed to get posts: ", err.Error())
-					http.Error(rw, `{ "msg": "posts not found" }`, http.StatusInternalServerError)
-					return
-				}
+		if params.ParentID != nil && *params.ParentID != "" {
+			parentID, _ := primitive.ObjectIDFromHex(*params.ParentID)
+			filter["$or"] = bson.A{
+				bson.M{"group_id": groupID},
+				bson.M{"group_id": parentID},
 			}
-		}()
+		} else {
+			filter["group_id"] = groupID
+		}
 
-		wg.Wait()
+		posts, err := aggregations.AggregatePosts(filter, 20, 0, p.Database)
 
 		if posts == nil || len(*posts) == 0 {
 			http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
 			return
 		}
 
-		if user == nil {
-			http.Error(rw, `{ "msg": "user not found!" }`, http.StatusInternalServerError)
-			return
+		resp := models.PostsResponse{
+			TotalPosts: len(*posts),
+			Posts:      *posts,
 		}
 
-		if user.BlockedUsers != nil {
-			_posts := removePostsByPosterUUIDs(posts, user.BlockedUsers)
-
-			if _posts == nil || len(*_posts) == 0 {
-				http.Error(rw, `{ "msg": "no posts found" }`, http.StatusNoContent)
-				return
-			}
-
-			resp := models.PostsResponse{
-				TotalPosts: len(*_posts),
-				Posts:      *_posts,
-			}
-
-			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(resp)
-
-		} else {
-			resp := models.PostsResponse{
-				TotalPosts: len(*posts),
-				Posts:      *posts,
-			}
-
-			rw.WriteHeader(http.StatusOK)
-			json.NewEncoder(rw).Encode(resp)
-		}
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
 	}
 }
 
@@ -164,7 +116,7 @@ func (p *Service) GetPost() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 
 		// run aggregation pipeline to fetch post
-		post, err := FindPost(oid, p.Database)
+		post, err := aggregations.AggregatePost(oid, p.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, `{"msg": "post not found"}`, http.StatusNotFound)
@@ -198,6 +150,10 @@ Http handler
 func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		// Context setup
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
 
@@ -210,12 +166,10 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			return
 		}
 
-		// add additional data to post model
-		id := primitive.NewObjectID()
-		timeStamp := time.Now().Unix()
-		req.CreatedAt = &timeStamp
+		// Add additional data to post model
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		req.CreatedAt = &timestamp
 		post := models.PostDao{
-			ID:           &id,
 			Type:         req.Type,
 			Poster:       &uuid,
 			GroupID:      req.GroupID,
@@ -224,28 +178,51 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			Images:       req.Images,
 			IsSensitive:  req.IsSensitive,
 			ExternalLink: req.ExternalLink,
-			CreatedAt:    &timeStamp,
+			CreatedAt:    &timestamp,
 		}
 
-		// create post in database
-		_, err = p.Database.PostCol.InsertOne(context.TODO(), post)
+		// Create post in database
+		id, err := p.InsertPost(context.TODO(), &post, nil)
 		if err != nil {
 			p.Logger.Error("failed to create post: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to create post"}`, http.StatusInternalServerError)
 			return
 		}
+		if id == nil {
+			p.Logger.Error("inserted post id is null")
+			http.Error(rw, `{"msg": "failed to add post to database"}`, http.StatusInternalServerError)
+			return
+		}
 
-		// create post notif topic
-
-		err = utils.CreateNotificationTopic(post.ID.Hex())
+		// Create post notification topic
+		postID := id.Hex()
+		topic := models.NotificationTopicDao{
+			Name:  &postID,
+			Users: &[]string{uuid},
+		}
+		err = p.Notification.CreateTopic(r.Header.Get("Authorization"), topic)
 		if err != nil {
 			p.Logger.Error("failed to create topic: " + err.Error())
 		}
 
-		if *req.Type == "announcement" {
+		var user models.UserData
+		var note models.PushNotification
 
-			// grab org data
+		// grab user info
+		user, err = p.SearchService.SearchUserByUUID(uuid)
+		if err != nil {
+			p.Logger.Error("failed to fetch user data: ", err.Error())
+			rw.WriteHeader(http.StatusCreated)
+			rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
+			return
+		}
+
+		switch *req.Type {
+		case "announcement":
+			var memberUUIDs []string
 			var org models.OrganizationDao
+
+			// Find organization data
 			filter := bson.M{"_id": post.GroupID}
 			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
 			if err != nil {
@@ -254,24 +231,31 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				return
 			}
 
-			members := *org.Members
-
-			for i := 0; i < len(members); i++ {
-				err = utils.AddTokenToTopic(post.ID.Hex(), members[i].UUID)
-				if err != nil {
-					p.Logger.Error("failed to create topic: " + err.Error())
-				}
+			// Find organization members to add to the post notification topic
+			members, err := findOrganizationMembers(&ctx, post.GroupID, p.Database)
+			if err != nil {
+				p.Logger.Error("Failed to find organization members. Error: ", err.Error())
+			}
+			for _, v := range *members {
+				memberUUIDs = append(memberUUIDs, v.UserID)
+			}
+			err = p.Notification.ModifyTopic(r.Header.Get("Authorization"), org.ID.Hex(), models.NotificationTopicUpdateRequest{
+				Action: "subscribe",
+				Users:  memberUUIDs,
+			})
+			if err != nil {
+				p.Logger.Error("Failed to add organization members to new announcement topic.")
 			}
 
-			// find child clubs
+			// Find child clubs
 			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": post.GroupID})
 			if err != nil {
 				p.Logger.Error("No children found")
 				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+				rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, post.ID.Hex()))
 			}
 
-			// send a notification to all of them
+			// Send a notification to all of them
 			for cur.Next(context.TODO()) {
 				var club models.Club
 				err := cur.Decode(&club)
@@ -280,18 +264,14 @@ func (p *Service) CreatePost() http.HandlerFunc {
 				}
 
 				// send notification to club members
-				note := models.Notification{
-					Title: *org.Name,
-					Body:  "New announcement!",
-					Topic: club.ID.Hex(),
-					Data:  post,
-				}
-
-				utils.SendNotificationToTopic(&note)
+				clubID := club.ID.Hex()
+				note = generateNewAnnouncementNotification(postID, *org.Name)
+				p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+					Topic:        &clubID,
+					Notification: note,
+				})
 			}
-
-		} else if *req.Type == "post" {
-
+		default:
 			// grab club info
 			var club models.Club
 			filter := bson.M{"_id": post.GroupID}
@@ -299,31 +279,19 @@ func (p *Service) CreatePost() http.HandlerFunc {
 			if err != nil {
 				p.Logger.Error("failed to fetch club data: ", err.Error())
 				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
-				return
+				rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
 			}
 
-			// grab user info
-			user, err := p.SearchService.SearchUserByUUID(uuid)
-			if err != nil {
-				p.Logger.Error("failed to fetch user data: ", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
-				return
-			}
-
-			// send notification to club members
-			note := models.Notification{
-				Title: club.Name,
-				Body:  user.Username + " created a post!",
-				Topic: club.ID.Hex(),
-				Data:  post,
-			}
-			utils.SendNotificationToTopic(&note)
+			clubID := club.ID.Hex()
+			note = generateNewPostNotification(postID, club.Name, user.Username)
+			p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+				Topic:        &clubID,
+				Notification: note,
+			})
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(`{"id": "` + post.ID.Hex() + `" }`))
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
 	}
 }
 
@@ -386,7 +354,7 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 		}
 
 		// update post
-		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, update)
+		_, err = p.Database.PostsCollection.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
 			p.Logger.Error("failed to update post: ", err.Error())
 			http.Error(rw, `{ "msg" : "failed to update post" }`, http.StatusInternalServerError)
@@ -431,7 +399,7 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		filter := bson.M{"_id": oid}
-		_, err = p.Database.PostCol.DeleteOne(context.TODO(), filter)
+		_, err = p.Database.PostsCollection.DeleteOne(context.TODO(), filter)
 		if err != nil {
 			p.Logger.Debug("failed to delete post: ", err.Error())
 			http.Error(rw, `{ "msg": "failed to delete post" }`, http.StatusInternalServerError)
@@ -439,12 +407,13 @@ func (p *Service) DeletePost() http.HandlerFunc {
 		}
 
 		// delete notif topic
-		err = utils.DeleteNotificationTopic(id)
+		err = p.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
 		if err != nil {
 			p.Logger.Error("failed to delete topic: ", err.Error())
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -465,6 +434,8 @@ Returns:
 */
 func (p *Service) AddLike() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
 
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
@@ -477,32 +448,28 @@ func (p *Service) AddLike() http.HandlerFunc {
 			return
 		}
 
-		like := models.Like{
-			ID:        primitive.NewObjectID(),
-			UUID:      uuid,
-			CreatedAt: time.Now().Unix(),
-		}
-
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
 		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid, "likes.uuid": bson.M{"$ne": uuid}}
-		change := bson.M{
-			"$push": bson.M{
-				"likes": like,
-			},
+		like := models.ReactionDao{
+			UserID:    &uuid,
+			PostID:    &oid,
+			CreatedAt: &timestamp,
 		}
 
-		resp, err := p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
+		rid, err := p.InsertReaction(ctx, &like, nil)
 		if err != nil { // unexpected error
-			p.Logger.Error("failed to add like: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to add like" }`, http.StatusInternalServerError)
+			p.Logger.Error("Failed to add reaction: ", err.Error())
+			http.Error(rw, `{ "msg" : "something went wrong" }`, http.StatusInternalServerError)
 			return
-		} else if resp.ModifiedCount != 1 { // the like already exits
-			rw.WriteHeader(http.StatusOK)
-			return
-		} else { // newly created like
-			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, like.ID.Hex())))
 		}
+		if rid == nil {
+			p.Logger.Error("Failed to insert reaction. Inserted ID nil.")
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, rid.Hex()))
 	}
 }
 
@@ -541,7 +508,7 @@ func (p *Service) RemoveLike() http.HandlerFunc {
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"likes": bson.M{"_id": loid}}}
 
-		_, err := p.Database.PostCol.UpdateOne(context.TODO(), match, change)
+		_, err := p.Database.PostsCollection.UpdateOne(context.TODO(), match, change)
 		if err != nil {
 			p.Logger.Error("failed to remove like: ", err.Error())
 			http.Error(rw, `{ "msg" : "failed to remove like" }`, http.StatusInternalServerError)
@@ -549,6 +516,7 @@ func (p *Service) RemoveLike() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -569,6 +537,9 @@ Returns:
 func (p *Service) AddComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
+
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
 
@@ -580,35 +551,34 @@ func (p *Service) AddComment() http.HandlerFunc {
 		}
 		id := vars["id"]
 
-		var req models.CommentDao
-		// decode request
+		var req models.PostCommentDao
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			p.Logger.Error("failed to decode comments: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to decode comments" }`, http.StatusBadRequest)
+			p.Logger.Error("failed to decode comment: ", err.Error())
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusBadRequest)
 			return
 		}
 
-		newID := primitive.NewObjectID()
-		timestamp := time.Now().Unix()
-
-		req.ID = &newID
-		req.UUID = &uuid
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		oid, _ := primitive.ObjectIDFromHex(id)
+		req.UserID = &uuid
+		req.PostID = &oid
 		req.CreatedAt = &timestamp
 
-		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.M{"_id": oid}
-		change := bson.M{"$push": bson.M{"comments": req}}
-
-		_, err = p.Database.PostCol.UpdateOne(context.TODO(), filter, change)
+		cid, err := p.InsertComment(ctx, &req, nil)
 		if err != nil {
-			p.Logger.Error("failed to update post: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to update post" }`, http.StatusInternalServerError)
+			p.Logger.Error("Failed to insert comment. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
+			return
+		}
+		if cid == nil {
+			p.Logger.Error("Failed to insert comment. Inserted ID nil.")
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(fmt.Sprintf(`{ "id": "%s" }`, req.ID.Hex())))
+		rw.Write(fmt.Appendf(nil, `{ "id": "%s" }`, cid.Hex()))
 	}
 }
 
@@ -626,8 +596,11 @@ Returns:
 	Http handler
 		- Writes back OK to client
 */
-func (p *Service) RemoveComment() http.HandlerFunc {
+func (p *Service) DeleteComment() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
+
 		// grab id from path
 		vars := mux.Vars(r)
 		id := vars["id"]
@@ -644,37 +617,15 @@ func (p *Service) RemoveComment() http.HandlerFunc {
 		oid, _ := primitive.ObjectIDFromHex(id)
 		coid, _ := primitive.ObjectIDFromHex(cId)
 
-		match := bson.M{"_id": oid}
-		change := bson.M{"$pull": bson.M{"comments": bson.M{"_id": coid}}}
-
-		_, err := p.Database.PostCol.UpdateOne(context.TODO(), match, change)
+		err := p.RemoveComment(ctx, bson.M{"_id": coid, "post_id": oid})
 		if err != nil {
-			p.Logger.Error("failed to remove comment: ", err.Error())
-			http.Error(rw, `{ "msg" : "failed to remove comment" }`, http.StatusInternalServerError)
+			p.Logger.Error("failed to remove comment. Error: ", err.Error())
+			http.Error(rw, `{ "msg" : "something went wrong" }`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
-	}
-}
+		rw.Write([]byte(`{ "msg": "OK" }`))
 
-func removePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Post {
-	var result []models.Post
-	if len(*posts) > 0 {
-		for _, post := range *posts {
-			found := false
-			for _, uuid := range uuids {
-				if post.Poster != nil {
-					if post.Poster.UUID == uuid {
-						found = true
-						break
-					}
-				}
-			}
-			if !found {
-				result = append(result, post)
-			}
-		}
 	}
-	return &result
 }

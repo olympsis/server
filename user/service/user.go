@@ -38,16 +38,10 @@ func (u *Service) FindUsers(ctx context.Context, filter interface{}, users *[]mo
 }
 
 // update user in database
-func (u *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *models.User) error {
+func (u *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *models.UserDao) error {
 
 	// update user
 	_, err := u.Database.UserCol.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	// find and return updated user
-	err = u.FindUser(ctx, filter, user)
 	if err != nil {
 		return err
 	}

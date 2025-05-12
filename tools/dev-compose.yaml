@@ -11,7 +11,7 @@ services:
     container_name: server
     restart: always
     ports:
-     - 80:80
+     - 443:443
     volumes:
       - db-data:/server
     environment:
@@ -21,7 +21,6 @@ services:
       DB_ADDR: master:27017
     depends_on:
       - master-db
-      - notif-db
       
 
   master-db:
@@ -34,14 +33,3 @@ services:
     volumes:
       - db-data:/master
       - ./master-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-
-  notif-db:
-    container_name: notif
-    image: mongo
-    restart: always
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: olympsis
-    volumes:
-      - db-data:/notif
-      - ./notif-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
