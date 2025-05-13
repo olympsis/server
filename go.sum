@@ -116,6 +116,8 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/olympsis/models v0.0.0-20250508172551-254dbf4412b1 h1:nqA/y72K0RGnt7Y80GDPadXw+GGQ/Lf75y7BNaacT4E=
 github.com/olympsis/models v0.0.0-20250508172551-254dbf4412b1/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
+github.com/olympsis/models v0.0.0-20250512233517-bac5bd8b75e1 h1:rwizt4jsChhcBL3jrxNeFZnwG4NFXh05bwv97lVxd6U=
+github.com/olympsis/models v0.0.0-20250512233517-bac5bd8b75e1/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
 github.com/olympsis/search v0.0.0-20250405234947-7fa228174fb7 h1:7SO7qvXIImqKMJOgWK6lSY337ZOdTv/HJNFbeM/+gAM=
 github.com/olympsis/search v0.0.0-20250405234947-7fa228174fb7/go.mod h1:TCVskrRg8s0p1WwkmBB5Ntf8pVzscTHCYG8ME/+oJbs=
 github.com/olympsis/search v0.0.0-20250508195913-a73758f3ccae h1:9vRi2OlKvusp2j8ToOeaU8iQAFqaGMv7UwDlnIo5QFk=
