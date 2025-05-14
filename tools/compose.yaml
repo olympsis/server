@@ -1,0 +1,50 @@
+name: olympsis-prod
+
+volumes:
+    db-data:
+
+services:
+    nginx:
+        image: nginx:alpine
+        ports:
+            - "80:80"
+        volumes:
+            - ./nginx:/etc/nginx/conf.d
+
+    server:
+        container_name: server
+        image: us-central1-docker.pkg.dev/olympsis-408521/main/server:latest
+        restart: always
+        pull_policy: always
+        ports:
+            - 8080:80
+        volumes:
+            - db-data:/server
+        environment:
+            MODE: PRODUCTION
+            FIREBASE_FILE_PATH: /etc/olympsis/firebase-credentials.json
+            MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
+
+    # storage:
+    #     container_name: storage
+    #     image: us-central1-docker.pkg.dev/olympsis-408521/main/storage:latest
+    #     restart: always
+    #     pull_policy: always
+    #     ports:
+    #         - 8081:7002
+
+    # chat:
+    #     container_name: chat
+    #     image: us-central1-docker.pkg.dev/olympsis-408521/main/chat:latest
+    #     restart: always
+    #     pull_policy: always
+    #     ports:
+    #         - 8082:7003
+
+    # notification:
+    #     container_name: notif
+    #     image: us-central1-docker.pkg.dev/olympsis-408521/main/notif:latest
+    #     restart: always
+    #     pull_policy: always
+    #     ports:
+    #         - 8083:7004
