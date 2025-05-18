@@ -17,7 +17,7 @@ if [ ! -d "$OLYMPSIS_DIR" ]; then
 fi
 
 # 3. Create symbolic link for server.conf
-SERVER_CONF_SRC="$USER_HOME/server/nginx/server.conf"
+SERVER_CONF_SRC="$USER_HOME/server/tools/nginx/server.conf"
 SERVER_CONF_LINK="$OLYMPSIS_DIR/server.conf"
 
 if [ ! -L "$SERVER_CONF_LINK" ]; then
@@ -28,7 +28,7 @@ else
 fi
 
 # 4. Create symbolic link for proxy_headers.conf
-PROXY_HEADERS_SRC="$USER_HOME/server/nginx/proxy_headers.conf"
+PROXY_HEADERS_SRC="$USER_HOME/server/tools/nginx/proxy_headers.conf"
 PROXY_HEADERS_LINK="$OLYMPSIS_DIR/proxy_headers.conf"
 
 if [ ! -L "$PROXY_HEADERS_LINK" ]; then
