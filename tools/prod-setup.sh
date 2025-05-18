@@ -16,7 +16,18 @@ if [ ! -d "$OLYMPSIS_DIR" ]; then
     sudo mkdir -p "$OLYMPSIS_DIR"
 fi
 
-# 3. Create symbolic link for server.conf
+# 3. Create symbolic link for nginx.conf
+PROXY_HEADERS_SRC="$USER_HOME/server/tools/nginx/nginx.conf"
+PROXY_HEADERS_LINK="$OLYMPSIS_DIR/nginx.conf"
+
+if [ ! -L "$PROXY_HEADERS_LINK" ]; then
+    echo "Linking nginx.conf..."
+    sudo ln -s "$PROXY_HEADERS_SRC" "$PROXY_HEADERS_LINK"
+else
+    echo "nginx.conf link already exists."
+fi
+
+# 4. Create symbolic link for server.conf
 SERVER_CONF_SRC="$USER_HOME/server/tools/nginx/server.conf"
 SERVER_CONF_LINK="$OLYMPSIS_DIR/server.conf"
 
@@ -27,7 +38,7 @@ else
     echo "server.conf link already exists."
 fi
 
-# 4. Create symbolic link for proxy_headers.conf
+# 5. Create symbolic link for proxy_headers.conf
 PROXY_HEADERS_SRC="$USER_HOME/server/tools/nginx/proxy_headers.conf"
 PROXY_HEADERS_LINK="$OLYMPSIS_DIR/proxy_headers.conf"
 
