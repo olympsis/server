@@ -9,9 +9,8 @@ services:
         ports:
             - "80:80"
         volumes:
-            - /etc/olympsis/nginx:/etc/nginx/conf.d:ro
-            - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro
-
+            - /etc/olympsis/nginx:/etc/nginx/conf.d/server.conf:ro
+            - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/conf.d/proxy_headers.conf:ro
     server:
         container_name: server
         image: us-central1-docker.pkg.dev/olympsis-408521/main/server:v0.7.0
