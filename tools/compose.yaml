@@ -9,7 +9,7 @@ services:
         ports:
             - "80:80"
         volumes:
-            - /etc/olympsis/nginx:/etc/nginx/conf.d/server.conf:ro
+            - /etc/olympsis/nginx/server.conf:/etc/nginx/conf.d/server.conf:ro
             - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/conf.d/proxy_headers.conf:ro
     server:
         container_name: server
