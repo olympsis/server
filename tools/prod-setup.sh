@@ -38,4 +38,7 @@ else
     echo "proxy_headers.conf link already exists."
 fi
 
+chmod 644 /etc/olympsis/nginx/server.conf
+chmod 644 /etc/olympsis/nginx/proxy_headers.conf
+
 echo "Done."
