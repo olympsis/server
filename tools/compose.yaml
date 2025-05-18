@@ -21,7 +21,7 @@ services:
             - 8080:80
         volumes:
             # - db-data:/server
-            - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json
+            - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
         environment:
             MODE: PRODUCTION
             FIREBASE_FILE_PATH: ./firebase-credentials.json
