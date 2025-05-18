@@ -9,7 +9,7 @@ services:
         ports:
             - "80:80"
         volumes:
-            - ./nginx:/etc/nginx/conf.d
+            - ./nginx:/etc/olympsis/nginx.conf.dco
 
     server:
         container_name: server
@@ -18,11 +18,12 @@ services:
         pull_policy: always
         ports:
             - 8080:80
-        # volumes:
-        #     - db-data:/server
+        volumes:
+            # - db-data:/server
+            - ./firebase-credentials.json:/etc/olympsis/firebase-credentials.json
         environment:
             MODE: PRODUCTION
-            FIREBASE_FILE_PATH: ./files/firebase-credentials.json
+            FIREBASE_FILE_PATH: ./firebase-credentials.json
             MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
 
     # storage:
