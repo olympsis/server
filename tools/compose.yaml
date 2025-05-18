@@ -9,7 +9,7 @@ services:
         ports:
             - "80:80"
         volumes:
-            - ./nginx:/etc/olympsis/nginx.conf.dco
+            - /etc/olympsis/nginx.conf.dco:/etc/nginx/nginx.conf
 
     server:
         container_name: server
@@ -20,7 +20,7 @@ services:
             - 8080:80
         volumes:
             # - db-data:/server
-            - ./firebase-credentials.json:/etc/olympsis/firebase-credentials.json
+            - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json
         environment:
             MODE: PRODUCTION
             FIREBASE_FILE_PATH: ./firebase-credentials.json
