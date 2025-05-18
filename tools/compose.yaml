@@ -9,7 +9,7 @@ services:
         ports:
             - "80:80"
         volumes:
-            - /etc/olympsis/nginx.conf.dco:/etc/nginx/nginx.conf
+            - /etc/olympsis/nginx.conf:/etc/nginx/nginx.conf
 
     server:
         container_name: server
