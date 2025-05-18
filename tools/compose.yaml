@@ -1,8 +1,7 @@
 version: "3.0"
-name: olympsis-prod
 
-volumes:
-    db-data:
+# volumes:
+#     db-data:
 
 services:
     nginx:
@@ -19,12 +18,11 @@ services:
         pull_policy: always
         ports:
             - 8080:80
-        volumes:
-            - db-data:/server
+        # volumes:
+        #     - db-data:/server
         environment:
             MODE: PRODUCTION
-            # FIREBASE_FILE_PATH: /etc/olympsis/firebase-credentials.json
-            FIREBASE_FILE_PATH: ./files/firebase-credentials.json
+            FIREBASE_FILE_PATH: /etc/olympsis/firebase-credentials.json
             MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
 
     # storage:
