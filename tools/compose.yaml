@@ -20,7 +20,7 @@ services:
         restart: always
         pull_policy: always
         ports:
-            - 8080:80
+            - 80:8088
         volumes:
             # - db-data:/server
             - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
