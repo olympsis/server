@@ -55,7 +55,7 @@ services:
             FIREBASE_FILE_PATH: ./firebase-credentials.json
 
 
-    notification:
+    notif:
         container_name: notif
         image: us-central1-docker.pkg.dev/olympsis-408521/main/notif:v0.6.2
         restart: always
