@@ -11,6 +11,9 @@ services:
         volumes:
             - /etc/olympsis/nginx/server.conf:/etc/nginx/server.conf:ro
             - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro
+        depends_on:
+            - server
+            
     server:
         container_name: server
         image: us-central1-docker.pkg.dev/olympsis-408521/main/server:v0.7.0
