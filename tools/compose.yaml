@@ -12,6 +12,9 @@ services:
             - backend
         links:
             - "server"
+            - "storage"
+            - "notif"
+            - "chat"
         volumes:
             - /etc/olympsis/nginx/server.conf:/etc/nginx/conf.d/default.conf:ro
             - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro
@@ -32,6 +35,8 @@ services:
             - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
         environment:
             MODE: PRODUCTION
+            NOTIF_URL: http://notif
+            STORAGE_URL: http://storage
             FIREBASE_FILE_PATH: ./firebase-credentials.json
             MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
 
@@ -49,6 +54,25 @@ services:
         environment:
             FIREBASE_FILE_PATH: ./firebase-credentials.json
 
+
+    notification:
+        container_name: notif
+        image: us-central1-docker.pkg.dev/olympsis-408521/main/notif:v0.6.2
+        restart: always
+        pull_policy: always
+        ports:
+            - 8082:80
+        networks:
+            - backend
+        volumes:
+            - /etc/olympsis/AuthKey_5MP3VW78BZ.p8:/app/AuthKey_5MP3VW78BZ.p8:ro
+            - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
+        environment:
+            KEY_ID: 5MP3VW78BZ
+            TEAM_ID: 5A6H49Q85D
+            APNS_KEY_URL: ./AuthKey_5MP3VW78BZ.p8
+            FIREBASE_FILE_PATH: ./firebase-credentials.json
+
     # chat:
     #     container_name: chat
     #     image: us-central1-docker.pkg.dev/olympsis-408521/main/chat:v1.0.0
@@ -56,14 +80,6 @@ services:
     #     pull_policy: always
     #     ports:
     #         - 8082:7003
-
-    # notification:
-    #     container_name: notif
-    #     image: us-central1-docker.pkg.dev/olympsis-408521/main/notif:v1.0.0
-    #     restart: always
-    #     pull_policy: always
-    #     ports:
-    #         - 8083:7004
 
 networks:
     backend:
