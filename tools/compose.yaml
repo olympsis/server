@@ -14,7 +14,7 @@ services:
             - "server"
             - "storage"
             - "notif"
-            - "chat"
+            # - "chat"
         volumes:
             - /etc/olympsis/nginx/server.conf:/etc/nginx/conf.d/default.conf:ro
             - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro
