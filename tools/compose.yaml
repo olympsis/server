@@ -65,12 +65,12 @@ services:
         networks:
             - backend
         volumes:
-            - /etc/olympsis/AuthKey_5MP3VW78BZ.p8:/app/AuthKey_5MP3VW78BZ.p8:ro
+            - /etc/olympsis/AuthKey_FDZ85P3KX3.p8:/app/AuthKey_FDZ85P3KX3.p8:ro
             - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
         environment:
-            KEY_ID: 5MP3VW78BZ
+            KEY_ID: FDZ85P3KX3
             TEAM_ID: 5A6H49Q85D
-            APNS_KEY_URL: ./AuthKey_5MP3VW78BZ.p8
+            APNS_KEY_URL: ./AuthKey_FDZ85P3KX3.p8
             FIREBASE_FILE_PATH: ./firebase-credentials.json
 
     # chat:
