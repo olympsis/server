@@ -8,6 +8,10 @@ services:
         image: nginx:alpine
         ports:
             - "80:80"
+        networks:
+            - backend
+        links:
+            - "server"
         volumes:
             - /etc/olympsis/nginx/server.conf:/etc/nginx/server.conf:ro
             - /etc/olympsis/nginx/proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro
@@ -20,7 +24,9 @@ services:
         restart: always
         pull_policy: always
         ports:
-            - 80:8088
+            - 8080:80
+        networks:
+            - backend
         volumes:
             # - db-data:/server
             - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
@@ -52,3 +58,7 @@ services:
     #     pull_policy: always
     #     ports:
     #         - 8083:7004
+
+networks:
+    backend:
+        driver: bridge
