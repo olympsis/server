@@ -29,7 +29,7 @@ jobs:
         gcloud compute ssh ${{ secrets.SSH_USER }}@server-b \
           --zone=${{ secrets.GCP_ZONE }} \
           --tunnel-through-iap \
-          --command="cd /home/app && git pull && docker compose pull && docker compose up -d --build"
+          --command="cd /home/joel/server && git pull && make prod-down && make prod-up
 
     - name: Wait for server-b to be healthy in backend
       run: |
@@ -53,7 +53,7 @@ jobs:
         gcloud compute ssh ${{ secrets.SSH_USER }}@server \
           --zone=${{ secrets.GCP_ZONE }} \
           --tunnel-through-iap \
-          --command="cd /home/app && git pull && docker compose pull && docker compose up -d --build"
+          --command="cd /home/joel/server && git pull && make prod-down && make prod-up
 
     - name: Wait for server to be healthy in backend
       run: |
