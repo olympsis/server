@@ -24,6 +24,13 @@ jobs:
       run: |
         gcloud compute instances start server-b --zone=${{ secrets.GCP_ZONE }}
 
+    - name: Get server-b internal IP
+      id: server-b-ip
+      run: |
+        INTERNAL_IP=$(gcloud compute instances describe server-b --zone=${{ secrets.GCP_ZONE }} --format="get(networkInterfaces[0].networkIP)")
+        echo "INTERNAL_IP=$INTERNAL_IP" >> $GITHUB_OUTPUT
+        echo "Server-b internal IP: $INTERNAL_IP"
+
     - name: Deploy to server-b
       run: |
         gcloud compute ssh ${{ secrets.SSH_USER }}@server-b \
@@ -35,10 +42,10 @@ jobs:
       run: |
         echo "Waiting for server-b to be healthy..."
         for i in {1..30}; do
-          STATUS=$(gcloud compute backend-services get-health main-vm \
+          STATUS=$(gcloud compute backend-services get-health vm-service \
             --global \
             --format="json" | jq -r \
-            '.[] | .status.healthStatus[]? | select(.ipAddress == "${{ secrets.SERVER_B_IP }}) | .healthState')
+            '.[] | .status.healthStatus[]? | select(.ipAddress == "${{ steps.server-b-ip.outputs.INTERNAL_IP }}") | .healthState')
 
           echo "Health status: $STATUS"
           if [ "$STATUS" = "HEALTHY" ]; then
@@ -47,6 +54,13 @@ jobs:
           fi
           sleep 10
         done
+
+    - name: Get server internal IP
+      id: server-ip
+      run: |
+        INTERNAL_IP=$(gcloud compute instances describe server --zone=${{ secrets.GCP_ZONE }} --format="get(networkInterfaces[0].networkIP)")
+        echo "INTERNAL_IP=$INTERNAL_IP" >> $GITHUB_OUTPUT
+        echo "Server internal IP: $INTERNAL_IP"
 
     - name: Deploy to server
       run: |
@@ -59,10 +73,10 @@ jobs:
       run: |
         echo "Waiting for server to be healthy..."
         for i in {1..30}; do
-          STATUS=$(gcloud compute backend-services get-health main-vm \
+          STATUS=$(gcloud compute backend-services get-health vm-service \
             --global \
             --format="json" | jq -r \
-            '.[] | .status.healthStatus[]? | select(.ipAddress == "${{ secrets.SERVER_IP }}) | .healthState')
+            '.[] | .status.healthStatus[]? | select(.ipAddress == "${{ steps.server-ip.outputs.INTERNAL_IP }}") | .healthState')
 
           echo "Health status: $STATUS"
           if [ "$STATUS" = "HEALTHY" ]; then
