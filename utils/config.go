@@ -91,23 +91,23 @@ func GetDatabaseConfig() DatabaseConfig {
 // Reads from OS environment variables to create a collections config object
 func GetCollectionsConfig() CollectionsConfig {
 
-	announcementCollection := os.Getenv("ANNOUNCE_COL")
+	announcementCollection := os.Getenv("ANNOUNCEMENT_COLLECTION")
 	if announcementCollection == "" {
 		panic("announcement collection required in config")
 	}
 
 	// USER COLLECTIONS
-	authCollection := os.Getenv("AUTH_COL")
+	authCollection := os.Getenv("AUTHENTICATION_COLLECTION")
 	if authCollection == "" {
 		panic("auth collection name required in config")
 	}
-	userCollection := os.Getenv("USER_COL")
+	userCollection := os.Getenv("USER_COLLECTION")
 	if userCollection == "" {
 		panic("user collection name required in config")
 	}
 
 	// CLUB COLLECTIONS
-	clubCollection := os.Getenv("CLUB_COL")
+	clubCollection := os.Getenv("CLUB_COLLECTION")
 	if clubCollection == "" {
 		panic("club collection name required in config")
 	}
@@ -115,25 +115,25 @@ func GetCollectionsConfig() CollectionsConfig {
 	if clubMembersCollection == "" {
 		panic("club members collection name required in config")
 	}
-	clubInvitationCollection := os.Getenv("CLUB_INVITATION_COL")
+	clubInvitationCollection := os.Getenv("CLUB_INVITATION_COLLECTION")
 	if clubInvitationCollection == "" {
 		panic("club invitation collection name required in config")
 	}
-	clubApplicationCollection := os.Getenv("CLUB_APPLICATION_COL")
+	clubApplicationCollection := os.Getenv("CLUB_APPLICATION_COLLECTION")
 	if clubApplicationCollection == "" {
 		panic("club application collection name required in config")
 	}
 
 	// ORGANIZATION COLLECTIONS
-	orgCollection := os.Getenv("ORG_COL")
+	orgCollection := os.Getenv("ORGANIZATION_COLLECTION")
 	if orgCollection == "" {
 		panic("organization collection name is required in config")
 	}
-	orgInvitationCollection := os.Getenv("ORG_INVITATION_COL")
+	orgInvitationCollection := os.Getenv("ORGANIZATION_INVITATION_COLLECTION")
 	if orgInvitationCollection == "" {
 		panic("organization invitation name collection required in config")
 	}
-	orgApplicationCollection := os.Getenv("ORG_APPLICATION_COL")
+	orgApplicationCollection := os.Getenv("ORGANIZATION_APPLICATION_COLLECTION")
 	if orgApplicationCollection == "" {
 		panic("organization application name collection required in config")
 	}
@@ -198,77 +198,77 @@ func GetCollectionsConfig() CollectionsConfig {
 	}
 
 	// REPORT COLLECTIONS
-	bugReportCollection := os.Getenv("BUG_REPORT_COL")
+	bugReportCollection := os.Getenv("BUG_REPORT_COLLECTION")
 	if bugReportCollection == "" {
 		panic("bug report collection name required in config")
 	}
-	venueReportCollection := os.Getenv("VENUE_REPORT_COL")
+	venueReportCollection := os.Getenv("VENUE_REPORT_COLLECTION")
 	// if venueReportCollection == "" {
 	// 	panic("venue report collection name required in config")
 	// }
-	eventReportCollection := os.Getenv("EVENT_REPORT_COL")
+	eventReportCollection := os.Getenv("EVENT_REPORT_COLLECTION")
 	if eventReportCollection == "" {
 		panic("event report collection name required in config")
 	}
-	memberReportCollection := os.Getenv("MEMBER_REPORT_COL")
+	memberReportCollection := os.Getenv("MEMBER_REPORT_COLLECTION")
 	if memberReportCollection == "" {
 		panic("member report collection name required in config")
 	}
 
 	// LOG COLLECTIONS
-	authLog := os.Getenv("AUTH_LOG_COL")
+	authLog := os.Getenv("AUTH_LOG_COLLECTION")
 	// if authLog == "" {
 	// 	panic("auth log collection name required in config")
 	// }
-	eventLog := os.Getenv("EVENT_LOG_COL")
+	eventLog := os.Getenv("EVENT_LOG_COLLECTION")
 	// if eventLog == "" {
 	// 	panic("event log collection name required in config")
 	// }
-	venueLog := os.Getenv("VENUE_LOG_COL")
+	venueLog := os.Getenv("VENUE_LOG_COLLECTION")
 	// if venueLog == "" {
 	// 	panic("venue log collection name required in config")
 	// }
-	postLog := os.Getenv("POST_LOG_COL")
+	postLog := os.Getenv("POST_LOG_COLLECTION")
 	// if postLog == "" {
 	// 	panic("post log collection name required in config")
 	// }
-	commentLog := os.Getenv("COMMENT_LOG_COL")
+	commentLog := os.Getenv("COMMENT_LOG_COLLECTION")
 	// if commentLog == "" {
 	// 	panic("comment log collection name required in config")
 	// }
-	orgLog := os.Getenv("ORG_LOG_COL")
+	orgLog := os.Getenv("ORG_LOG_COLLECTION")
 	// if orgLog == "" {
 	// 	panic("org log collection name required in config")
 	// }
-	clubLog := os.Getenv("CLUB_LOG_COL")
+	clubLog := os.Getenv("CLUB_LOG_COLLECTION")
 	// if clubLog == "" {
 	// 	panic("club log collection name required in config")
 	// }
-	clubApplicationLog := os.Getenv("CLUB_APPLICATION_LOG_COL")
+	clubApplicationLog := os.Getenv("CLUB_APPLICATION_LOG_COLLECTION")
 	// if clubApplicationLog == "" {
 	// 	panic("club application log collection name required in config")
 	// }
 
 	// LOCALE COLLECTIONS
-	countriesCollection := os.Getenv("COUNTRY_COL")
+	countriesCollection := os.Getenv("COUNTRY_COLLECTION")
 	if countriesCollection == "" {
 		panic("countries collection name required in config")
 	}
-	adminAreaCollection := os.Getenv("ADMIN_AREA_COL")
+	adminAreaCollection := os.Getenv("ADMIN_AREA_COLLECTION")
 	if adminAreaCollection == "" {
 		panic("admin area collection name required in config")
 	}
-	subAdminAreaCollection := os.Getenv("SUB_ADMIN_AREA_COL")
+	subAdminAreaCollection := os.Getenv("SUB_ADMIN_AREA_COLLECTION")
 	if subAdminAreaCollection == "" {
 		panic("sub admin area collection name required in config")
 	}
 
-	tagsCollection := os.Getenv("TAGS_COL")
+	tagsCollection := os.Getenv("TAGS_COLLECTION")
 	if tagsCollection == "" {
 		panic("tags collection name required in config")
 	}
 
-	sportsCollection := os.Getenv("SPORTS_COL")
+	sportsCollection := os.Getenv("SPORTS_COLLECTION")
 	if sportsCollection == "" {
 		panic("sports collection name required in config")
 	}
