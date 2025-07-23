@@ -11,16 +11,19 @@ services:
         container_name: server
         restart: always
         ports:
-            - 443:443
+            - 80:80
         volumes:
             - db-data:/server
+            - ../files/firebase-credentials.json:/app/firebase-credentials.json:ro
+            - ../files/localhost.key:/app/localhost.key:ro
+            - ../files/localhost.crt:/app/localhost.crt:ro
         environment:
-            PORT: 443
-            HTTP: SECURE
+            PORT: 80
+            HTTP: UNSECURE
             MODE: PRODUCTION
-            KEY_FILE_PATH: ./files/localhost.key
-            CERT_FILE_PATH: ./files/localhost.crt
-            FIREBASE_FILE_PATH: ./files/firebase-credentials.json
+            KEY_FILE_PATH: ./localhost.key
+            CERT_FILE_PATH: ./localhost.crt
+            FIREBASE_FILE_PATH: ./firebase-credentials.json
             MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
         depends_on:
             - master-db
