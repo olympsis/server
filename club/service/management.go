@@ -27,26 +27,12 @@ func (s *Service) KickAMember(clubID *string, memberID *string) bool {
 
 // POST MANAGEMENT
 
-func (s *Service) PinPost(clubID *string, postID *string) bool {
-
-	// convert club hex id string to object id
-	cid, err := primitive.ObjectIDFromHex(*clubID)
-	if err != nil {
-		s.Logger.Error("Failed to create club object id: " + err.Error())
-		return false
-	}
-
-	// convert post hex id string to object id
-	pid, err := primitive.ObjectIDFromHex(*postID)
-	if err != nil {
-		s.Logger.Error("Failed to create post object id: " + err.Error())
-		return false
-	}
+func (s *Service) PinPost(clubID *primitive.ObjectID, postID *primitive.ObjectID) bool {
 
 	// update club's pinned post
-	filter := bson.M{"_id": cid}
-	update := bson.M{"$set": bson.M{"pinned_post_id": pid}}
-	err = s.UpdateClub(context.TODO(), filter, update)
+	filter := bson.M{"_id": clubID}
+	update := bson.M{"$set": bson.M{"pinned_post_id": postID}}
+	err := s.UpdateClub(context.TODO(), filter, update)
 	if err != nil {
 		s.Logger.Error("Failed to update club: " + err.Error())
 		return false
@@ -55,19 +41,12 @@ func (s *Service) PinPost(clubID *string, postID *string) bool {
 	return true
 }
 
-func (s *Service) UnpinPost(clubID *string) bool {
-
-	// convert club hex id string to object id
-	cid, err := primitive.ObjectIDFromHex(*clubID)
-	if err != nil {
-		s.Logger.Error("Failed to create club object id: " + err.Error())
-		return false
-	}
+func (s *Service) UnpinPost(clubID *primitive.ObjectID) bool {
 
 	// remove club's pinned post
-	filter := bson.M{"_id": cid}
+	filter := bson.M{"_id": clubID}
 	update := bson.M{"$unset": bson.M{"pinned_post_id": 1}}
-	err = s.UpdateClub(context.TODO(), filter, update)
+	err := s.UpdateClub(context.TODO(), filter, update)
 	if err != nil {
 		s.Logger.Error("Failed to update club: " + err.Error())
 		return false

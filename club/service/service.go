@@ -27,9 +27,7 @@ type Service struct {
 	Notification  *utils.NotificationInterface
 }
 
-/*
-Create new Club service struct
-*/
+// Creates a new club service object
 func NewClubService(i *server.ServerInterface) *Service {
 	return &Service{
 		Logger:        i.Logger,
@@ -637,6 +635,12 @@ func (c *Service) KickMember() http.HandlerFunc {
 }
 
 // Leave club
+//
+// - Validate club ID
+// - Remove member from members collection
+// - Remove member from topics
+//
+// Returns: OK if successful
 func (c *Service) LeaveClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -645,18 +649,11 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 
 		uuid := r.Header.Get("UUID")
 
-		// Grab club id from path and validate it
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
-			return
-		}
-
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
-			c.Logger.Error("Failed to encode club id to ObjectID. Error: ", err.Error())
-			http.Error(rw, `{"msg": "failed to decode club id"}`, http.StatusBadRequest)
+			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
 			return
 		}
 
@@ -668,7 +665,7 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 			return
 		}
 
-		// remove from topics
+		// Remove member from topics
 		topicName := id
 		adminName := id + "_admin"
 		request := models.NotificationTopicUpdateRequest{
@@ -679,7 +676,6 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
-
 		err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), adminName, request)
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
@@ -690,59 +686,71 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 	}
 }
 
-// CLUB POST ENDPOINTS
+/*
+CLUB POST ENDPOINTS
+*/
 
+// Pin a club post
+//
+// - Validates club ID
+// - Validates post ID
+// - Updates the club to pin the post
+//
+// Returns: Ok if successful
 func (s *Service) PinClubPost() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(w, "invalid club id", http.StatusBadRequest)
+		// Validate club ID
+		id, err := utils.ValidateObjectID(mux.Vars(r)["id"])
+		if err != nil {
+			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
 			return
 		}
 
-		// grab post id from path
-		postID := mux.Vars(r)["postID"]
-		if len(postID) < 24 {
-			http.Error(w, "bad post id", http.StatusBadRequest)
+		// Validate post ID
+		postID, err := utils.ValidateObjectID(mux.Vars(r)["postID"])
+		if err != nil {
+			http.Error(rw, `{"msg": "invalid post id"}`, http.StatusBadRequest)
 			return
 		}
 
-		// update club data to reflect new post
+		// Pin the post
 		ok := s.PinPost(&id, &postID)
-		if ok {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"msg": "OK"}`))
-			return
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
+		if !ok {
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
+// Unpin a club post
+//
+// - Validates club id
+// - Updates the club to remove the pinned post
+//
+// Returns: Ok if successful
 func (s *Service) UnpinClubPost() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(w, "invalid club id", http.StatusBadRequest)
+		// Validate club ID
+		id, err := utils.ValidateObjectID(mux.Vars(r)["id"])
+		if err != nil {
+			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
 			return
 		}
 
-		// remove pinned post from club
+		// Remove the pinned post
 		ok := s.UnpinPost(&id)
-		if ok {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"msg": "OK"}`))
+		if !ok {
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+
 		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
