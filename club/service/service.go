@@ -17,7 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Service struct {
@@ -41,7 +40,12 @@ func NewClubService(i *server.ServerInterface) *Service {
 	}
 }
 
-// Fetches all of the clubs in a given location
+// Gets clubs based on parameters given
+//
+// - Process club find parameters
+// - Aggregate club objects
+//
+// Returns: array of Club objects
 func (s *Service) GetClubs() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		params, err := parseQueryParams(r)
@@ -265,7 +269,7 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 			return
 		}
 		if member.Role == string(models.MemberMember) {
-			http.Error(rw, `{"msg": "invalid permissions"}`, http.StatusUnauthorized)
+			http.Error(rw, `{"msg": "invalid permission"}`, http.StatusUnauthorized)
 			return
 		}
 
@@ -348,7 +352,7 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 // - Delete club from database
 // - Deletes club topics
 //
-// Returns: Ok if successful
+// Returns: OK if successful
 func (c *Service) DeleteClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -372,7 +376,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 			return
 		}
 		if member.Role == string(models.AdminMember) || member.Role == string(models.MemberMember) {
-			http.Error(rw, `{"msg": "invalid permissions"}`, http.StatusUnauthorized)
+			http.Error(rw, `{"msg": "invalid permission"}`, http.StatusUnauthorized)
 			return
 		}
 
@@ -409,30 +413,22 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 }
 
 // Change member rank
+//
+// - Validates club ID
+// - Validates member ID
+// - Validates user role
+// - Update member
+// - Notify member
+//
+// Returns: OK if successful
 func (c *Service) ChangeMemberRank() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		// grab club id from path
-		vars := mux.Vars(r)
-
-		// Grab club id from path and validate it
-		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
-			return
-		}
-
-		// if there is no member id
-		if len(vars["memberID"]) == 0 || len(vars["memberID"]) < 24 {
-			http.Error(rw, `{"msg": "invalid member id"}`, http.StatusBadRequest)
-			return
-		}
-
 		// Validate club ID
+		id := mux.Vars(r)["id"]
 		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
 			c.Logger.Error("Invalid club ID. Error: ", err.Error())
@@ -440,46 +436,47 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			return
 		}
 
-		// convert club id to oid
-		memID := vars["memberID"]
-		memOID, err := primitive.ObjectIDFromHex(memID)
+		// Validate member ID
+		mid := mux.Vars(r)["memberID"]
+		moid, err := utils.ValidateObjectID(mid)
 		if err != nil {
-			c.Logger.Error("Failed to convert member id to ObjectID. Error: ", err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusBadRequest)
+			c.Logger.Error("Invalid member ID. Error: ", err.Error())
+			http.Error(rw, `{"msg": "invalid member id"}`, http.StatusBadRequest)
+			return
 		}
 
 		// Validate user role - admin/owners can modify a club
 		uuid := r.Header.Get("UUID")
-		member, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		admin, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			c.Logger.Error("Failed to find member. Error: ", err.Error())
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
-		if member.Role == string(models.MemberMember) {
-			http.Error(rw, `{"msg": "invalid permissions"}`, http.StatusUnauthorized)
+		if admin.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "invalid permission"}`, http.StatusUnauthorized)
 			return
 		}
 
 		// Decode request
 		var req models.ChangeRoleRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			c.Logger.Error("Failed to decode request. Error: ", err.Error())
+			http.Error(rw, `{"msg": "invalid request body"}`, http.StatusBadRequest)
+			return
+		}
 
 		// Find member
-		member, err := c.FindMember(ctx, bson.M{"_id": memOID})
+		member, err := c.FindMember(ctx, bson.M{"_id": moid})
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{"msg": "member not found"}`, http.StatusNotFound)
-				return
-			}
-
+			utils.HandleFindError(rw, err)
 			c.Logger.Error("Failed to find member. Error: ", err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 
 		// Update member
-		err = c.UpdateMember(ctx, bson.M{"_id": memOID}, bson.M{"role": req.Role})
+		err = c.UpdateMember(ctx, bson.M{"_id": moid}, bson.M{"role": req.Role})
 		if err != nil {
 			c.Logger.Error("Failed to update member. Error: ", err.Error())
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
@@ -496,7 +493,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			noteText = "You've been demoted to Member"
 		}
 
-		// if user was member then add them to the admin topic
+		// If user was member then add them to the admin topic
 		if member.Role == "member" {
 			err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), id+"_admin", models.NotificationTopicUpdateRequest{
 				Action: "subscribe",
@@ -514,7 +511,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			return
 		}
 
-		// notify user that they had their rank changed
+		// Notify user that they had their rank changed
 		note := models.PushNotification{
 			Title: *club.Name,
 			Body:  noteText,
@@ -530,93 +527,73 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			c.Logger.Error("Failed to add user to admin topic")
 		}
 
-		// fetch updated club data
-		err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&club)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, "club not found", http.StatusNotFound)
-				return
-			}
-		}
-
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(club)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
 // Kick member
+//
+// - Validate club ID
+// - Validate member ID
+// - Validate user role
+// - Remove member from members collection
+// - Notify the user and remove them from the topics
+//
+// Returns: OK if successful
 func (c *Service) KickMember() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		// grab club id from path
-		vars := mux.Vars(r)
-
-		// Grab club id from path and validate it
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
-			return
-		}
-
-		// if there is no club id
-		if len(vars["memberID"]) == 0 {
-			http.Error(rw, "bad member id found", http.StatusBadRequest)
-			return
-		}
-
-		// if we get an invalid id
-		if len(vars["memberID"]) < 24 {
-			http.Error(rw, "bad member id found", http.StatusBadRequest)
-			return
-		}
-
-		// convert club id to object id
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
-			c.Logger.Debug(err.Error())
+			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
+			return
 		}
 
-		// convert member id to objectid
-		mid := vars["memberID"]
-		memOID, err := primitive.ObjectIDFromHex(mid)
+		// Validate member ID
+		mid := mux.Vars(r)["memberID"]
+		moid, err := utils.ValidateObjectID(mid)
 		if err != nil {
-			c.Logger.Debug(err.Error())
+			http.Error(rw, `{"msg": "invalid member id"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Validate user role - admin/owners can modify a club
+		uuid := r.Header.Get("UUID")
+		admin, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			c.Logger.Error("Failed to find member. Error: ", err.Error())
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+		if admin.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "invalid permission"}`, http.StatusUnauthorized)
+			return
 		}
 
 		// Find club
 		club, err := c.FindClub(ctx, bson.M{"_id": oid})
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				c.Logger.Error("Failed to find club. It does not exist.")
-				http.Error(rw, `{"msg": "club not found"}`, http.StatusNotFound)
-				return
-			}
-
-			c.Logger.Error("Failed to find club. Error: ", err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			utils.HandleFindError(rw, err)
+			c.Logger.Error(fmt.Sprintf("Failed to find club. ID: %s - Error: %s", id, err.Error()))
 			return
 		}
 
 		// Find member
-		member, err := c.FindMember(ctx, bson.M{"_id": memOID})
+		member, err := c.FindMember(ctx, bson.M{"_id": moid})
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				c.Logger.Error("Failed to find member. It does not exist.")
-				http.Error(rw, `{"msg": "member not found"}`, http.StatusNotFound)
-				return
-			}
-
-			c.Logger.Error("Failed to find member. Error: ", err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			utils.HandleFindError(rw, err)
+			c.Logger.Error(fmt.Sprintf("Failed to find member. ID: %s - Error: %s", mid, err.Error()))
 			return
 		}
 
 		// Remove user from members collection
-		err = c.DeleteMember(ctx, bson.M{"_id": memOID})
+		err = c.DeleteMember(ctx, bson.M{"_id": mid})
 		if err != nil {
 			c.Logger.Error("Failed to find remove member. Error: ", err.Error())
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
@@ -636,6 +613,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 			c.Logger.Error("failed to send user a notification: ", err.Error())
 		}
 
+		// Remove user from topics
 		clubTopic := club.ID.Hex()
 		adminTopic := club.ID.Hex() + "_admin"
 		req := models.NotificationTopicUpdateRequest{
@@ -646,10 +624,11 @@ func (c *Service) KickMember() http.HandlerFunc {
 		if err != nil {
 			c.Logger.Error("failed to remove token from topic: ", err.Error())
 		}
-
-		err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), adminTopic, req)
-		if err != nil {
-			c.Logger.Error("failed to remove token from admin topic: ", err.Error())
+		if member.Role != string(models.MemberMember) {
+			err = c.Notification.ModifyTopic(r.Header.Get("Authorization"), adminTopic, req)
+			if err != nil {
+				c.Logger.Error("failed to remove token from admin topic: ", err.Error())
+			}
 		}
 
 		rw.WriteHeader(http.StatusOK)

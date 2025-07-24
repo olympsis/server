@@ -11,7 +11,7 @@ func HandleFindError(rw http.ResponseWriter, err error) {
 		http.Error(rw, `{ "msg": "resource not found" }`, http.StatusNotFound)
 		return
 	} else {
-		http.Error(rw, `{ "msg": "failed to find resource" }`, http.StatusNotFound)
+		http.Error(rw, `{ "msg": "failed to find resource" }`, http.StatusInternalServerError)
 		return
 	}
 }

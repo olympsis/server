@@ -11,6 +11,7 @@
         "INITDB",
         "MAPKIT",
         "mapsnapshots",
+        "moid",
         "msan",
         "myserver",
         "Rvme",
