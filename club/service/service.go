@@ -115,44 +115,34 @@ func (s *Service) GetClubs() http.HandlerFunc {
 func (c *Service) GetClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		vars := mux.Vars(r)
-		id := vars["id"]
-
-		// check if id is valid
-		isValidId := utils.ValidateClubID(id)
-		if !isValidId {
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`{"msg": "bad club id found in request." }`))
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
-
-		// convert string -> oid
-		oid, _ := primitive.ObjectIDFromHex(id)
 		_, ctx := context.WithTimeout(context.Background(), 30*time.Second)
 		defer ctx()
 
-		// find club data in database
+		// Find club in database
 		club, err := aggregations.AggregateClub(oid, c.Database)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
-				return
-			} else {
-				c.Logger.Error("failed to find club", err.Error())
-				http.Error(rw, `{ "msg": "failed to find club" }`, http.StatusNotFound)
-				return
-			}
+			utils.HandleFindError(rw, err)
+			c.Logger.Error(fmt.Sprintf("Failed to find club. ID: %s - Error: %s", id, err.Error()))
+			return
 		}
 
-		// if no error is returned and no club is returned
-		if club.ID.IsZero() {
-			http.Error(rw, `{ "msg": "club not found" }`, http.StatusNotFound)
+		// If club object is malformed
+		if utils.ValidateClubObject(club) {
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
+			c.Logger.Error(fmt.Sprintf("Club Object is malformed. ID: %s", id))
 			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(club)
-
 	}
 }
 
