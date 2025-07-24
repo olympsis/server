@@ -111,7 +111,13 @@ func (s *Service) GetClubs() http.HandlerFunc {
 	}
 }
 
-// Get the data of a club
+// Get a club object
+//
+// - Validates club id
+// - Aggregates club data from database
+// - Validate object post fetching
+//
+// Returns: Club object
 func (c *Service) GetClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -123,8 +129,6 @@ func (c *Service) GetClub() http.HandlerFunc {
 			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
-		_, ctx := context.WithTimeout(context.Background(), 30*time.Second)
-		defer ctx()
 
 		// Find club in database
 		club, err := aggregations.AggregateClub(oid, c.Database)
@@ -147,6 +151,13 @@ func (c *Service) GetClub() http.HandlerFunc {
 }
 
 // Creates a new club
+//
+// - Validates request body
+// - Adds server-side updates
+// - Add club to database
+// - Create notification topics
+//
+// Returns: The created club ID
 func (c *Service) CreateClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -160,33 +171,18 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			c.Logger.Error("Failed to decode request ", err.Error())
-			http.Error(rw, "Failed to decode request", http.StatusBadRequest)
+			http.Error(rw, "failed to decode request", http.StatusBadRequest)
 			return
 		}
 
+		// Additional data
 		timeStamp := primitive.NewDateTimeFromTime(time.Now())
 		verification := false
-
-		club := models.ClubDao{
-			Name:        req.Name,
-			Description: req.Description,
-			Tags:        req.Tags,
-			Sports:      req.Sports,
-			City:        req.City,
-			State:       req.State,
-			Country:     req.Country,
-			Location:    req.Location,
-			Logo:        req.Logo,
-			Banner:      req.Banner,
-			Visibility:  req.Visibility,
-			BlackList:   req.BlackList,
-			Rules:       req.Rules,
-			IsVerified:  &verification,
-			CreatedAt:   &timeStamp,
-		}
+		req.IsVerified = &verification
+		req.CreatedAt = &timeStamp
 
 		// Create club in database
-		id, err := c.InsertClub(context.TODO(), &club)
+		id, err := c.InsertClub(context.TODO(), &req)
 		if err != nil {
 			c.Logger.Error("Failed to create club: ", err.Error())
 			http.Error(rw, "Failed to create club", http.StatusInternalServerError)
@@ -204,16 +200,11 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		_, err = c.InsertMember(ctx, &member)
 		if err != nil {
 			c.Logger.Error("Failed to create member owner. Error: ", err.Error())
-
-			_, err = c.InsertMember(ctx, &member)
-			if err != nil {
-				c.Logger.Error("Failed to create member owner x2. Error: ", err.Error())
-				http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
-				return
-			}
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
 		}
 
-		// create notification topics
+		// Create notification topics
 		topicName := id.Hex()
 		adminName := id.Hex() + "_admin"
 		clubTopic := models.NotificationTopicDao{
