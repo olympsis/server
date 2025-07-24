@@ -193,7 +193,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		member := models.MemberDao{
 			ID:       primitive.NewObjectID(),
 			UserID:   uuid,
-			Role:     "owner",
+			Role:     string(models.OwnerMember),
 			ClubID:   id,
 			JoinedAt: timeStamp,
 		}
@@ -216,6 +216,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 			Users: &[]string{uuid},
 		}
 
+		// Create notification topics
 		err = c.Notification.CreateTopic(r.Header.Get("Authorization"), clubTopic)
 		if err != nil {
 			c.Logger.Error("Failed to create club topic: ", err.Error())
@@ -232,21 +233,45 @@ func (c *Service) CreateClub() http.HandlerFunc {
 }
 
 // Updates club data
+//
+// - Validates club ID
+// - Validate role
+// - Decodes request
+// - Create changes map
+// - Update club in database
+//
+// Returns: OK if successful
 func (c *Service) ModifyClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Grab club id from path and validate it
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, `{ "msg": "invalid club id" }`, http.StatusBadRequest)
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
 
-		var req models.ClubDao
+		// Validate user role - admin/owners can modify a club
+		uuid := r.Header.Get("UUID")
+		member, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			c.Logger.Error("Failed to find member. Error: ", err.Error())
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "invalid permissions"}`, http.StatusUnauthorized)
+			return
+		}
 
-		// decode request
-		err := json.NewDecoder(r.Body).Decode(&req)
+		// Decode request
+		var req models.ClubDao
+		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			c.Logger.Error("Failed to decode body: ", err.Error())
 			http.Error(rw, `{ "msg": "Failed to decode body" }`, http.StatusBadRequest)
@@ -254,7 +279,6 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		}
 
 		// Conversions and new variables
-		oid, _ := primitive.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
 		change := bson.M{}
 		update := bson.M{"$set": change}
@@ -263,8 +287,14 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		if req.Name != nil {
 			change["name"] = req.Name
 		}
+		if req.ParentID != nil {
+			change["parent_id"] = req.ParentID
+		}
 		if req.Description != nil {
 			change["description"] = req.Description
+		}
+		if req.Tags != nil && len(*req.Tags) > 0 {
+			change["tags"] = req.Tags
 		}
 		if req.Sports != nil {
 			change["sports"] = req.Sports
@@ -277,6 +307,9 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		}
 		if req.Country != nil {
 			change["country"] = req.Country
+		}
+		if req.Location != nil {
+			change["location"] = req.Location
 		}
 		if req.Logo != nil {
 			change["logo"] = req.Logo
@@ -294,11 +327,11 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 			change["rules"] = req.Rules
 		}
 
-		// update club data in database
+		// Update club data in database
 		err = c.UpdateClub(context.Background(), filter, update)
 		if err != nil {
-			c.Logger.Error("Failed to update club: ", err.Error())
-			http.Error(rw, `{ "msg": "Failed to update club" }`, http.StatusInternalServerError)
+			c.Logger.Error(fmt.Sprintf("Failed to update club. ID: %s - Error: %s", id, err.Error()))
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 			return
 		}
 
@@ -308,56 +341,66 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 }
 
 // Deletes a club
+//
+// - Validates club ID
+// - Validate user role
+// - Remove members from club
+// - Delete club from database
+// - Deletes club topics
+//
+// Returns: Ok if successful
 func (c *Service) DeleteClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		// Grab club id from path and validate it
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
 			http.Error(rw, `{ "msg": "invalid club id" }`, http.StatusBadRequest)
 			return
 		}
 
-		// convert club id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
+		// Validate user role - only owners can delete a club
+		uuid := r.Header.Get("UUID")
+		member, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
-			c.Logger.Error("Failed to convert club id: ", err.Error())
-			http.Error(rw, `{ "msg": "bad club id" }`, http.StatusBadRequest)
+			c.Logger.Error("Failed to find member. Error: ", err.Error())
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
-
-		// Delete club
-		err = c.RemoveClub(ctx, bson.M{"_id": oid})
-		if err != nil {
-			c.Logger.Error("Failed to delete club. Error: ", err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+		if member.Role == string(models.AdminMember) || member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "invalid permissions"}`, http.StatusUnauthorized)
 			return
 		}
 
 		// Delete club members
 		err = c.DeleteMembers(ctx, bson.M{"club_id": oid})
 		if err != nil {
-			c.Logger.Error("Failed to delete club members. Error: ", err.Error())
+			c.Logger.Error(fmt.Sprintf("Failed to delete club members. ID: %s, Error: %s", err.Error()))
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 
-		// delete topics
-		clubTopic := id
-		clubAdminTopic := id + "_admin"
-
-		err = c.Notification.DeleteTopic(r.Header.Get("Authorization"), clubTopic)
+		// Delete club
+		err = c.RemoveClub(ctx, bson.M{"_id": oid})
 		if err != nil {
-			c.Logger.Error("failed to delete topic", err.Error())
+			c.Logger.Error(fmt.Sprintf("Failed to delete club. ID: %s - Error: %s", id, err.Error()))
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
 		}
 
+		// Delete club topics
+		clubAdminTopic := id + "_admin"
+		err = c.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
+		if err != nil {
+			c.Logger.Error(fmt.Sprintf("Failed to delete topic. ID: %s - Error: %s", id, err.Error()))
+		}
 		err = c.Notification.DeleteTopic(r.Header.Get("Authorization"), clubAdminTopic)
 		if err != nil {
-			c.Logger.Error("failed to delete topic", err.Error())
+			c.Logger.Error(fmt.Sprintf("Failed to delete topic. ID: %s - Error: %s", clubAdminTopic, err.Error()))
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -365,18 +408,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 	}
 }
 
-/*
-Change Member Rank (PUT)
-
-  - Updates a member's rank
-
-  - Grab parameters and update
-
-Returns:
-
-	Http handler
-		- Writes OK back to client if successful
-*/
+// Change member rank
 func (c *Service) ChangeMemberRank() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -400,11 +432,11 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			return
 		}
 
-		// convert club id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
+		// Validate club ID
+		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
-			c.Logger.Error("Failed to convert club id to ObjectID. Error: ", err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusBadRequest)
+			c.Logger.Error("Invalid club ID. Error: ", err.Error())
+			http.Error(rw, `{"msg": "invalid club id"}`, http.StatusBadRequest)
 			return
 		}
 
@@ -414,6 +446,19 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		if err != nil {
 			c.Logger.Error("Failed to convert member id to ObjectID. Error: ", err.Error())
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusBadRequest)
+		}
+
+		// Validate user role - admin/owners can modify a club
+		uuid := r.Header.Get("UUID")
+		member, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			c.Logger.Error("Failed to find member. Error: ", err.Error())
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "invalid permissions"}`, http.StatusUnauthorized)
+			return
 		}
 
 		// Decode request
@@ -499,18 +544,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 	}
 }
 
-/*
-Kick Member (PUT)
-
-  - Removes member from club
-
-  - Grab parameters and update
-
-Returns:
-
-	Http handler
-		- Writes OK back to client if successful
-*/
+// Kick member
 func (c *Service) KickMember() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
@@ -623,18 +657,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 	}
 }
 
-/*
-Leave Club (PUT)
-
-  - Leave club
-
-  - Grab parameters and update
-
-Returns:
-
-	Http handler
-		- Writes OK back to client if successful
-*/
+// Leave club
 func (c *Service) LeaveClub() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
