@@ -16,56 +16,40 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-/*
-Get Club Applications(GET)
-
-  - Fetches and returns a list of club applications
-
-  - Grabs club id from path
-
-  - Must be club Admin
-
-Returns:
-
-	Http handler
-		- Writes applications back to client
-*/
+// Get club applications
+//
+// - Validates club ID
+// - Check query parameters for status
+// - Aggregate club applications
+//
+// Returns: an array of application objects
 func (c *Service) GetApplications() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Grab club id from path and validate it
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "Bad/Invalid club id", http.StatusBadRequest)
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
 
-		// status of applications
+		// Check query parameters for status
 		status := r.URL.Query().Get("status")
 		if status == "" {
 			status = "pending"
 		}
 
-		// convert club id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
+		// Aggregate club applications
 		apps, err := aggregations.AggregateClubApplications(&oid, status, c.Database)
-
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				rw.WriteHeader(http.StatusNoContent)
-				return
-			}
-			c.Logger.Error(fmt.Sprintf("Failed to get club applications: %s", err.Error()))
-			http.Error(rw, `{ "msg": "Failed to get club applications" }`, http.StatusInternalServerError)
+			utils.HandleFindError(rw, err)
+			c.Logger.Error(fmt.Sprintf("Failed to get club applications. ID: %s - Error: %s", id, err.Error()))
 			return
 		}
 
-		// just in case mongo doesn't throw an error
+		// No content http return
 		if len(*apps) == 0 {
 			rw.WriteHeader(http.StatusNoContent)
 			return
@@ -82,319 +66,244 @@ func (c *Service) GetApplications() http.HandlerFunc {
 	}
 }
 
-/*
-Create a Club Application(POST)
-
-  - Creates a club applications
-
-  - Grabs club id from path
-
-  - creates club application
-
-Returns:
-
-	Http handler
-		- Writes back application object to user
-*/
+// Create club application
+//
+// - Validates club ID
+// - Validate request body
+// - Check if application exists
+// - Notify club admins of application
+//
+// Returns: the ID of the created application object
 func (c *Service) CreateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		ctx := r.Context()
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		uuid := r.Header.Get("UUID")
 
-		// Grab club id from path and validate it
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, `{ "msg": "invalid club id" }`, http.StatusBadRequest)
-			return
-		}
-
-		// Convert id to object ID
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
-			c.Logger.Error("Failed to convert club id: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to convert club id" }`, http.StatusBadRequest)
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
 
-		// check if an application already exists
+		// Check for existing application
+		// Return if found and no errors
 		var _app models.ClubApplicationDao
-		filter := bson.M{"uuid": uuid, "club_id": oid, "status": "pending"}
+		filter := bson.M{"applicant": uuid, "club_id": oid, "status": "pending"}
 		err = c.Database.ClubApplicationCol.FindOne(ctx, filter).Decode(&_app)
-		if err != nil {
-			// If we have no existing events create a new one
-			if err == mongo.ErrNoDocuments {
-				timeStamp := primitive.NewDateTimeFromTime(time.Now())
-				status := "pending"
-				app := models.ClubApplicationDao{
-					Applicant: &uuid,
-					ClubID:    &oid,
-					Status:    &status,
-					CreatedAt: &timeStamp,
-				}
+		if err == nil {
+			rw.WriteHeader(http.StatusCreated)
+			rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, _app.ID.Hex()))
+			return
+		}
 
-				// create club application in database
-				resp, err := c.Database.ClubApplicationCol.InsertOne(ctx, app)
-				if err != nil {
-					c.Logger.Error("failed to create application: ", err.Error())
-					http.Error(rw, `{ "msg": "failed to create application" }`, http.StatusInternalServerError)
-					return
-				}
+		// If we have no existing events create a new one
+		if err == mongo.ErrNoDocuments {
+			timeStamp := primitive.NewDateTimeFromTime(time.Now())
+			status := "pending"
+			app := models.ClubApplicationDao{
+				Applicant: &uuid,
+				ClubID:    &oid,
+				Status:    &status,
+				CreatedAt: &timeStamp,
+			}
 
-				topic := id + "_admin"
-				note := generateNewApplicationNotification(id, resp.InsertedID.(primitive.ObjectID).Hex())
-				c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-					Topic:        &topic,
-					Notification: note,
-				})
-
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write([]byte(fmt.Sprintf(`{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex())))
+			// Create new club application
+			resp, err := c.Database.ClubApplicationCol.InsertOne(ctx, app)
+			if err != nil {
+				c.Logger.Error(fmt.Sprintf("Failed to create application. ID: %s - Error: %s ", id, err.Error()))
+				http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 				return
 			}
 
-			// Other database errors
-			c.Logger.Error("Failed to check for application: " + err.Error())
-			http.Error(rw, `{ "msg": "failed to check application" }`, http.StatusInternalServerError)
+			topic := id + "_admin"
+			note := generateNewApplicationNotification(id, resp.InsertedID.(primitive.ObjectID).Hex())
+			c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+				Topic:        &topic,
+				Notification: note,
+			})
+
+			rw.WriteHeader(http.StatusCreated)
+			rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex()))
+			return
+		} else {
+			c.Logger.Error(fmt.Sprintf("Failed to check for application. ID: %s - Error: %s", id, err.Error()))
+			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 			return
 		}
-
-		// We've found a pending application
-		c.Logger.Info("Club Application already exists")
-		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(_app)
 	}
 }
 
-/*
-Update a Club Applications(PUT)
-
-  - Updates a club applications
-
-  - Grabs club id from path
-
-  - Grabs application id from path
-
-  - Update the status of the specific application
-
-  - Must be club Admin
-
-Returns:
-
-	Http handler
-		- Writes ok back to user
-*/
+// Update club application
+//
+// - Validate club ID
+// - Validate application ID
+// - Decode request body
+// - Handle application status update
+// - Notify applicant of status change
+//
+// Returns: OK if successful
 func (c *Service) UpdateApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Grab club id from path and validate it
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
 
-		// grab club id from path
-		vars := mux.Vars(r)
-		// if there is no application id
-		if len(vars["applicationID"]) == 0 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
+		// Validate application ID
+		aid := mux.Vars(r)["applicationID"]
+		aoid, err := utils.ValidateObjectID(aid)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Application ID - Error: ", err.Error())
 			return
 		}
 
-		// if we get an invalid application id
-		if len(vars["applicationID"]) < 24 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
+		// Decode request body
 		var req models.UpdateStatusRequest
-		// decode request
-		err := json.NewDecoder(r.Body).Decode(&req)
+		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": " ` + err.Error() + `" }`))
 			return
 		}
 
-		// convert club id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
+		// Handle accepting application
+		if req.Status == models.AcceptedApplicationStatus {
 
-		// convert application id to oid
-		aid := vars["applicationID"]
-		aoid, err := primitive.ObjectIDFromHex(aid)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		// if the admin accepts the application
-		if req.Status == "accepted" {
-
-			// check if application exists
+			// Check for existing application
 			var app models.ClubApplicationDao
-			filter := bson.M{"_id": aoid}
-			err = c.Database.ClubApplicationCol.FindOne(context.TODO(), filter).Decode(&app)
+			err = c.Database.ClubApplicationCol.FindOne(context.TODO(), bson.M{"_id": aoid}).Decode(&app)
 			if err != nil {
-				c.Logger.Error("failed to find application: ", err.Error())
-				http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
+				c.Logger.Error(fmt.Sprintf("Failed to find application. ID: %s - Error: %s ", id, err.Error()))
+				http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 				return
 			}
 
-			// if someone else already accepted it we don't want to cause issues in user data where there are duplicated club id's
-			if *app.Status == "pending" {
-
-				// update club application in database
-				filter := bson.M{"_id": aoid}
-				change := bson.M{"$set": bson.M{"status": req.Status}}
-				_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
-				if err != nil {
-					c.Logger.Error("failed to update application: ", err.Error())
-					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
-					return
-				}
-
-				// add club id to user data
-				filter = bson.M{"uuid": app.Applicant}
-				change = bson.M{"$push": bson.M{"clubs": oid}}
-				_, err = c.Database.UserCol.UpdateOne(context.TODO(), filter, change)
-				if err != nil {
-					c.Logger.Error("failed to add club to user data: ", err.Error())
-					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
-					return
-				}
-
-				member := models.MemberDao{ // member object to put in club
-					ID:       primitive.NewObjectID(),                   // unique member identifier
-					UserID:   *app.Applicant,                            // user uuid
-					Role:     "member",                                  // user role
-					JoinedAt: primitive.NewDateTimeFromTime(time.Now()), // joined date
-				}
-
-				// update club information by adding member in the list
-				filter = bson.M{"_id": oid}
-				change = bson.M{"$push": bson.M{"members": member}}
-				_, err = c.Database.ClubCol.UpdateOne(context.TODO(), filter, change)
-				if err != nil {
-					c.Logger.Error("failed to update club: ", err.Error())
-					http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
-					return
-				}
-
-				var club models.ClubDao
-				err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(club)
-				if err != nil {
-					c.Logger.Error("failed to find club and send notification: ", err.Error())
-					rw.WriteHeader(http.StatusOK)
-					rw.Write([]byte(`{"msg":"OK"}`))
-					return
-				}
-
-				// Notify user that their application was accepted
-				note := generateUpdateApplicationNotification(id, *club.Name, aid, req.Status)
-				c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-					Users:        &[]string{*app.Applicant},
-					Notification: note,
-				})
-
+			// Only process pending application
+			if *app.Status != models.PendingApplicationStatus {
 				rw.WriteHeader(http.StatusOK)
 				rw.Write([]byte(`{"msg":"OK"}`))
 				return
 			}
 
-			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"msg":"OK"}`))
-			return
-		} else {
-			// update club application in database
+			// Update club application status
 			filter := bson.M{"_id": aoid}
 			change := bson.M{"$set": bson.M{"status": req.Status}}
 			_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
 			if err != nil {
-				c.Logger.Error("failed to update application: " + err.Error())
-				http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
+				c.Logger.Error("Failed to update application: ", err.Error())
+				http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 				return
 			}
+
+			// Add member to database
+			member := models.MemberDao{
+				ID:       primitive.NewObjectID(),                   // doc id
+				UserID:   *app.Applicant,                            // user uuid
+				ClubID:   &oid,                                      // club id
+				Role:     string(models.MemberMember),               // user role
+				JoinedAt: primitive.NewDateTimeFromTime(time.Now()), // joined date
+			}
+			_, err = c.InsertMember(ctx, &member)
+			if err != nil {
+				c.Logger.Error(fmt.Sprintf("Failed to add member to database. Club ID: %s - UserID: %s - Error: %s", id, *app.Applicant, err.Error()))
+				http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+				return
+			}
+
+			// Fetch club for notification
+			var club models.ClubDao
+			err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(club)
+			if err != nil {
+				c.Logger.Error(fmt.Sprintf("Failed to find club and send notification. Club ID: %s - Error: %s", id, err.Error()))
+				rw.WriteHeader(http.StatusOK)
+				rw.Write([]byte(`{"msg":"OK"}`))
+				return
+			}
+
+			// Notify user that their application was accepted
+			note := generateUpdateApplicationNotification(id, *club.Name, aid, req.Status)
+			c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+				Users:        &[]string{*app.Applicant},
+				Notification: note,
+			})
 
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"msg":"OK"}`))
 			return
 		}
+
+		// Handle application denial
+		filter := bson.M{"_id": aoid}
+		change := bson.M{"$set": bson.M{"status": req.Status}}
+		_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
+		if err != nil {
+			c.Logger.Error("failed to update application: " + err.Error())
+			http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg":"OK"}`))
 	}
 }
 
-/*
-Delete a Club Applications(DELETE)
-
-  - removes a club application
-
-  - Grabs club id from path
-
-  - Grabs application id from path
-
-  - delete club application
-
-Returns:
-
-	Http handler
-		- Writes ok back to user
-*/
+// Delete club application
+//
+// - Validate club ID
+// - Validate application ID
+// - Delete club application from database
+//
+// Returns: OK if successful
 func (c *Service) DeleteApplication() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// Check & Validate Auth Token
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
 		uuid := r.Header.Get("UUID")
 
-		// Grab club id from path and validate it
+		// Validate club ID
 		id := mux.Vars(r)["id"]
-		valid := utils.ValidateClubID(id)
-		if !valid {
-			http.Error(rw, "invalid club id", http.StatusBadRequest)
-			return
-		}
-		// grab application id from path
-		vars := mux.Vars(r)
-
-		// if there is no application id
-		if len(vars["applicationId"]) == 0 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
-		// if we get an invalid application id
-		if len(vars["applicationId"]) < 24 {
-			http.Error(rw, "bad application id", http.StatusBadRequest)
-			return
-		}
-
-		// convert club id to oid
-		appID := vars["application_id"]
-		appOID, err := primitive.ObjectIDFromHex(appID)
+		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		clubID := vars["id"]
-		clubOID, err := primitive.ObjectIDFromHex(clubID)
-		if err != nil {
-			c.Logger.Debug(err.Error())
-		}
-
-		filter := bson.M{"_id": appOID, "uuid": uuid, "club_id": clubOID}
-
-		// delete club application from database
-		_, err = c.Database.ClubApplicationCol.DeleteOne(context.TODO(), filter)
-		if err != nil {
-			c.Logger.Error(err.Error())
-			http.Error(rw, "failed to delete club application", http.StatusInternalServerError)
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Club ID - Error: ", err.Error())
 			return
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
+		// Validate application ID
+		aid := mux.Vars(r)["applicationID"]
+		aoid, err := utils.ValidateObjectID(aid)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			c.Logger.Error("Invalid Application ID - Error: ", err.Error())
+			return
+		}
+
+		// Delete club application from database
+		filter := bson.M{"_id": aoid, "applicant": uuid, "club_id": oid}
+		_, err = c.Database.ClubApplicationCol.DeleteOne(ctx, filter)
+		if err != nil {
+			c.Logger.Error(fmt.Sprintf("Failed to delete club application. ID: %s - Error: %s", id, err.Error()))
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "OK" }`))
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }

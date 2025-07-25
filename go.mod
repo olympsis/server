@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.46.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20250724192233-e4321c9e13de
+	github.com/olympsis/models v0.0.0-20250725161244-bad3ea0c9e7f
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.205.0
 )

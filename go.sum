@@ -118,6 +118,10 @@ github.com/olympsis/models v0.0.0-20250724190257-35268e874021 h1:x23gToPQUlV5aMJ
 github.com/olympsis/models v0.0.0-20250724190257-35268e874021/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
 github.com/olympsis/models v0.0.0-20250724192233-e4321c9e13de h1:oCuv7FziNeePSNolgeq3MapH4H08IbHfGTkhfPC7aSE=
 github.com/olympsis/models v0.0.0-20250724192233-e4321c9e13de/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
+github.com/olympsis/models v0.0.0-20250725152059-385d7e8c4319 h1:nnGAy5o3PGqSDCia2wOg7Jxu+m7oeDs6mPbOQyDBsbE=
+github.com/olympsis/models v0.0.0-20250725152059-385d7e8c4319/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
+github.com/olympsis/models v0.0.0-20250725161244-bad3ea0c9e7f h1:S8hJQdFhwitjsfIitEbq9sRN43UQfY1UVAR+qShRwu8=
+github.com/olympsis/models v0.0.0-20250725161244-bad3ea0c9e7f/go.mod h1:IqqZBLxJeFUdiWchWdBIFGyK+cR4pakAWxyM041AkgY=
 github.com/olympsis/search v0.0.0-20250508195913-a73758f3ccae h1:9vRi2OlKvusp2j8ToOeaU8iQAFqaGMv7UwDlnIo5QFk=
 github.com/olympsis/search v0.0.0-20250508195913-a73758f3ccae/go.mod h1:wiarW6F4nSZwsDMYV0Gwvk7vWAvB9H1+M6TgrpS70dc=
 github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=
