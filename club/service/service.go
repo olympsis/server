@@ -75,17 +75,11 @@ func (s *Service) GetClubs() http.HandlerFunc {
 			}
 		}
 
-		// Default values for radius if needed
-		radiusValue := float64(16000) // Default radius in meters
-		if params.Radius != nil {
-			radiusValue = *params.Radius
-		}
-
 		// Get all of the clubs data
 		clubs, err := aggregations.AggregateClubs(
 			filter,          // Regular filter for country/state/city/sports
 			params.Location, // GeoJSON location if provided
-			radiusValue,     // Radius (with default)
+			params.Radius,   // Radius in meters
 			params.Limit,    // Use the limit from params
 			params.Skip,     // Use the skip from params
 			s.Database,

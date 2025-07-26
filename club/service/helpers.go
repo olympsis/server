@@ -12,7 +12,7 @@ import (
 // LocationQueryParams holds validated query parameters for the Location endpoint
 type ClubsQueryParams struct {
 	Location *models.GeoJSON
-	Radius   *float64
+	Radius   float64
 	City     string
 	State    string
 	Country  string
@@ -21,7 +21,15 @@ type ClubsQueryParams struct {
 	Limit    int
 }
 
-// Parse and validate location query parameters
+// Parse query parameters for the get clubs function
+//
+// - Parses location queries
+// - Parses radius queries or set default to 16000 meters
+// - Parses sports queries
+// - Parses skip query for pagination
+// - Parses limit query
+//
+// Returns: an array of Club objects
 func parseQueryParams(r *http.Request) (*ClubsQueryParams, error) {
 	query := r.URL.Query()
 	params := &ClubsQueryParams{}
@@ -76,10 +84,10 @@ func parseQueryParams(r *http.Request) (*ClubsQueryParams, error) {
 		}
 
 		tempRadius := float64(radius)
-		params.Radius = &tempRadius
+		params.Radius = tempRadius
 	} else {
-		tempRadius := float64(10)
-		params.Radius = &tempRadius
+		tempRadius := float64(16000)
+		params.Radius = tempRadius
 	}
 
 	// Parse sports
