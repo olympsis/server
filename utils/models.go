@@ -7,6 +7,7 @@ type ServerConfig struct {
 	FirebaseFilePath string // Firebase config path
 
 	MapKitToken string // Apple Mapkit token
+	StripeToken string // Stripe API token
 
 	NotifServiceURL   string
 	StorageServiceURL string

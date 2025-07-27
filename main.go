@@ -29,23 +29,25 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"github.com/stripe/stripe-go/v82"
 	"google.golang.org/api/option"
 )
 
 func main() {
-	// logger
+	// Set up logger
 	l := logrus.New()
 
-	// mux router
+	// Set up Mux router
 	r := mux.NewRouter()
 
-	// Server configuration
+	// Set up server configuration
 	config := utils.GetServerConfig()
 
-	// database
+	// Set up database
 	d := database.NewDatabase(l)
 	d.EstablishConnection(&config)
 
+	// Set up firebase authentication
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
@@ -58,21 +60,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	// search service
+	// Set up search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
 
-	// Pass references to apis
+	// Set up stripe API
+	sc := stripe.NewClient(config.StripeToken)
+
+	// Pass references to the server interface
 	serverInterface := &server.ServerInterface{
 		Logger:   l,
 		Router:   r,
-		Database: d,
+		Database: d, // db wrapper
 
-		Auth:   client,
-		Search: sh,
+		Stripe: sc,     // stripe
+		Auth:   client, // firebase
+		Search: sh,     // search
 
 		Notification: utils.NewNotificationInterface(config.NotifServiceURL, l),
 	}
 
+	// Set up API
 	announceAPI := announcement.NewAnnouncementAPI(serverInterface)
 	authAPI := auth.NewAuthAPI(serverInterface)
 	userAPI := user.NewUserAPI(serverInterface)
@@ -87,6 +94,7 @@ func main() {
 	snapShotAPI := mapsnapshots.NewMapSnapshotAPI(serverInterface, &config)
 	systemAPI := system.NewConfigApi(serverInterface)
 
+	// Initialize APIs
 	announceAPI.Ready(client)
 	authAPI.Ready(client)
 	userAPI.Ready(client)
@@ -101,7 +109,7 @@ func main() {
 	snapShotAPI.Ready()
 	systemAPI.Ready()
 
-	// server config
+	// Set up server configuration
 	s := &http.Server{
 		Addr:         `:` + config.Port,
 		Handler:      r,
@@ -110,7 +118,7 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	// start server
+	// Start server
 	go func() {
 		l.Info(`Starting olympsis server at...` + config.Port)
 

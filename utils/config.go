@@ -30,10 +30,20 @@ func GetServerConfig() ServerConfig {
 		panic("secure server requires a key and certificate file path env variable")
 	}
 
-	mapkit := os.Getenv("MAPKIT_TOKEN")
-
 	notif := os.Getenv("NOTIF_URL")
 	storage := os.Getenv("STORAGE_URL")
+
+	// Set up MapKit token
+	mapkit := os.Getenv("MAPKIT_TOKEN")
+	if mapkit == "" {
+		panic("mapkit token missing in config")
+	}
+
+	// Set up Stripe token
+	stripe := os.Getenv("STRIPE_TOKEN")
+	if stripe == "" {
+		panic("stripe token missing in config")
+	}
 
 	return ServerConfig{
 		Port:             port,
@@ -42,6 +52,7 @@ func GetServerConfig() ServerConfig {
 		FirebaseFilePath: firebase,
 
 		MapKitToken: mapkit,
+		StripeToken: stripe,
 
 		NotifServiceURL:   notif,
 		StorageServiceURL: storage,

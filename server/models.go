@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"github.com/stripe/stripe-go/v82"
 )
 
 type ServerInterface struct {
@@ -15,8 +16,10 @@ type ServerInterface struct {
 	Router   *mux.Router
 	Database *database.Database
 
-	Auth   *auth.Client    // firebase auth
-	Search *search.Service // search service
+	Stripe *stripe.Client // Stripe client
+
+	Auth   *auth.Client    // Firebase auth client
+	Search *search.Service // Search service
 
 	Notification *utils.NotificationInterface
 }

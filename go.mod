@@ -56,7 +56,10 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 )
 
-require go.mongodb.org/mongo-driver v1.17.4
+require (
+	github.com/stripe/stripe-go/v82 v82.3.0
+	go.mongodb.org/mongo-driver v1.17.4
+)
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
