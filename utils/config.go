@@ -134,6 +134,14 @@ func GetCollectionsConfig() CollectionsConfig {
 	if clubApplicationCollection == "" {
 		panic("club application collection name required in config")
 	}
+	clubFinancialAccountsCollection := os.Getenv("CLUB_FINANCIAL_ACCOUNTS_COLLECTION")
+	if clubFinancialAccountsCollection == "" {
+		panic("club financial accounts collection name required in config")
+	}
+	clubTransactionsCollection := os.Getenv("CLUB_TRANSACTIONS_COLLECTION")
+	if clubTransactionsCollection == "" {
+		panic("club transactions collection name required in config")
+	}
 
 	// ORGANIZATION COLLECTIONS
 	orgCollection := os.Getenv("ORGANIZATION_COLLECTION")
@@ -290,10 +298,12 @@ func GetCollectionsConfig() CollectionsConfig {
 		AuthCollection: authCollection,
 		UserCollection: userCollection,
 
-		ClubCollection:            clubCollection,
-		ClubMembersCollection:     clubMembersCollection,
-		ClubInvitationCollection:  clubInvitationCollection,
-		ClubApplicationCollection: clubApplicationCollection,
+		ClubCollection:                  clubCollection,
+		ClubMembersCollection:           clubMembersCollection,
+		ClubInvitationCollection:        clubInvitationCollection,
+		ClubApplicationCollection:       clubApplicationCollection,
+		ClubTransactionsCollection:      clubTransactionsCollection,
+		ClubFinancialAccountsCollection: clubFinancialAccountsCollection,
 
 		OrgCollection:                 orgCollection,
 		OrgInvitationCollection:       orgInvitationCollection,

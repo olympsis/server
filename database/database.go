@@ -46,6 +46,9 @@ type Database struct {
 	EventTeamsWaitlistCollection        *mongo.Collection
 	EventParticipantsWaitlistCollection *mongo.Collection
 
+	ClubTransactionsCollection      *mongo.Collection
+	ClubFinancialAccountsCollection *mongo.Collection
+
 	BugReportCol    *mongo.Collection
 	PostReportCol   *mongo.Collection
 	MemberReportCol *mongo.Collection

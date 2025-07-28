@@ -33,10 +33,12 @@ type CollectionsConfig struct {
 	UserCollection string
 
 	// Clubs
-	ClubCollection            string
-	ClubMembersCollection     string
-	ClubInvitationCollection  string
-	ClubApplicationCollection string
+	ClubCollection                  string
+	ClubMembersCollection           string
+	ClubInvitationCollection        string
+	ClubApplicationCollection       string
+	ClubTransactionsCollection      string
+	ClubFinancialAccountsCollection string
 
 	// Orgs
 	OrgCollection                 string

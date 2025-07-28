@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"olympsis-server/utils"
 
@@ -19,7 +18,7 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 	}
 	_, err := d.AnnouncementCol.Indexes().CreateOne(context.Background(), announceModel)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Could not create geospatial index for announcements: %v", err))
+		return fmt.Errorf("could not create geospatial index for announcements: %v", err)
 	}
 
 	regionModel := mongo.IndexModel{
@@ -31,7 +30,7 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 	}
 	_, err = d.AnnouncementCol.Indexes().CreateOne(context.Background(), regionModel)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Could not create region index for announcements: %v", err))
+		return fmt.Errorf("could not create region index for announcements: %v", err)
 	}
 
 	timeModel := mongo.IndexModel{
@@ -42,7 +41,7 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 	}
 	_, err = d.AnnouncementCol.Indexes().CreateOne(context.Background(), timeModel)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Could not create time index for announcements: %v", err))
+		return fmt.Errorf("could not create time index for announcements: %v", err)
 	}
 	return nil
 }
@@ -705,6 +704,82 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 	} else {
 		d.ClubApplicationCol = db.Collection(config.ClubApplicationCollection)
+	}
+
+	// Set up Club Financial Accounts Collection
+	if !collectionExists(config.ClubFinancialAccountsCollection) {
+		err := db.CreateCollection(context.Background(), config.ClubFinancialAccountsCollection)
+		if err != nil {
+			return fmt.Errorf("could not create club financial accounts collection: %v", err)
+		}
+		d.ClubFinancialAccountsCollection = db.Collection(config.ClubFinancialAccountsCollection)
+		// Define club financial accounts indexes
+		financialAccountIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "club_id", Value: 1}},
+				Options: options.Index().SetName("club_id_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "stripe_account_id", Value: 1}},
+				Options: options.Index().SetName("stripe_account_id_index").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "account_status", Value: 1}},
+				Options: options.Index().SetName("account_status_index"),
+			},
+		}
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.ClubFinancialAccountsCollection, financialAccountIndexes); err != nil {
+			return fmt.Errorf("failed to create club financial accounts indexes: %v", err)
+		}
+	} else {
+		d.ClubFinancialAccountsCollection = db.Collection(config.ClubFinancialAccountsCollection)
+	}
+
+	// Set up Club Transactions Collection
+	if !collectionExists(config.ClubTransactionsCollection) {
+		err := db.CreateCollection(context.Background(), config.ClubTransactionsCollection)
+		if err != nil {
+			return fmt.Errorf("could not create club transactions collection: %v", err)
+		}
+		d.ClubTransactionsCollection = db.Collection(config.ClubTransactionsCollection)
+		// Define club transactions indexes
+		transactionIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "club_id", Value: 1}},
+				Options: options.Index().SetName("club_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "event_id", Value: 1}},
+				Options: options.Index().SetName("event_id_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "type", Value: 1}},
+				Options: options.Index().SetName("type_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "status", Value: 1}},
+				Options: options.Index().SetName("status_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "created_at", Value: -1}},
+				Options: options.Index().SetName("created_at_desc_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "stripe_charge_id", Value: 1}},
+				Options: options.Index().SetName("stripe_charge_id_index").SetSparse(true),
+			},
+			{
+				Keys:    bson.D{{Key: "stripe_payout_id", Value: 1}},
+				Options: options.Index().SetName("stripe_payout_id_index").SetSparse(true),
+			},
+		}
+		// Create indexes using the safe method
+		if err := safeCreateIndexes(d.ClubTransactionsCollection, transactionIndexes); err != nil {
+			return fmt.Errorf("failed to create club transactions indexes: %v", err)
+		}
+	} else {
+		d.ClubTransactionsCollection = db.Collection(config.ClubTransactionsCollection)
 	}
 
 	return nil

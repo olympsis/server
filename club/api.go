@@ -187,4 +187,68 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
+
+	/*
+		Club Finance
+	*/
+
+	// Create Stripe Connect account for club
+	s.Router.Handle("/v1/clubs/{id}/finance/account",
+		middleware.Chain(
+			s.Service.CreateFinancialAccount(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// Get club financial overview (balance, recent transactions)
+	s.Router.Handle("/v1/clubs/{id}/finance/overview",
+		middleware.Chain(
+			s.Service.GetFinancialOverview(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
+
+	// Get transaction history
+	s.Router.Handle("/v1/clubs/{id}/finance/transactions",
+		middleware.Chain(
+			s.Service.GetTransactionHistory(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
+
+	// Initiate payout/withdrawal
+	s.Router.Handle("/v1/clubs/{id}/finance/payout",
+		middleware.Chain(
+			s.Service.InitiatePayout(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// Get payout history
+	s.Router.Handle("/v1/clubs/{id}/finance/payouts",
+		middleware.Chain(
+			s.Service.GetPayoutHistory(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
+
+	// Get financial account details
+	s.Router.Handle("/v1/clubs/{id}/finance/account",
+		middleware.Chain(
+			s.Service.GetFinancialAccount(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
 }

@@ -748,3 +748,351 @@ func (s *Service) UnpinClubPost() http.HandlerFunc {
 		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
+
+/*
+FINANCE ENDPOINTS
+*/
+
+// CreateFinancialAccount creates a Stripe Connect account for the club
+//
+// - Validates club ID and user permissions
+// - Checks if financial account already exists
+// - Creates Stripe Connect Express account
+// - Stores account details in database
+//
+// Returns: Stripe account creation response with onboarding URL
+func (s *Service) CreateFinancialAccount() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions - only owners/admins can create financial accounts
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Check if account already exists
+		existingAccount, _ := s.FindFinancialAccount(ctx, bson.M{"club_id": oid})
+		if existingAccount != nil {
+			http.Error(rw, `{"msg": "financial account already exists"}`, http.StatusConflict)
+			return
+		}
+
+		// TODO: Create Stripe Connect Express account
+		// For now, return placeholder response
+		response := map[string]interface{}{
+			"msg":            "Financial account creation initiated",
+			"account_id":     "acct_placeholder",
+			"onboarding_url": "https://connect.stripe.com/express/onboarding/placeholder",
+		}
+
+		rw.WriteHeader(http.StatusCreated)
+		json.NewEncoder(rw).Encode(response)
+	}
+}
+
+// GetFinancialAccount retrieves the club's financial account details
+//
+// - Validates club ID and user permissions
+// - Fetches financial account from database
+// - Returns account status and basic details
+//
+// Returns: Club financial account information
+func (s *Service) GetFinancialAccount() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Find financial account
+		account, err := s.FindFinancialAccount(ctx, bson.M{"club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find financial account. Error: ", err.Error())
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(account)
+	}
+}
+
+// GetFinancialOverview provides a summary of the club's financial status
+//
+// - Validates club ID and user permissions
+// - Retrieves current balance from Stripe
+// - Gets recent transactions
+// - Calculates summary statistics
+//
+// Returns: Financial overview with balance and recent activity
+func (s *Service) GetFinancialOverview() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Find financial account
+		account, err := s.FindFinancialAccount(ctx, bson.M{"club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find financial account. Error: ", err.Error())
+			return
+		}
+
+		// TODO: Get current balance from Stripe
+		// TODO: Get recent transactions
+
+		// Placeholder response
+		overview := map[string]interface{}{
+			"club_id":             id,
+			"account_status":      account.AccountStatus,
+			"available_balance":   0,
+			"pending_balance":     0,
+			"currency":            "usd",
+			"total_earnings":      0,
+			"total_payouts":       0,
+			"recent_transactions": []interface{}{},
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(overview)
+	}
+}
+
+// GetTransactionHistory retrieves the club's transaction history
+//
+// - Validates club ID and user permissions
+// - Processes query parameters (limit, offset, type filter)
+// - Fetches transactions from database
+// - Returns paginated transaction list
+//
+// Returns: List of club transactions with pagination info
+func (s *Service) GetTransactionHistory() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// TODO: Parse query parameters (limit, offset, type, date range)
+		// TODO: Fetch transactions from database with filters
+
+		// Placeholder response
+		response := map[string]interface{}{
+			"club_id":      id,
+			"transactions": []interface{}{},
+			"total_count":  0,
+			"limit":        20,
+			"offset":       0,
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(response)
+	}
+}
+
+// InitiatePayout processes a withdrawal request from club balance
+//
+// - Validates club ID and user permissions
+// - Validates payout request (amount, destination)
+// - Checks available balance
+// - Creates Stripe payout
+// - Records transaction in database
+//
+// Returns: Payout confirmation details
+func (s *Service) InitiatePayout() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions - only owners can initiate payouts
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role != string(models.OwnerMember) {
+			http.Error(rw, `{"msg": "only club owners can initiate payouts"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Decode payout request
+		var req models.PayoutRequest
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			s.Logger.Error("Failed to decode payout request: ", err.Error())
+			http.Error(rw, `{"msg": "invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Find financial account
+		account, err := s.FindFinancialAccount(ctx, bson.M{"club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find financial account. Error: ", err.Error())
+			return
+		}
+
+		if account.AccountStatus != "active" {
+			http.Error(rw, `{"msg": "account not active for payouts"}`, http.StatusBadRequest)
+			return
+		}
+
+		// TODO: Check available balance with Stripe
+		// TODO: Create Stripe payout
+		// TODO: Record transaction in database
+
+		// Placeholder response
+		response := map[string]interface{}{
+			"msg":               "Payout initiated successfully",
+			"payout_id":         "po_placeholder",
+			"amount":            req.Amount,
+			"currency":          req.Currency,
+			"estimated_arrival": "2-3 business days",
+		}
+
+		rw.WriteHeader(http.StatusCreated)
+		json.NewEncoder(rw).Encode(response)
+	}
+}
+
+// GetPayoutHistory retrieves the club's payout history
+//
+// - Validates club ID and user permissions
+// - Fetches payout records from database
+// - Returns paginated payout list with status information
+//
+// Returns: List of club payouts with details
+func (s *Service) GetPayoutHistory() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role == string(models.MemberMember) {
+			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// TODO: Fetch payout records from database
+		// TODO: Parse query parameters for pagination
+
+		// Placeholder response
+		response := map[string]interface{}{
+			"club_id":     id,
+			"payouts":     []interface{}{},
+			"total_count": 0,
+			"limit":       20,
+			"offset":      0,
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(response)
+	}
+}
