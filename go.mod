@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.46.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20250728221634-669a30a872d4
+	github.com/olympsis/models v0.0.0-20250730135132-937f2367422f
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.205.0
 )
@@ -63,7 +63,7 @@ require (
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.3 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 )
 

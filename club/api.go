@@ -251,4 +251,14 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
+
+	// Get Stripe Customer Sheet configuration for iOS client
+	s.Router.Handle("/v1/clubs/{id}/finance/customer-sheet",
+		middleware.Chain(
+			s.Service.GetCustomerSheetConfig(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
 }

@@ -783,7 +783,7 @@ func (s *Service) CreateFinancialAccount() http.HandlerFunc {
 			s.Logger.Error("Failed to find member. Error: ", err.Error())
 			return
 		}
-		if member.Role == string(models.MemberMember) {
+		if member.Role == string(models.OwnerMember) {
 			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
 			return
 		}
@@ -837,7 +837,7 @@ func (s *Service) GetFinancialAccount() http.HandlerFunc {
 			s.Logger.Error("Failed to find member. Error: ", err.Error())
 			return
 		}
-		if member.Role == string(models.MemberMember) {
+		if member.Role == string(models.OwnerMember) {
 			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
 			return
 		}
@@ -885,7 +885,7 @@ func (s *Service) GetFinancialOverview() http.HandlerFunc {
 			s.Logger.Error("Failed to find member. Error: ", err.Error())
 			return
 		}
-		if member.Role == string(models.MemberMember) {
+		if member.Role == string(models.OwnerMember) {
 			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
 			return
 		}
@@ -948,7 +948,7 @@ func (s *Service) GetTransactionHistory() http.HandlerFunc {
 			s.Logger.Error("Failed to find member. Error: ", err.Error())
 			return
 		}
-		if member.Role == string(models.MemberMember) {
+		if member.Role == string(models.OwnerMember) {
 			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
 			return
 		}
@@ -1075,7 +1075,7 @@ func (s *Service) GetPayoutHistory() http.HandlerFunc {
 			s.Logger.Error("Failed to find member. Error: ", err.Error())
 			return
 		}
-		if member.Role == string(models.MemberMember) {
+		if member.Role == string(models.OwnerMember) {
 			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
 			return
 		}
@@ -1090,6 +1090,71 @@ func (s *Service) GetPayoutHistory() http.HandlerFunc {
 			"total_count": 0,
 			"limit":       20,
 			"offset":      0,
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(response)
+	}
+}
+
+// GetCustomerSheetConfig retrieves Stripe Customer Sheet configuration for iOS client
+//
+// - Validates club ID and user permissions
+// - Fetches club's financial account to get Stripe customer/account ID
+// - Creates ephemeral key for the customer
+// - Creates setup intent for payment method attachment
+// - Returns configuration needed for Stripe Customer Sheet on iOS
+//
+// Returns: Customer ID, ephemeral key secret, and setup intent client secret
+func (s *Service) GetCustomerSheetConfig() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
+		defer cancel()
+
+		// Validate club ID
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			utils.HandleInvalidIDError(rw)
+			s.Logger.Error("Invalid Club ID - Error: ", err.Error())
+			return
+		}
+
+		// Validate user permissions - only club members can access this
+		uuid := r.Header.Get("UUID")
+		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find member. Error: ", err.Error())
+			return
+		}
+		if member.Role != string(models.OwnerMember) {
+			http.Error(rw, `{"msg": "insufficient permissions"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Find financial account to get Stripe account/customer ID
+		account, err := s.FindFinancialAccount(ctx, bson.M{"club_id": oid})
+		if err != nil {
+			utils.HandleFindError(rw, err)
+			s.Logger.Error("Failed to find financial account. Error: ", err.Error())
+			return
+		}
+
+		if account.AccountStatus != "active" {
+			http.Error(rw, `{"msg": "club financial account not active"}`, http.StatusBadRequest)
+			return
+		}
+
+		// TODO: Create Stripe customer if not exists
+		// TODO: Create ephemeral key for customer
+		// TODO: Create setup intent for payment method attachment
+
+		// Placeholder response - replace with actual Stripe API calls
+		response := models.StripeCustomerSheetResponse{
+			CustomerID:              "cus_placeholder_" + account.StripeAccountID,
+			EphemeralKeySecret:      "ek_test_placeholder_ephemeral_key_secret",
+			SetupIntentClientSecret: "seti_placeholder_client_secret",
 		}
 
 		rw.WriteHeader(http.StatusOK)
