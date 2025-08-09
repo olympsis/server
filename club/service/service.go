@@ -15,6 +15,7 @@ import (
 	"github.com/olympsis/models"
 	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
+	"github.com/stripe/stripe-go/v82"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -23,6 +24,7 @@ type Service struct {
 	Database      *database.Database
 	Logger        *logrus.Logger
 	Router        *mux.Router
+	StripeClient  *stripe.Client
 	SearchService *search.Service
 	Notification  *utils.NotificationInterface
 }
@@ -34,6 +36,7 @@ func NewClubService(i *server.ServerInterface) *Service {
 		Router:        i.Router,
 		Database:      i.Database,
 		SearchService: i.Search,
+		StripeClient:  i.Stripe,
 		Notification:  i.Notification,
 	}
 }
@@ -795,16 +798,55 @@ func (s *Service) CreateFinancialAccount() http.HandlerFunc {
 			return
 		}
 
-		// TODO: Create Stripe Connect Express account
-		// For now, return placeholder response
-		response := map[string]interface{}{
-			"msg":            "Financial account creation initiated",
-			"account_id":     "acct_placeholder",
-			"onboarding_url": "https://connect.stripe.com/express/onboarding/placeholder",
+		// Find club information for stripe customer account
+		club, err := s.FindClub(ctx, bson.M{"_id": oid})
+		if err != nil {
+			http.Error(rw, `{"msg": "failed to get club"}`, http.StatusInternalServerError)
+			s.Logger.Errorf("Failed to get club ID: %s - Error: %s", id, err.Error())
+			return
 		}
 
+		// Create Stripe club customer
+		params := &stripe.CustomerCreateParams{
+			Name:             club.Name,
+			Description:      stripe.String("Club wallet account"),
+			Email:            stripe.String("gostripe@stripe.com"),
+			PreferredLocales: stripe.StringSlice([]string{"en", "es"}),
+			Metadata: map[string]string{
+				"club_id": id,
+			},
+		}
+		customer, err := s.StripeClient.V1Customers.Create(ctx, params)
+		if err != nil {
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			s.Logger.Errorf("Failed to create club stripe customer. ClubID: %s - Error: %s", id, err.Error())
+			return
+		}
+
+		// Add Club financial info to the database
+		status := "active"
+		tempBalance := float64(0.00)
+		currencyString := "usd"
+		timestamp := primitive.DateTime(time.Now().Unix())
+		account := models.ClubFinancialAccount{
+			ClubID:          &oid,
+			StripeAccountID: &customer.ID,
+			AccountStatus:   &status,
+			Currency:        &currencyString,
+			CreatedAt:       &timestamp,
+		}
+		aid, err := s.InsertFinancialAccount(ctx, &account)
+		if err != nil {
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			s.Logger.Errorf("Failed to add financial account. Club ID: %s - Error: %s", id, err.Error())
+			return
+		}
+
+		account.ID = &aid
+		account.AvailableBalance = &tempBalance
+
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(response)
+		json.NewEncoder(rw).Encode(account)
 	}
 }
 
@@ -898,23 +940,45 @@ func (s *Service) GetFinancialOverview() http.HandlerFunc {
 			return
 		}
 
-		// TODO: Get current balance from Stripe
-		// TODO: Get recent transactions
-
-		// Placeholder response
-		overview := map[string]interface{}{
-			"club_id":             id,
-			"account_status":      account.AccountStatus,
-			"available_balance":   0,
-			"pending_balance":     0,
-			"currency":            "usd",
-			"total_earnings":      0,
-			"total_payouts":       0,
-			"recent_transactions": []interface{}{},
+		// Get stripe customer
+		customer, err := s.StripeClient.V1Customers.Retrieve(ctx, *account.StripeAccountID, &stripe.CustomerRetrieveParams{})
+		if err != nil {
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			s.Logger.Errorf("Failed to find stripe customer data. Error: %s", err.Error())
+			return
 		}
 
+		// Get transactions
+		var transactions []models.ClubTransaction
+		stripeCursor := s.StripeClient.V1BalanceTransactions.List(ctx, &stripe.BalanceTransactionListParams{})
+		for t := range stripeCursor {
+			transaction := models.ClubTransaction{
+				StripeChargeID: &t.ID,
+				Amount:         t.Amount,
+				Type:           string(t.Type),
+				Status:         string(t.Status),
+				Currency:       string(t.Currency),
+				CreatedAt:      primitive.DateTime(t.Created),
+			}
+
+			// Handle event id
+			if t.Source != nil {
+				eventID := t.Source.Payout.Metadata["event_id"]
+				if eventID != "" {
+					eid, _ := primitive.ObjectIDFromHex(eventID)
+					transaction.EventID = &eid
+				}
+			}
+
+			transactions = append(transactions, transaction)
+		}
+
+		balance := float64(customer.Balance)
+		account.AvailableBalance = &balance
+		account.RecentTransactions = &transactions
+
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(overview)
+		json.NewEncoder(rw).Encode(account)
 	}
 }
 
@@ -1023,7 +1087,7 @@ func (s *Service) InitiatePayout() http.HandlerFunc {
 			return
 		}
 
-		if account.AccountStatus != "active" {
+		if account.AccountStatus != nil && *account.AccountStatus == "active" {
 			http.Error(rw, `{"msg": "account not active for payouts"}`, http.StatusBadRequest)
 			return
 		}
@@ -1141,7 +1205,7 @@ func (s *Service) GetCustomerSheetConfig() http.HandlerFunc {
 			return
 		}
 
-		if account.AccountStatus != "active" {
+		if account.AccountStatus != nil && *account.AccountStatus == "active" {
 			http.Error(rw, `{"msg": "club financial account not active"}`, http.StatusBadRequest)
 			return
 		}
@@ -1152,7 +1216,7 @@ func (s *Service) GetCustomerSheetConfig() http.HandlerFunc {
 
 		// Placeholder response - replace with actual Stripe API calls
 		response := models.StripeCustomerSheetResponse{
-			CustomerID:              "cus_placeholder_" + account.StripeAccountID,
+			CustomerID:              "cus_placeholder_" + *account.StripeAccountID,
 			EphemeralKeySecret:      "ek_test_placeholder_ephemeral_key_secret",
 			SetupIntentClientSecret: "seti_placeholder_client_secret",
 		}
