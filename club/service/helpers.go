@@ -136,30 +136,28 @@ func generateNewReportNotification(id string, name string, repID string) models.
 	}
 }
 
-func generateNewApplicationNotification(id string, appID string) models.PushNotification {
+func generateNewApplicationNotification(id string, clubName string) models.PushNotification {
 	return models.PushNotification{
-		Title:    "New Application",
-		Body:     "You have a new club application!",
+		Title:    fmt.Sprintf("[%s] New Club Application", clubName),
+		Body:     "A new club application was filed", //fmt.Sprintf("%s applied to your club", applicantName),
 		Type:     "push",
 		Category: "groups",
 		Data: map[string]interface{}{
-			"type":           "new_application",
-			"id":             id,
-			"application_id": appID,
+			"type":    models.NewClubApplication,
+			"club_id": id,
 		},
 	}
 }
 
-func generateUpdateApplicationNotification(id string, name string, appID string, status string) models.PushNotification {
+func generateUpdateApplicationNotification(id string, name string) models.PushNotification {
 	return models.PushNotification{
-		Title:    "Application Status",
-		Body:     fmt.Sprintf("%s accepted your application!", name),
+		Title:    "Club Application Update",
+		Body:     fmt.Sprintf("Your application to %s was approved!", name),
 		Type:     "push",
 		Category: "groups",
 		Data: map[string]interface{}{
-			"type":           "application_update",
-			"id":             id,
-			"application_id": appID,
+			"type":    models.NewClubApplication,
+			"club_id": id,
 		},
 	}
 }

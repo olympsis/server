@@ -378,7 +378,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		// Delete club members
 		err = c.DeleteMembers(ctx, bson.M{"club_id": oid})
 		if err != nil {
-			c.Logger.Error(fmt.Sprintf("Failed to delete club members. ID: %s, Error: %s", err.Error()))
+			c.Logger.Errorf("Failed to delete club members. ID: %s, Error: %s", id, err.Error())
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}

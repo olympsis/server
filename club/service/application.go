@@ -121,8 +121,16 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 				return
 			}
 
+			club, err := c.FindClub(ctx, bson.M{"_id": oid})
+			if err != nil {
+				c.Logger.Errorf("Failed to find club for notification. Error: %s", err.Error())
+				rw.WriteHeader(http.StatusCreated)
+				rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex()))
+				return
+			}
+
 			topic := id + "_admin"
-			note := generateNewApplicationNotification(id, resp.InsertedID.(primitive.ObjectID).Hex())
+			note := generateNewApplicationNotification(id, *club.Name)
 			c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 				Topic:        &topic,
 				Notification: note,
@@ -236,7 +244,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			}
 
 			// Notify user that their application was accepted
-			note := generateUpdateApplicationNotification(id, *club.Name, aid, req.Status)
+			note := generateUpdateApplicationNotification(id, *club.Name)
 			c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 				Users:        &[]string{*app.Applicant},
 				Notification: note,
