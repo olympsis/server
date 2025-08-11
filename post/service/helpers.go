@@ -67,13 +67,13 @@ func parsePostQueryParams(r *http.Request) (*PostQueryParams, error) {
 
 func generateNewPostNotification(id string, title string, username string) models.PushNotification {
 	return models.PushNotification{
-		Title:    title,
+		Title:    fmt.Sprintf("[%s] New Post", title),
 		Body:     username + " created a new post!",
 		Type:     "push",
 		Category: "club",
 		Data: map[string]interface{}{
-			"type": "new_post",
-			"id":   id,
+			"type":    models.ClubNewPostType,
+			"club_id": id,
 		},
 	}
 }
@@ -85,8 +85,8 @@ func generateNewAnnouncementNotification(id string, title string) models.PushNot
 		Type:     "push",
 		Category: "organization",
 		Data: map[string]interface{}{
-			"type": "new_post",
-			"id":   id,
+			"type":   models.OrganizationNewAnnouncementType,
+			"org_id": id,
 		},
 	}
 }

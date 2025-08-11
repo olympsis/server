@@ -219,8 +219,8 @@ func GenerateNewEventNotification(id string, title string) models.PushNotificati
 		Type:     "push",
 		Category: "events",
 		Data: map[string]interface{}{
-			"type": "new_event",
-			"id":   id,
+			"type":     models.ClubNewEventType,
+			"event_id": id,
 		},
 	}
 }
@@ -232,8 +232,8 @@ func generateNewParticipantNotification(id string, title string, status string) 
 		Type:     "push",
 		Category: "events",
 		Data: map[string]interface{}{
-			"type": "event_update",
-			"id":   id,
+			"type":     models.EventParticipantUpdateType,
+			"event_id": id,
 		},
 	}
 }

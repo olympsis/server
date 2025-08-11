@@ -64,7 +64,7 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			}
 
 			// Add the host as the participant
-			if req.IncludeHost != nil && *req.IncludeHost == true {
+			if req.IncludeHost != nil && *req.IncludeHost {
 				rsvp := models.RSVPYes
 				participant := models.ParticipantDao{
 					UserID:    &uuid,
@@ -894,19 +894,26 @@ func (s *Service) AddComment() http.HandlerFunc {
 
 		// Notify users of a new comment
 		event, err := s.FindEvent(ctx, bson.M{"_id": oid})
+		if err != nil {
+			s.Logger.Errorf("Failed to get event for notification. Error: %s", err.Error())
+			w.WriteHeader(http.StatusCreated)
+			w.Write(fmt.Appendf(nil, `{"id": "%s"}`, cid.Hex()))
+			return
+		}
+
 		notif := models.PushNotification{
 			Title:    *event.Title,
 			Body:     "A new comment was posted!",
 			Type:     "push",
 			Category: "events",
 			Data: map[string]any{
-				"type": "event_update",
-				"id":   id,
+				"type":     models.NewEventCommentType,
+				"event_id": id,
 			},
 		}
 		s.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 			Notification: notif,
-			Users:        &[]string{uuid},
+			Topic:        &id,
 		})
 
 		w.WriteHeader(http.StatusCreated)
