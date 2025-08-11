@@ -600,6 +600,10 @@ func (c *Service) KickMember() http.HandlerFunc {
 		note := models.PushNotification{
 			Title: *club.Name,
 			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
+			Data: map[string]interface{}{
+				"type":    models.ClubSuspensionType,
+				"club_id": id,
+			},
 		}
 		err = c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
 			Users:        &[]string{member.UserID},
