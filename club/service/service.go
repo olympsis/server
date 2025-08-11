@@ -511,6 +511,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			Title: *club.Name,
 			Body:  noteText,
 			Data: map[string]interface{}{
+				"type":    models.ClubRankingChangeType,
 				"club_id": id,
 			},
 		}

@@ -122,16 +122,15 @@ func parseQueryParams(r *http.Request) (*ClubsQueryParams, error) {
 	return params, nil
 }
 
-func generateNewReportNotification(id string, name string, repID string) models.PushNotification {
+func generateNewReportNotification(id string, name string) models.PushNotification {
 	return models.PushNotification{
-		Title:    "New Report!",
-		Body:     fmt.Sprintf("A member of %s created a report.", name),
+		Title:    fmt.Sprintf("[%s] New Report", name),
+		Body:     "A new report was created",
 		Type:     "push",
 		Category: "groups",
 		Data: map[string]interface{}{
-			"type":      "new_report",
-			"id":        id,
-			"report_id": repID,
+			"type":    "new_report",
+			"club_id": id,
 		},
 	}
 }
@@ -143,7 +142,7 @@ func generateNewApplicationNotification(id string, clubName string) models.PushN
 		Type:     "push",
 		Category: "groups",
 		Data: map[string]interface{}{
-			"type":    models.NewClubApplication,
+			"type":    models.NewClubApplicationType,
 			"club_id": id,
 		},
 	}
@@ -156,7 +155,7 @@ func generateUpdateApplicationNotification(id string, name string) models.PushNo
 		Type:     "push",
 		Category: "groups",
 		Data: map[string]interface{}{
-			"type":    models.NewClubApplication,
+			"type":    models.NewClubApplicationType,
 			"club_id": id,
 		},
 	}
