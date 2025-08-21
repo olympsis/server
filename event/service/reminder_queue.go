@@ -28,7 +28,7 @@ func (q *NotificationReminderQueue) Add(eventID string) {
 	q.items = append(q.items, eventID)
 }
 
-func (q *NotificationReminderQueue) ProcessWithRetry(sender *notifications.NotificationProcess, cache *redis.RedisDatabase, eventStopTime time.Time) {
+func (q *NotificationReminderQueue) ProcessWithRetry(sender *notifications.NotificationService, cache *redis.RedisDatabase, eventStopTime time.Time) {
 	var failures []string
 
 	for _, eventID := range q.items {

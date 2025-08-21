@@ -8,11 +8,14 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
+	"olympsis-server/event/service"
 	"olympsis-server/health"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
+	"olympsis-server/notifications"
 	"olympsis-server/organization"
 	"olympsis-server/post"
+	"olympsis-server/redis"
 	"olympsis-server/report"
 	"olympsis-server/server"
 	"olympsis-server/system"
@@ -47,18 +50,30 @@ func main() {
 	d := database.NewDatabase(l)
 	d.EstablishConnection(&config)
 
-	// Set up firebase authentication
+	// Set up redis
+
+	cache := redis.NewRedisClient("", "", 0)
+	cacheDB := redis.NewRedisDatabase(&cache, l)
+	if err := cache.Ping(context.Background()); err != nil {
+		l.Fatalf("Error setting up redis client. Error: %s", err.Err().Error())
+		os.Exit(1)
+	}
+
+	// Set up Firebase authentication
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
-		l.Fatalf("error starting firebase app: %s\n", err)
+		l.Fatalf("Error starting Firebase app: %s\n", err)
 		os.Exit(1)
 	}
 	client, err := app.Auth(context.TODO())
 	if err != nil {
-		l.Fatalf("error getting Auth client: %v\n", err)
+		l.Fatalf("Error getting Firebase Auth client: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Set up Notification Service
+	notif := notifications.NewNotificationService(l)
 
 	// Set up search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
@@ -76,7 +91,8 @@ func main() {
 		Auth:   client, // firebase
 		Search: sh,     // search
 
-		Notification: utils.NewNotificationInterface(config.NotifServiceURL, l),
+		Notification:        utils.NewNotificationInterface(config.NotifServiceURL, l),
+		NotificationService: notif,
 	}
 
 	// Set up API
@@ -108,6 +124,12 @@ func main() {
 	healthAPI.Ready()
 	snapShotAPI.Ready()
 	systemAPI.Ready()
+
+	// Set up event polling
+	eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
+	go func() {
+		eventPolling.Start(context.Background())
+	}()
 
 	// Set up server configuration
 	s := &http.Server{

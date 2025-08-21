@@ -17,7 +17,7 @@ type EventPollingService struct {
 	db     *database.Database
 	logger *logrus.Logger
 	cache  *redis.RedisDatabase
-	sender *notifications.NotificationProcess
+	sender *notifications.NotificationService
 }
 
 // Stripped down event object to reduce memory footprint
@@ -26,7 +26,7 @@ type StrippedEvent struct {
 	StopTime primitive.DateTime `bson:"stop_time"`
 }
 
-func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.NotificationProcess) *EventPollingService {
+func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.NotificationService) *EventPollingService {
 	return &EventPollingService{
 		db:     d,
 		cache:  c,

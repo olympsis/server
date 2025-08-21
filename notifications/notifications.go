@@ -6,15 +6,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type NotificationProcess struct {
-	logger logrus.Logger
+type NotificationService struct {
+	logger *logrus.Logger
 }
 
-func (n *NotificationProcess) SendNewEventNotification(eventID string) error {
+func NewNotificationService(l *logrus.Logger) *NotificationService {
+	return &NotificationService{
+		logger: l,
+	}
+}
+
+func (n *NotificationService) SendNewEventNotification(eventID string) error {
 	return nil
 }
 
 // Event starts soon
-func (n *NotificationProcess) SendEventReminderNotification(eventID string, time time.Duration) error {
+func (n *NotificationService) SendEventReminderNotification(eventID string, time time.Duration) error {
 	return nil
 }
