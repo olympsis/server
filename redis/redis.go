@@ -9,8 +9,8 @@ import (
 )
 
 type RedisDatabase struct {
-	Client redis.UniversalClient
-	Logger *logrus.Logger
+	client redis.UniversalClient
+	logger *logrus.Logger
 }
 
 func NewRedisClient(addr string, password string, db int) redis.UniversalClient {
@@ -30,17 +30,17 @@ func NewRedisClusterClient(addrs []string, password string) redis.UniversalClien
 
 func NewRedisDatabase(client *redis.UniversalClient, logger *logrus.Logger) RedisDatabase {
 	return RedisDatabase{
-		Client: *client,
-		Logger: logger,
+		client: *client,
+		logger: logger,
 	}
 }
 
 func (r *RedisDatabase) IsNotificationSent(eventID string) (bool, error) {
-	exists, err := r.Client.Exists(context.Background(), eventID).Result()
+	exists, err := r.client.Exists(context.Background(), eventID).Result()
 	return exists > 0, err
 }
 
 func (r *RedisDatabase) MarkNotificationSent(eventID string, ttl time.Duration) error {
-	r.Logger.Infof("Notification sent for event_ID: %s", eventID)
-	return r.Client.Set(context.Background(), eventID, "1", ttl).Err()
+	r.logger.Infof("Notification sent for event_ID: %s", eventID)
+	return r.client.Set(context.Background(), eventID, "1", ttl).Err()
 }
