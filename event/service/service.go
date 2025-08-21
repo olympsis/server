@@ -203,7 +203,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 			} else {
 				venues = venueIDs
 			}
-		} else if queryParams.VenueIDs != nil && len(queryParams.VenueIDs) > 0 {
+		} else if len(queryParams.VenueIDs) > 0 {
 			// Use directly provided venue IDs
 			venues = queryParams.VenueIDs
 		}
@@ -234,7 +234,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 		} else {
 			// Handle unauthenticated case or failed user data retrieval
 			// Convert sports string to array if provided in query
-			if queryParams.Sports != nil && len(queryParams.Sports) > 0 {
+			if len(queryParams.Sports) > 0 {
 				sportsList = queryParams.Sports
 			}
 
