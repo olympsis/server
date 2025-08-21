@@ -13,14 +13,29 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type PollingService struct {
+type EventPollingService struct {
 	db     *database.Database
 	logger *logrus.Logger
 	cache  *redis.RedisDatabase
 	sender *notifications.NotificationProcess
 }
 
-func (p *PollingService) Start(ctx context.Context) {
+// Stripped down event object to reduce memory footprint
+type StrippedEvent struct {
+	ID       string             `bson:"_id"`
+	StopTime primitive.DateTime `bson:"stop_time"`
+}
+
+func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.NotificationProcess) *EventPollingService {
+	return &EventPollingService{
+		db:     d,
+		cache:  c,
+		sender: s,
+		logger: l,
+	}
+}
+
+func (p *EventPollingService) Start(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -34,10 +49,7 @@ func (p *PollingService) Start(ctx context.Context) {
 	}
 }
 
-func (p *PollingService) processUpcomingEvents() {
-	start := time.Now().Add(25 * time.Minute)
-	end := time.Now().Add(35 * time.Minute)
-
+func (p *EventPollingService) getEvents(start time.Time, end time.Time) []StrippedEvent {
 	projection := bson.M{"_id": 1, "stop_time": 1}
 	options := options.Find().SetProjection(projection)
 	filter := bson.M{
@@ -49,13 +61,7 @@ func (p *PollingService) processUpcomingEvents() {
 	cursor, err := p.db.EventsCollection.Find(context.Background(), filter, options)
 	if err != nil {
 		p.logger.Errorf("Error fetching events: %v", err)
-		return
-	}
-
-	// Stripped down event object to reduce memory footprint
-	type StrippedEvent struct {
-		ID       string             `bson:"_id"`
-		StopTime primitive.DateTime `bson:"stop_time"`
+		return []StrippedEvent{}
 	}
 
 	// Decode events
@@ -69,6 +75,18 @@ func (p *PollingService) processUpcomingEvents() {
 		}
 		events = append(events, event)
 	}
+
+	return events
+}
+
+func (p *EventPollingService) processUpcomingEvents() {
+	p.logger.Info("Starting Event Polling Reminder Processing...")
+
+	start := time.Now().Add(25 * time.Minute)
+	end := time.Now().Add(35 * time.Minute)
+
+	// Fetch events starting in the next 30 mins or so...
+	events := p.getEvents(start, end)
 
 	// Group events by stop time for efficient queue processing
 	eventsByStopTime := make(map[time.Time][]string)
@@ -92,4 +110,6 @@ func (p *PollingService) processUpcomingEvents() {
 		}
 		queue.ProcessWithRetry(p.sender, p.cache, stopTime)
 	}
+
+	p.logger.Info("Stopping Event Polling Reminder Processing...")
 }

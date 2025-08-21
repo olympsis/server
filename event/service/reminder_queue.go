@@ -15,7 +15,7 @@ type NotificationReminderQueue struct {
 	logger     *logrus.Logger
 }
 
-func NewNotificationQueue(l *logrus.Logger) *NotificationReminderQueue {
+func NewEventNotificationQueue(l *logrus.Logger) *NotificationReminderQueue {
 	return &NotificationReminderQueue{
 		items:      make([]string, 0),
 		retries:    make(map[string]int),
