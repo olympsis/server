@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/server"
+	"olympsis-server/utils"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -150,10 +151,6 @@ Http handler
 func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Context setup
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
-		defer cancel()
-
 		// grab uuid of the user who made this request
 		uuid := r.Header.Get("UUID")
 
@@ -196,98 +193,20 @@ func (p *Service) CreatePost() http.HandlerFunc {
 
 		// Create post notification topic
 		postID := id.Hex()
-		topic := models.NotificationTopicDao{
-			Name:  &postID,
-			Users: &[]string{uuid},
-		}
-		err = p.Notification.CreateTopic(r.Header.Get("Authorization"), topic)
-		if err != nil {
-			p.Logger.Error("failed to create topic: " + err.Error())
+		if err = p.Notification.CreateTopic(postID, []string{uuid}); err != nil {
+			p.Logger.Errorf("Failed to create post topic. Post ID: %s - Error: %s", id, err.Error())
 		}
 
-		var user models.UserData
-		var note models.PushNotification
-
-		// grab user info
-		user, err = p.SearchService.SearchUserByUUID(uuid)
-		if err != nil {
-			p.Logger.Error("failed to fetch user data: ", err.Error())
-			rw.WriteHeader(http.StatusCreated)
-			rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
-			return
-		}
-
+		// Notify the members
 		switch *req.Type {
 		case "announcement":
-			var memberUUIDs []string
-			var org models.OrganizationDao
-
-			// Find organization data
-			filter := bson.M{"_id": post.GroupID}
-			err = p.Database.OrgCol.FindOne(context.Background(), filter).Decode(&org)
-			if err != nil {
-				p.Logger.Error("failed to find organization: ", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				return
-			}
-
-			// Find organization members to add to the post notification topic
-			members, err := findOrganizationMembers(&ctx, post.GroupID, p.Database)
-			if err != nil {
-				p.Logger.Error("Failed to find organization members. Error: ", err.Error())
-			}
-			for _, v := range *members {
-				memberUUIDs = append(memberUUIDs, v.UserID)
-			}
-			err = p.Notification.ModifyTopic(r.Header.Get("Authorization"), org.ID.Hex(), models.NotificationTopicUpdateRequest{
-				Action: "subscribe",
-				Users:  memberUUIDs,
-			})
-			if err != nil {
-				p.Logger.Error("Failed to add organization members to new announcement topic.")
-			}
-
-			// Find child clubs
-			cur, err := p.Database.ClubCol.Find(context.TODO(), bson.M{"parent_id": post.GroupID})
-			if err != nil {
-				p.Logger.Error("No children found")
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, post.ID.Hex()))
-			}
-
-			// Send a notification to all of them
-			for cur.Next(context.TODO()) {
-				var club models.Club
-				err := cur.Decode(&club)
-				if err != nil {
-					p.Logger.Error("failed to decode club: ", err.Error())
-				}
-
-				// send notification to club members
-				clubID := club.ID.Hex()
-				note = generateNewAnnouncementNotification(postID, *org.Name)
-				p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-					Topic:        &clubID,
-					Notification: note,
-				})
+			if err = p.Notification.NewAnnouncement(id, &post); err != nil {
+				p.Logger.Errorf("Failed to notify organization and clubs. Post ID: %s - Error: %s", postID, err.Error())
 			}
 		default:
-			// grab club info
-			var club models.Club
-			filter := bson.M{"_id": post.GroupID}
-			err = p.Database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
-			if err != nil {
-				p.Logger.Error("failed to fetch club data: ", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, postID))
+			if err = p.Notification.NewPost(id, &post); err != nil {
+				p.Logger.Errorf("Failed to notify members. Post ID: %s - Error: %s", postID, err.Error())
 			}
-
-			clubID := club.ID.Hex()
-			note = generateNewPostNotification(postID, club.Name, user.Username)
-			p.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-				Topic:        &clubID,
-				Notification: note,
-			})
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -383,37 +302,29 @@ Returns:
 func (p *Service) DeletePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// grab club id from path
-		vars := mux.Vars(r)
-		id := vars["id"]
-		if len(id) < 24 {
-			http.Error(rw, `{ "mgs" : "bad/no post id found in request"}`, http.StatusBadRequest)
-			return
-		}
-
-		// convert post id to oid
-		oid, err := primitive.ObjectIDFromHex(id)
+		// Validate id
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
 		if err != nil {
-			p.Logger.Debug("failed to convert post id to object id: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to convert id to object id" }`, http.StatusInternalServerError)
+			p.Logger.Errorf("Failed to validate object ID: %s", err.Error())
+			http.Error(rw, `{"msg": "bad request"}`, http.StatusInternalServerError)
 		}
 
 		filter := bson.M{"_id": oid}
 		_, err = p.Database.PostsCollection.DeleteOne(context.TODO(), filter)
 		if err != nil {
 			p.Logger.Debug("failed to delete post: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to delete post" }`, http.StatusInternalServerError)
+			http.Error(rw, `{"msg": "failed to delete post"}`, http.StatusInternalServerError)
 			return
 		}
 
-		// delete notif topic
-		err = p.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
-		if err != nil {
-			p.Logger.Error("failed to delete topic: ", err.Error())
+		// Delete post topic
+		if err = p.Notification.RemoveTopic(id); err != nil {
+			p.Logger.Errorf("Failed to delete post topic. Post ID: %s - Error: %s", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "OK" }`))
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -575,6 +486,10 @@ func (p *Service) AddComment() http.HandlerFunc {
 			p.Logger.Error("Failed to insert comment. Inserted ID nil.")
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
+		}
+
+		if err = p.Notification.NewEventComment(oid, *req.Text); err != nil {
+			p.Logger.Errorf("Failed to notify users of new comment. Event ID: %s - Error: %s", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusOK)

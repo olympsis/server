@@ -2,9 +2,9 @@ package service
 
 import (
 	"olympsis-server/database"
+	"olympsis-server/notifications"
 	"olympsis-server/report/orm"
 	"olympsis-server/server"
-	"olympsis-server/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -19,7 +19,7 @@ type Service struct {
 	MemberReport *orm.MemberReportORM
 	FieldReport  *orm.FieldReportORM
 	EventReport  *orm.EventReportORM
-	Notification *utils.NotificationInterface
+	Notification *notifications.Service
 }
 
 func NewReportService(i *server.ServerInterface) *Service {
@@ -44,7 +44,7 @@ func NewReportService(i *server.ServerInterface) *Service {
 		Database: i.Database,
 		Logger:   i.Logger,
 	}
-	
+
 	return &Service{
 		Database:     i.Database,
 		Logger:       i.Logger,

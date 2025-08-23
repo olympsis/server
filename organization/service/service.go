@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/database"
+	"olympsis-server/notifications"
 	"olympsis-server/server"
 	"olympsis-server/utils"
 	"time"
@@ -36,7 +37,7 @@ type Service struct {
 	SearchService *search.Service
 
 	// notification service
-	Notification *utils.NotificationInterface
+	Notification *notifications.Service
 }
 
 /*
@@ -123,39 +124,14 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			}
 		}
 
-		// update user data
-		// NOTICE: - WILL REMOVE THIS SOON
-		update := bson.M{
-			"$push": bson.M{
-				"organizations": id,
-			},
-		}
-		_, err = e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
-		if err != nil {
-			e.Logger.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
-		}
-		// NOTICE: END
-
-		// create notification topics
+		// Create notification topics
 		topicName := id.Hex()
 		adminName := id.Hex() + "_admin"
-		orgTopic := models.NotificationTopicDao{
-			Name:  &topicName,
-			Users: &[]string{uuid},
+		if err = e.Notification.CreateTopic(topicName, []string{uuid}); err != nil {
+			e.Logger.Errorf("Failed to create club topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
-		adminTopic := models.NotificationTopicDao{
-			Name:  &adminName,
-			Users: &[]string{uuid},
-		}
-
-		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), orgTopic)
-		if err != nil {
-			e.Logger.Error("Failed to create organization topic: ", err.Error())
-		}
-
-		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), adminTopic)
-		if err != nil {
-			e.Logger.Error("Failed to create organization admin topic: ", err.Error())
+		if err = e.Notification.CreateTopic(adminName, []string{uuid}); err != nil {
+			e.Logger.Errorf("Failed to create club admin topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -318,6 +294,7 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -355,13 +332,11 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 		}
 
 		// Delete notification topics
-		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
-		if err != nil {
-			e.Logger.Error("Failed to delete topic: ", err.Error())
+		if err = e.Notification.RemoveTopic(id); err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to delete topic. ID: %s - Error: %s", id, err.Error()))
 		}
-		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id+"_admin")
-		if err != nil {
-			e.Logger.Error("Failed to delete topic: ", err.Error())
+		if err = e.Notification.RemoveTopic(id + "_admin"); err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to delete admin topic. ID: %s - Error: %s", id, err.Error()))
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -429,7 +404,9 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 			Topic:        &orgID,
 			Notification: notification,
 		}
-		e.Notification.SendNotification(r.Header.Get("Authorization"), request)
+		if err = e.Notification.AddNoteToCarousel(1, &request); err != nil {
+			e.Logger.Errorf("Failed to notify organization members. Org ID: %s - Error: %s", id, err.Error())
+		}
 
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, id.Hex()))
@@ -545,6 +522,7 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -571,6 +549,7 @@ func (e *Service) DeleteApplication() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -806,11 +785,12 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 			Topic:        &clubID,
 			Notification: notification,
 		}
-		err = e.Notification.SendNotification(r.Header.Get("Authorization"), request)
-		if err != nil {
+		if err = e.Notification.AddNoteToCarousel(1, &request); err != nil {
 			e.Logger.Error("Failed to send notification: " + err.Error())
 		}
+
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -837,6 +817,7 @@ func (e *Service) DeleteInvitation() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -861,14 +842,14 @@ func (s *Service) PinOrgPost() http.HandlerFunc {
 		}
 
 		// update club data to reflect new post
-		ok := s.PinPost(&id, &postID)
-		if ok {
-			w.WriteHeader(http.StatusOK)
-			return
-		} else {
+		if ok := s.PinPost(&id, &postID); !ok {
 			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{ "msg": "OK" }`))
 			return
 		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 

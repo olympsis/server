@@ -208,10 +208,10 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		topicName := id.Hex()
 		adminName := id.Hex() + "_admin"
 		if err = c.Notification.CreateTopic(topicName, []string{uuid}); err != nil {
-			c.Logger.Error("Failed to create club topic. Club ID: %s - Error: %s ", id, err.Error())
+			c.Logger.Errorf("Failed to create club topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
 		if err = c.Notification.CreateTopic(adminName, []string{uuid}); err != nil {
-			c.Logger.Error("Failed to create club admin topic. Club ID: %s - Error: %s ", id, err.Error())
+			c.Logger.Errorf("Failed to create club admin topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -385,7 +385,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 			c.Logger.Error(fmt.Sprintf("Failed to delete topic. ID: %s - Error: %s", id, err.Error()))
 		}
 		if err = c.Notification.RemoveTopic(clubAdminTopic); err != nil {
-			c.Logger.Error(fmt.Sprintf("Failed to delete topic. ID: %s - Error: %s", id, err.Error()))
+			c.Logger.Error(fmt.Sprintf("Failed to delete admin topic. ID: %s - Error: %s", id, err.Error()))
 		}
 
 		rw.WriteHeader(http.StatusOK)

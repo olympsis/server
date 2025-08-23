@@ -18,11 +18,10 @@ import (
 
 func NewAuthService(serverInterface *server.ServerInterface) *Service {
 	return &Service{
-		Log:          serverInterface.Logger,
-		Router:       serverInterface.Router,
-		Database:     serverInterface.Database,
-		Client:       serverInterface.Auth,
-		Notification: serverInterface.Notification,
+		Log:      serverInterface.Logger,
+		Router:   serverInterface.Router,
+		Database: serverInterface.Database,
+		Client:   serverInterface.Auth,
 	}
 }
 
