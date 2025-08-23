@@ -121,20 +121,9 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 				return
 			}
 
-			club, err := c.FindClub(ctx, bson.M{"_id": oid})
-			if err != nil {
-				c.Logger.Errorf("Failed to find club for notification. Error: %s", err.Error())
-				rw.WriteHeader(http.StatusCreated)
-				rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex()))
-				return
+			if err = c.Notification.NewApplication(oid, app); err != nil {
+				c.Logger.Errorf("Failed to notify admins of new application. Club ID: %s - Error: %s", id, err.Error())
 			}
-
-			topic := id + "_admin"
-			note := generateNewApplicationNotification(id, *club.Name)
-			c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-				Topic:        &topic,
-				Notification: note,
-			})
 
 			rw.WriteHeader(http.StatusCreated)
 			rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex()))
@@ -233,22 +222,10 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 				return
 			}
 
-			// Fetch club for notification
-			var club models.ClubDao
-			err = c.Database.ClubCol.FindOne(context.Background(), bson.M{"_id": oid}).Decode(club)
-			if err != nil {
-				c.Logger.Error(fmt.Sprintf("Failed to find club and send notification. Club ID: %s - Error: %s", id, err.Error()))
-				rw.WriteHeader(http.StatusOK)
-				rw.Write([]byte(`{"msg":"OK"}`))
-				return
+			// Notify the user that they've been accepted
+			if err = c.Notification.ApplicationUpdate(oid, *app.ID); err != nil {
+				c.Logger.Errorf("Failed to notify user. Club ID: %s - Error: %s", id, err.Error())
 			}
-
-			// Notify user that their application was accepted
-			note := generateUpdateApplicationNotification(id, *club.Name)
-			c.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-				Users:        &[]string{*app.Applicant},
-				Notification: note,
-			})
 
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"msg":"OK"}`))
