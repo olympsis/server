@@ -121,7 +121,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 				return
 			}
 
-			if err = c.Notification.NewApplication(oid, app); err != nil {
+			if err = c.Notification.NewApplication(&oid, &app); err != nil {
 				c.Logger.Errorf("Failed to notify admins of new application. Club ID: %s - Error: %s", id, err.Error())
 			}
 
@@ -223,7 +223,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			}
 
 			// Notify the user that they've been accepted
-			if err = c.Notification.ApplicationUpdate(oid, *app.ID); err != nil {
+			if err = c.Notification.ApplicationUpdate(oid, &app); err != nil {
 				c.Logger.Errorf("Failed to notify user. Club ID: %s - Error: %s", id, err.Error())
 			}
 
