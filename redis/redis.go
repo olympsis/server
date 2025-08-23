@@ -13,7 +13,7 @@ type RedisDatabase struct {
 	logger *logrus.Logger
 }
 
-func NewRedisClient(addr string, password string, db int) redis.UniversalClient {
+func NewClient(addr string, password string, db int) redis.UniversalClient {
 	return redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: password,
@@ -21,14 +21,14 @@ func NewRedisClient(addr string, password string, db int) redis.UniversalClient 
 	})
 }
 
-func NewRedisClusterClient(addrs []string, password string) redis.UniversalClient {
+func NewClusterClient(addrs []string, password string) redis.UniversalClient {
 	return redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:    addrs,
 		Password: password,
 	})
 }
 
-func NewRedisDatabase(client *redis.UniversalClient, logger *logrus.Logger) RedisDatabase {
+func New(client *redis.UniversalClient, logger *logrus.Logger) RedisDatabase {
 	return RedisDatabase{
 		client: *client,
 		logger: logger,
