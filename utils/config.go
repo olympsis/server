@@ -1,6 +1,34 @@
 package utils
 
-import "os"
+import (
+	"errors"
+	"os"
+
+	"github.com/sideshow/apns2"
+	"github.com/sideshow/apns2/token"
+)
+
+// Create APNS2 Client
+func CreateApns2Client(keyID string, teamID string, fileName string) (*apns2.Client, error) {
+	key, err := token.AuthKeyFromFile(fileName)
+	if err != nil {
+		return nil, errors.New("failed to read key from file. Error: " + err.Error())
+	}
+
+	token := token.Token{
+		AuthKey: key,
+		KeyID:   keyID,
+		TeamID:  teamID,
+	}
+
+	mode := os.Getenv("MODE")
+	switch mode {
+	case "production":
+		return apns2.NewTokenClient(&token).Production(), nil
+	default:
+		return apns2.NewTokenClient(&token).Development(), nil
+	}
+}
 
 // Reads from OS environment variables to create server config object
 func GetServerConfig() ServerConfig {
@@ -17,6 +45,24 @@ func GetServerConfig() ServerConfig {
 	http := os.Getenv("HTTP")
 	if http == "" {
 		http = "UNSECURE"
+	}
+
+	// Apple Key ID
+	key := os.Getenv("KEY_ID")
+	if key == "" {
+		panic("No Apple Key ID provided!")
+	}
+
+	// Apple Team ID
+	team := os.Getenv("TEAM_ID")
+	if team == "" {
+		panic("No Apple Team ID provided!")
+	}
+
+	// p8 Key file path
+	apnsFilePath := os.Getenv("APNS_KEY_URL")
+	if apnsFilePath == "" {
+		panic("No APNS key file path provided!")
 	}
 
 	firebase := os.Getenv("FIREBASE_FILE_PATH")
@@ -50,6 +96,10 @@ func GetServerConfig() ServerConfig {
 		Mode:             mode,
 		Http:             http,
 		FirebaseFilePath: firebase,
+
+		AppleKeyID:  key,
+		AppleTeamID: team,
+		APNSFileURl: apnsFilePath,
 
 		MapKitToken: mapkit,
 		StripeToken: stripe,

@@ -12,9 +12,8 @@ import (
 )
 
 type Database struct {
-	Logger      *logrus.Logger
-	Client      *mongo.Client
-	NotifClient *mongo.Client
+	Logger *logrus.Logger
+	Client *mongo.Client
 
 	AnnouncementCol *mongo.Collection
 
@@ -61,6 +60,13 @@ type Database struct {
 
 	TagsCollection   *mongo.Collection
 	SportsCollection *mongo.Collection
+
+	// NOTIFICATIONS
+	NotificationsClient          *mongo.Client
+	NotificationTopicsCollection *mongo.Collection
+	NotificationLogsCollection   *mongo.Collection
+	UserNotificationsCollection  *mongo.Collection
+	PushNotificationsCollection  *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {

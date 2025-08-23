@@ -51,9 +51,8 @@ func main() {
 	d.EstablishConnection(&config)
 
 	// Set up redis
-
-	cache := redis.NewRedisClient("", "", 0)
-	cacheDB := redis.NewRedisDatabase(&cache, l)
+	cache := redis.NewClient("", "", 0)
+	cacheDB := redis.New(&cache, l)
 	if err := cache.Ping(context.Background()); err != nil {
 		l.Fatalf("Error setting up redis client. Error: %s", err.Err().Error())
 		os.Exit(1)
@@ -72,8 +71,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create APNS client
+	apnsClient, err := utils.CreateApns2Client(config.AppleKeyID, config.AppleTeamID, config.APNSFileURl)
+	if err != nil {
+		l.Fatalf("Failed to create Apns2 client. Error: %s", err.Error())
+		os.Exit(1)
+	}
+
 	// Set up Notification Service
-	notif := notifications.NewNotificationService(l)
+	notif := notifications.New(apnsClient, l, d)
 
 	// Set up search service
 	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
@@ -91,8 +97,7 @@ func main() {
 		Auth:   client, // firebase
 		Search: sh,     // search
 
-		Notification:        utils.NewNotificationInterface(config.NotifServiceURL, l),
-		NotificationService: notif,
+		Notification: notif, // notifications
 	}
 
 	// Set up API

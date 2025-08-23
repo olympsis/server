@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/server"
-	"olympsis-server/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -23,10 +22,9 @@ Locale Service Struct
   - Notification interface
 */
 type Service struct {
-	Database     *database.Database
-	Logger       *logrus.Logger
-	Router       *mux.Router
-	Notification *utils.NotificationInterface
+	Database *database.Database
+	Logger   *logrus.Logger
+	Router   *mux.Router
 }
 
 /*
@@ -34,10 +32,9 @@ Creates a new instance of the locale service
 */
 func NewLocaleService(i *server.ServerInterface) *Service {
 	return &Service{
-		Logger:       i.Logger, 
-		Router:       i.Router, 
-		Database:     i.Database,
-		Notification: i.Notification,
+		Logger:   i.Logger,
+		Router:   i.Router,
+		Database: i.Database,
 	}
 }
 

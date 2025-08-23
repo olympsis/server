@@ -72,7 +72,7 @@ func generateNewPostNotification(id string, title string, username string) model
 		Type:     "push",
 		Category: "club",
 		Data: map[string]interface{}{
-			"type":    models.ClubNewPostType,
+			"type":    models.NewPostType,
 			"club_id": id,
 		},
 	}
@@ -85,7 +85,7 @@ func generateNewAnnouncementNotification(id string, title string) models.PushNot
 		Type:     "push",
 		Category: "organization",
 		Data: map[string]interface{}{
-			"type":   models.OrganizationNewAnnouncementType,
+			"type":   models.NewAnnouncementType,
 			"org_id": id,
 		},
 	}

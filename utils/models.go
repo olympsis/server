@@ -6,6 +6,10 @@ type ServerConfig struct {
 	Http             string // Http | Https
 	FirebaseFilePath string // Firebase config path
 
+	AppleKeyID  string // APNS Key ID
+	AppleTeamID string // Apple Team ID
+	APNSFileURl string // URL key path
+
 	MapKitToken string // Apple Mapkit token
 	StripeToken string // Stripe API token
 

@@ -69,6 +69,9 @@ ENV NOTIF_URL=http://notif:8083
 
 ENV STORAGE_URL=http://storage:8081
 
+ENV KEY_ID=5MP3VW78BZ
+ENV TEAM_ID=5A6H49Q85D
+ENV APNS_KEY_URL=./files/AuthKey_5MP3VW78BZ.p8
 ENV FIREBASE_FILE_PATH=/files/firebase-credentials.json
 
 EXPOSE 80

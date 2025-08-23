@@ -219,7 +219,7 @@ func GenerateNewEventNotification(id string, title string) models.PushNotificati
 		Type:     "push",
 		Category: "events",
 		Data: map[string]interface{}{
-			"type":     models.ClubNewEventType,
+			"type":     models.NewEventType,
 			"event_id": id,
 		},
 	}

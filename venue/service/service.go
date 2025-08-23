@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"olympsis-server/database"
+	"olympsis-server/notifications"
 	"olympsis-server/server"
-	"olympsis-server/utils"
 	"os"
 	"strconv"
 	"strings"
@@ -34,7 +34,7 @@ type Service struct {
 	Router *mux.Router
 
 	// Notification service for sending notifications
-	Notification *utils.NotificationInterface
+	Notification *notifications.Service
 }
 
 /*

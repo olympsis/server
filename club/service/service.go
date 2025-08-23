@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/database"
+	"olympsis-server/notifications"
 	"olympsis-server/server"
 	"olympsis-server/utils"
 	"time"
@@ -26,7 +27,7 @@ type Service struct {
 	Router        *mux.Router
 	StripeClient  *stripe.Client
 	SearchService *search.Service
-	Notification  *utils.NotificationInterface
+	Notification  *notifications.Service
 }
 
 // Creates a new club service object
@@ -206,24 +207,11 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		// Create notification topics
 		topicName := id.Hex()
 		adminName := id.Hex() + "_admin"
-		clubTopic := models.NotificationTopicDao{
-			Name:  &topicName,
-			Users: &[]string{uuid},
+		if err = c.Notification.CreateTopic(topicName, []string{uuid}); err != nil {
+			c.Logger.Error("Failed to create club topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
-		adminTopic := models.NotificationTopicDao{
-			Name:  &adminName,
-			Users: &[]string{uuid},
-		}
-
-		// Create notification topics
-		err = c.Notification.CreateTopic(r.Header.Get("Authorization"), clubTopic)
-		if err != nil {
-			c.Logger.Error("Failed to create club topic: ", err.Error())
-		}
-
-		err = c.Notification.CreateTopic(r.Header.Get("Authorization"), adminTopic)
-		if err != nil {
-			c.Logger.Error("Failed to create club admin topic: ", err.Error())
+		if err = c.Notification.CreateTopic(adminName, []string{uuid}); err != nil {
+			c.Logger.Error("Failed to create club admin topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -511,7 +499,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			Title: *club.Name,
 			Body:  noteText,
 			Data: map[string]interface{}{
-				"type":    models.ClubRankingChangeType,
+				"type":    models.RankingChangeType,
 				"club_id": id,
 			},
 		}
@@ -601,7 +589,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 			Title: *club.Name,
 			Body:  fmt.Sprintf(`You've been kicked out of %s`, *club.Name),
 			Data: map[string]interface{}{
-				"type":    models.ClubSuspensionType,
+				"type":    models.SuspensionType,
 				"club_id": id,
 			},
 		}
