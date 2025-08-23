@@ -12,11 +12,11 @@ import (
 
 // Sets up the announcement collection
 func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.AnnouncementCol = db.Collection(config.AnnouncementCollection)
+	d.AnnouncementCollection = db.Collection(config.AnnouncementCollection)
 	announceModel := mongo.IndexModel{
 		Keys: bson.M{"location": "2dsphere"},
 	}
-	_, err := d.AnnouncementCol.Indexes().CreateOne(context.Background(), announceModel)
+	_, err := d.AnnouncementCollection.Indexes().CreateOne(context.Background(), announceModel)
 	if err != nil {
 		return fmt.Errorf("could not create geospatial index for announcements: %v", err)
 	}
@@ -28,7 +28,7 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 			{Key: "city", Value: 1},
 		},
 	}
-	_, err = d.AnnouncementCol.Indexes().CreateOne(context.Background(), regionModel)
+	_, err = d.AnnouncementCollection.Indexes().CreateOne(context.Background(), regionModel)
 	if err != nil {
 		return fmt.Errorf("could not create region index for announcements: %v", err)
 	}
@@ -39,7 +39,7 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 			{Key: "end_time", Value: 1},
 		},
 	}
-	_, err = d.AnnouncementCol.Indexes().CreateOne(context.Background(), timeModel)
+	_, err = d.AnnouncementCollection.Indexes().CreateOne(context.Background(), timeModel)
 	if err != nil {
 		return fmt.Errorf("could not create time index for announcements: %v", err)
 	}
@@ -48,8 +48,8 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 
 // Sets up the collections associated with user data
 func (d *Database) SetUpUserCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.AuthCol = db.Collection(config.AuthCollection)
-	d.UserCol = db.Collection(config.UserCollection)
+	d.AuthCollection = db.Collection(config.AuthCollection)
+	d.UserCollection = db.Collection(config.UserCollection)
 	return nil
 }
 
@@ -547,7 +547,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 			return fmt.Errorf("could not create club collection: %v", err)
 		}
 
-		d.ClubCol = db.Collection(config.ClubCollection)
+		d.ClubCollection = db.Collection(config.ClubCollection)
 
 		// Define all club indexes
 		clubIndexes := []mongo.IndexModel{
@@ -586,11 +586,11 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubCol, clubIndexes); err != nil {
+		if err := safeCreateIndexes(d.ClubCollection, clubIndexes); err != nil {
 			return fmt.Errorf("failed to create club indexes: %v", err)
 		}
 	} else {
-		d.ClubCol = db.Collection(config.ClubCollection)
+		d.ClubCollection = db.Collection(config.ClubCollection)
 	}
 
 	// Set up Club Invitation Collection
@@ -600,7 +600,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 			return fmt.Errorf("could not create club invitation collection: %v", err)
 		}
 
-		d.ClubInvitationCol = db.Collection(config.ClubInvitationCollection)
+		d.ClubInvitationCollection = db.Collection(config.ClubInvitationCollection)
 
 		// Define club invitation indexes
 		invitationIndexes := []mongo.IndexModel{
@@ -619,11 +619,11 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubInvitationCol, invitationIndexes); err != nil {
+		if err := safeCreateIndexes(d.ClubInvitationCollection, invitationIndexes); err != nil {
 			return fmt.Errorf("failed to create club invitation indexes: %v", err)
 		}
 	} else {
-		d.ClubInvitationCol = db.Collection(config.ClubInvitationCollection)
+		d.ClubInvitationCollection = db.Collection(config.ClubInvitationCollection)
 	}
 
 	// Set up Club Members Collection
@@ -673,7 +673,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 			return fmt.Errorf("could not create club application collection: %v", err)
 		}
 
-		d.ClubApplicationCol = db.Collection(config.ClubApplicationCollection)
+		d.ClubApplicationCollection = db.Collection(config.ClubApplicationCollection)
 
 		// Define club application indexes
 		applicationIndexes := []mongo.IndexModel{
@@ -699,11 +699,11 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubApplicationCol, applicationIndexes); err != nil {
+		if err := safeCreateIndexes(d.ClubApplicationCollection, applicationIndexes); err != nil {
 			return fmt.Errorf("failed to create club application indexes: %v", err)
 		}
 	} else {
-		d.ClubApplicationCol = db.Collection(config.ClubApplicationCollection)
+		d.ClubApplicationCollection = db.Collection(config.ClubApplicationCollection)
 	}
 
 	// Set up Club Financial Accounts Collection
@@ -857,7 +857,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 			return fmt.Errorf("could not create organization collection: %v", err)
 		}
 
-		d.OrgCol = db.Collection(config.OrgCollection)
+		d.OrgCollection = db.Collection(config.OrgCollection)
 
 		// Define all organization indexes
 		orgIndexes := []mongo.IndexModel{
@@ -888,11 +888,11 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrgCol, orgIndexes); err != nil {
+		if err := safeCreateIndexes(d.OrgCollection, orgIndexes); err != nil {
 			return fmt.Errorf("failed to create organization indexes: %v", err)
 		}
 	} else {
-		d.OrgCol = db.Collection(config.OrgCollection)
+		d.OrgCollection = db.Collection(config.OrgCollection)
 	}
 
 	// Set up Organization Invitation Collection
@@ -902,7 +902,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 			return fmt.Errorf("could not create organization invitation collection: %v", err)
 		}
 
-		d.OrgInvitationCol = db.Collection(config.OrgInvitationCollection)
+		d.OrgInvitationCollection = db.Collection(config.OrgInvitationCollection)
 
 		// Define organization invitation indexes
 		invitationIndexes := []mongo.IndexModel{
@@ -921,11 +921,11 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrgInvitationCol, invitationIndexes); err != nil {
+		if err := safeCreateIndexes(d.OrgInvitationCollection, invitationIndexes); err != nil {
 			return fmt.Errorf("failed to create organization invitation indexes: %v", err)
 		}
 	} else {
-		d.OrgInvitationCol = db.Collection(config.OrgInvitationCollection)
+		d.OrgInvitationCollection = db.Collection(config.OrgInvitationCollection)
 	}
 
 	// Set up Organization Application Collection
@@ -935,7 +935,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 			return fmt.Errorf("could not create organization application collection: %v", err)
 		}
 
-		d.OrgApplicationCol = db.Collection(config.OrgApplicationCollection)
+		d.OrgApplicationCollection = db.Collection(config.OrgApplicationCollection)
 
 		// Define organization application indexes
 		applicationIndexes := []mongo.IndexModel{
@@ -961,11 +961,11 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrgApplicationCol, applicationIndexes); err != nil {
+		if err := safeCreateIndexes(d.OrgApplicationCollection, applicationIndexes); err != nil {
 			return fmt.Errorf("failed to create organization application indexes: %v", err)
 		}
 	} else {
-		d.OrgApplicationCol = db.Collection(config.OrgApplicationCollection)
+		d.OrgApplicationCollection = db.Collection(config.OrgApplicationCollection)
 	}
 
 	// Set up Organization Members Collection
@@ -1206,20 +1206,20 @@ func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.Collec
 
 // Sets up all of the Report collections
 func (d *Database) SetUpReportCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.BugReportCol = db.Collection(config.BugReportCollection)
-	d.PostReportCol = db.Collection(config.PostReportCollection)
-	d.VenueReportCol = db.Collection(config.VenueReportCollection)
-	d.EventReportCol = db.Collection(config.EventReportCollection)
-	d.MemberReportCol = db.Collection(config.MemberReportCollection)
+	d.BugReportCollection = db.Collection(config.BugReportCollection)
+	d.PostReportCollection = db.Collection(config.PostReportCollection)
+	d.VenueReportCollection = db.Collection(config.VenueReportCollection)
+	d.EventReportCollection = db.Collection(config.EventReportCollection)
+	d.MemberReportCollection = db.Collection(config.MemberReportCollection)
 	return nil
 }
 
 // Sets up all of the locale collections
 func (d *Database) SetUpLocaleCollections(db *mongo.Database, config *utils.CollectionsConfig, dbConfig *utils.DatabaseConfig) error {
 	localeDB := d.Client.Database(dbConfig.LocaleName)
-	d.CountriesCol = localeDB.Collection(config.CountriesCollection)
-	d.AdminAreasCol = localeDB.Collection(config.AdminAreasCollection)
-	d.SubAdminAreasCol = localeDB.Collection(config.SubAdminAreasCollection)
+	d.CountriesCollection = localeDB.Collection(config.CountriesCollection)
+	d.AdminAreasCollection = localeDB.Collection(config.AdminAreasCollection)
+	d.SubAdminAreasCollection = localeDB.Collection(config.SubAdminAreasCollection)
 	return nil
 }
 

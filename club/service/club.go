@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Service) InsertClub(ctx context.Context, club *models.ClubDao) (*primitive.ObjectID, error) {
-	resp, err := s.Database.ClubCol.InsertOne(ctx, club)
+	resp, err := s.Database.ClubCollection.InsertOne(ctx, club)
 	if err != nil {
 		return nil, err
 	}
@@ -18,7 +18,7 @@ func (s *Service) InsertClub(ctx context.Context, club *models.ClubDao) (*primit
 
 func (s *Service) FindClub(ctx context.Context, filter interface{}) (*models.ClubDao, error) {
 	var club models.ClubDao
-	err := s.Database.ClubCol.FindOne(ctx, filter).Decode(&club)
+	err := s.Database.ClubCollection.FindOne(ctx, filter).Decode(&club)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +26,7 @@ func (s *Service) FindClub(ctx context.Context, filter interface{}) (*models.Clu
 }
 
 func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]models.Club) error {
-	cursor, err := s.Database.ClubCol.Find(ctx, filter)
+	cursor, err := s.Database.ClubCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]mo
 
 func (s *Service) UpdateClub(ctx context.Context, filter interface{}, update interface{}) error {
 	// update user
-	_, err := s.Database.ClubCol.UpdateOne(ctx, filter, update)
+	_, err := s.Database.ClubCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (s *Service) UpdateClubs(ctx context.Context, filter interface{}, update in
 }
 
 func (s *Service) RemoveClub(ctx context.Context, filter interface{}) error {
-	_, err := s.Database.ClubCol.DeleteOne(ctx, filter)
+	_, err := s.Database.ClubCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

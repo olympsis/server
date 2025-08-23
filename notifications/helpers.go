@@ -14,7 +14,7 @@ func (n *Service) findUsers(arr []string) ([]models.User, error) {
 			"$in": arr,
 		},
 	}
-	cursor, err := n.database.UserCol.Find(context.Background(), filter)
+	cursor, err := n.database.UserCollection.Find(context.Background(), filter)
 	if err != nil {
 		return []models.User{}, err
 	}
@@ -38,7 +38,7 @@ func (n *Service) findUser(userID string) (*models.User, error) {
 	}
 
 	var user models.User
-	err := n.database.UserCol.FindOne(context.Background(), filter).Decode(&user)
+	err := n.database.UserCollection.FindOne(context.Background(), filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (n *Service) findClub(id primitive.ObjectID) (*models.ClubDao, error) {
 	}
 
 	var club models.ClubDao
-	err := n.database.ClubCol.FindOne(context.Background(), filter).Decode(&club)
+	err := n.database.ClubCollection.FindOne(context.Background(), filter).Decode(&club)
 	if err != nil {
 		return nil, err
 	}

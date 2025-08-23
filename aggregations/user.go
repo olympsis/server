@@ -79,7 +79,7 @@ func AggregateUser(uuid *string, database *database.Database) (*models.UserData,
 		cleanup,
 	}
 
-	cur, err := database.AuthCol.Aggregate(ctx, pipeline)
+	cur, err := database.AuthCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}

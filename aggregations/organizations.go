@@ -28,7 +28,7 @@ func AggregateOrganization(id primitive.ObjectID, database *database.Database) (
 	completePipeline := append(bson.A{idPipeline}, corePipeline...)
 
 	// Execute the aggregation
-	cur, err := database.OrgCol.Aggregate(ctx, completePipeline)
+	cur, err := database.OrgCollection.Aggregate(ctx, completePipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func AggregateOrganizations(
 	completePipeline = append(completePipeline, skipPipeline, limitPipeline)
 
 	// Execute the aggregation
-	cur, err := database.OrgCol.Aggregate(ctx, completePipeline)
+	cur, err := database.OrgCollection.Aggregate(ctx, completePipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func AggregateOrganizationApplication(id *primitive.ObjectID, database *database
 		cleanupPipeline,
 	}
 
-	cur, err := database.OrgApplicationCol.Aggregate(ctx, pipeline)
+	cur, err := database.OrgApplicationCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func AggregateOrganizationApplications(organizationID *primitive.ObjectID, statu
 		cleanupPipeline,
 	}
 
-	cur, err := database.OrgApplicationCol.Aggregate(ctx, pipeline)
+	cur, err := database.OrgApplicationCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}

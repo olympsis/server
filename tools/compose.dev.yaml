@@ -45,14 +45,6 @@ services:
     #     depends_on:
     #         - redis-db
 
-    # notifications:
-    #     container_name: notif
-    #     restart: always
-    #     ports:
-    #         - 8083:80
-    #     depends_on:
-    #         - master-db
-
     master-db:
         container_name: mongo
         image: mongo

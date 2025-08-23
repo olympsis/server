@@ -82,7 +82,7 @@ func main() {
 	notif := notifications.New(apnsClient, l, d)
 
 	// Set up search service
-	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
+	sh := search.NewSearchService(l, d.AuthCollection, d.UserCollection)
 
 	// Set up stripe API
 	sc := stripe.NewClient(config.StripeToken)
@@ -132,9 +132,7 @@ func main() {
 
 	// Set up event polling
 	eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
-	go func() {
-		eventPolling.Start(context.Background())
-	}()
+	go eventPolling.Start(context.Background())
 
 	// Set up server configuration
 	s := &http.Server{

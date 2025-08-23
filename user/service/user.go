@@ -8,20 +8,20 @@ import (
 
 // Insert new user into database
 func (u *Service) InsertUser(ctx context.Context, user *models.User) error {
-	u.Database.UserCol.InsertOne(ctx, user)
+	u.Database.UserCollection.InsertOne(ctx, user)
 	return nil
 }
 
 // Get user from database
 func (u *Service) FindUser(ctx context.Context, filter interface{}, user *models.User) error {
-	u.Database.UserCol.FindOne(ctx, filter).Decode(&user)
+	u.Database.UserCollection.FindOne(ctx, filter).Decode(&user)
 	return nil
 }
 
 // get users from database
 func (u *Service) FindUsers(ctx context.Context, filter interface{}, users *[]models.User) error {
 
-	cursor, err := u.Database.UserCol.Find(ctx, filter)
+	cursor, err := u.Database.UserCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (u *Service) FindUsers(ctx context.Context, filter interface{}, users *[]mo
 func (u *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *models.UserDao) error {
 
 	// update user
-	_, err := u.Database.UserCol.UpdateOne(ctx, filter, update)
+	_, err := u.Database.UserCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -52,13 +52,13 @@ func (u *Service) UpdateUser(ctx context.Context, filter interface{}, update int
 // update users in database
 func (u *Service) UpdateUsers(ctx context.Context, filter interface{}, update interface{}, users *[]models.User) error {
 	// update users
-	_, err := u.Database.UserCol.UpdateMany(ctx, filter, update)
+	_, err := u.Database.UserCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
 
 	// find updated users
-	cursor, err := u.Database.UserCol.Find(ctx, filter)
+	cursor, err := u.Database.UserCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (u *Service) UpdateUsers(ctx context.Context, filter interface{}, update in
 func (u *Service) DeleteUser(ctx context.Context, filter interface{}) error {
 
 	// delete user
-	_, err := u.Database.UserCol.DeleteOne(ctx, filter)
+	_, err := u.Database.UserCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (u *Service) DeleteUser(ctx context.Context, filter interface{}) error {
 func (u *Service) DeleteUsers(ctx context.Context, filter interface{}) error {
 
 	// delete users
-	_, err := u.Database.UserCol.DeleteMany(ctx, filter)
+	_, err := u.Database.UserCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

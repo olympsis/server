@@ -9,7 +9,7 @@ import (
 
 // Insert a new organization into the database
 func (s *Service) InsertAnOrganization(ctx context.Context, event *models.OrganizationDao) (*primitive.ObjectID, error) {
-	resp, err := s.Database.OrgCol.InsertOne(ctx, event)
+	resp, err := s.Database.OrgCollection.InsertOne(ctx, event)
 	if err != nil {
 		return nil, err
 	}
@@ -20,7 +20,7 @@ func (s *Service) InsertAnOrganization(ctx context.Context, event *models.Organi
 // Get an organization from database
 func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}) (*models.OrganizationDao, error) {
 	var org models.OrganizationDao
-	err := s.Database.OrgCol.FindOne(ctx, filter).Decode(&org)
+	err := s.Database.OrgCollection.FindOne(ctx, filter).Decode(&org)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (s *Service) FindAnOrganization(ctx context.Context, filter interface{}) (*
 // Get organizations from database
 func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, organizations *[]models.Organization) error {
 
-	cursor, err := s.Database.OrgCol.Find(ctx, filter)
+	cursor, err := s.Database.OrgCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, org
 // Update an organization in database
 func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, update interface{}) error {
 	// update user
-	_, err := s.Database.OrgCol.UpdateOne(ctx, filter, update)
+	_, err := s.Database.OrgCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *Service) UpdateAnOrganization(ctx context.Context, filter interface{}, 
 func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.Organization) error {
 
 	// update event
-	_, err := s.Database.OrgCol.UpdateMany(ctx, filter, update)
+	_, err := s.Database.OrgCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (s *Service) UpdateOrganizations(ctx context.Context, filter interface{}, u
 func (s *Service) DeleteAnOrganization(ctx context.Context, filter interface{}) error {
 
 	// delete user
-	_, err := s.Database.OrgCol.DeleteOne(ctx, filter)
+	_, err := s.Database.OrgCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (s *Service) DeleteAnOrganization(ctx context.Context, filter interface{}) 
 func (s *Service) DeleteOrganizations(ctx context.Context, filter interface{}) error {
 
 	// delete users
-	_, err := s.Database.OrgCol.DeleteMany(ctx, filter)
+	_, err := s.Database.OrgCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

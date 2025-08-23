@@ -63,7 +63,7 @@ func AggregateAnnouncement(ctx context.Context, id primitive.ObjectID, db *datab
 		},
 	}
 
-	cursor, err := db.AnnouncementCol.Aggregate(ctx, pipeline)
+	cursor, err := db.AnnouncementCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func AggregateAnnouncements(ctx context.Context, filter bson.M, opts *options.Ag
 		},
 	}
 
-	cursor, err := db.AnnouncementCol.Aggregate(ctx, pipeline, opts)
+	cursor, err := db.AnnouncementCollection.Aggregate(ctx, pipeline, opts)
 	if err != nil {
 		return nil, err
 	}

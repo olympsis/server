@@ -8,13 +8,13 @@ import (
 
 // adds invitation document to database
 func (s *Service) InsertAnInvitation(ctx context.Context, invitation *models.Invitation) error {
-	s.Database.OrgInvitationCol.InsertOne(ctx, invitation)
+	s.Database.OrgInvitationCollection.InsertOne(ctx, invitation)
 	return nil
 }
 
 // finds and returns an invitation from database
 func (s *Service) FindAnInvitation(ctx context.Context, filter interface{}, invitation *models.Invitation) error {
-	err := s.Database.OrgInvitationCol.FindOne(ctx, filter).Decode(&invitation)
+	err := s.Database.OrgInvitationCollection.FindOne(ctx, filter).Decode(&invitation)
 	if err != nil {
 		return err
 	}
@@ -24,7 +24,7 @@ func (s *Service) FindAnInvitation(ctx context.Context, filter interface{}, invi
 // finds multiple invitations from database
 func (s *Service) FindInvitations(ctx context.Context, filter interface{}, invitations *[]models.Invitation) error {
 
-	cursor, err := s.Database.OrgInvitationCol.Find(ctx, filter)
+	cursor, err := s.Database.OrgInvitationCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (s *Service) FindInvitations(ctx context.Context, filter interface{}, invit
 // updates in invitation in the database
 func (s *Service) UpdateAnInvitation(ctx context.Context, filter interface{}, update interface{}, invitation *models.Invitation) error {
 	// update user
-	_, err := s.Database.OrgInvitationCol.UpdateOne(ctx, filter, update)
+	_, err := s.Database.OrgInvitationCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *Service) UpdateAnInvitation(ctx context.Context, filter interface{}, up
 func (s *Service) UpdateInvitations(ctx context.Context, filter interface{}, update interface{}, invitations *[]models.Invitation) error {
 
 	// update event
-	_, err := s.Database.OrgInvitationCol.UpdateMany(ctx, filter, update)
+	_, err := s.Database.OrgInvitationCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (s *Service) UpdateInvitations(ctx context.Context, filter interface{}, upd
 func (s *Service) DeleteAnInvitation(ctx context.Context, filter interface{}) error {
 
 	// delete user
-	_, err := s.Database.OrgInvitationCol.DeleteOne(ctx, filter)
+	_, err := s.Database.OrgInvitationCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (s *Service) DeleteAnInvitation(ctx context.Context, filter interface{}) er
 func (s *Service) DeleteInvitations(ctx context.Context, filter interface{}) error {
 
 	// delete users
-	_, err := s.Database.OrgInvitationCol.DeleteMany(ctx, filter)
+	_, err := s.Database.OrgInvitationCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

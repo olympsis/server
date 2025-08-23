@@ -95,7 +95,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		// Return if found and no errors
 		var _app models.ClubApplicationDao
 		filter := bson.M{"applicant": uuid, "club_id": oid, "status": "pending"}
-		err = c.Database.ClubApplicationCol.FindOne(ctx, filter).Decode(&_app)
+		err = c.Database.ClubApplicationCollection.FindOne(ctx, filter).Decode(&_app)
 		if err == nil {
 			rw.WriteHeader(http.StatusCreated)
 			rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, _app.ID.Hex()))
@@ -114,7 +114,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 			}
 
 			// Create new club application
-			resp, err := c.Database.ClubApplicationCol.InsertOne(ctx, app)
+			resp, err := c.Database.ClubApplicationCollection.InsertOne(ctx, app)
 			if err != nil {
 				c.Logger.Error(fmt.Sprintf("Failed to create application. ID: %s - Error: %s ", id, err.Error()))
 				http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
@@ -183,7 +183,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 
 			// Check for existing application
 			var app models.ClubApplicationDao
-			err = c.Database.ClubApplicationCol.FindOne(context.TODO(), bson.M{"_id": aoid}).Decode(&app)
+			err = c.Database.ClubApplicationCollection.FindOne(context.TODO(), bson.M{"_id": aoid}).Decode(&app)
 			if err != nil {
 				c.Logger.Error(fmt.Sprintf("Failed to find application. ID: %s - Error: %s ", id, err.Error()))
 				http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
@@ -200,7 +200,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			// Update club application status
 			filter := bson.M{"_id": aoid}
 			change := bson.M{"$set": bson.M{"status": req.Status}}
-			_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
+			_, err = c.Database.ClubApplicationCollection.UpdateOne(context.TODO(), filter, change)
 			if err != nil {
 				c.Logger.Error("Failed to update application: ", err.Error())
 				http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
@@ -235,7 +235,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 		// Handle application denial
 		filter := bson.M{"_id": aoid}
 		change := bson.M{"$set": bson.M{"status": req.Status}}
-		_, err = c.Database.ClubApplicationCol.UpdateOne(context.TODO(), filter, change)
+		_, err = c.Database.ClubApplicationCollection.UpdateOne(context.TODO(), filter, change)
 		if err != nil {
 			c.Logger.Error("failed to update application: " + err.Error())
 			http.Error(rw, `{ "msg": "failed to update application" }`, http.StatusInternalServerError)
@@ -281,7 +281,7 @@ func (c *Service) DeleteApplication() http.HandlerFunc {
 
 		// Delete club application from database
 		filter := bson.M{"_id": aoid, "applicant": uuid, "club_id": oid}
-		_, err = c.Database.ClubApplicationCol.DeleteOne(ctx, filter)
+		_, err = c.Database.ClubApplicationCollection.DeleteOne(ctx, filter)
 		if err != nil {
 			c.Logger.Error(fmt.Sprintf("Failed to delete club application. ID: %s - Error: %s", id, err.Error()))
 			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)

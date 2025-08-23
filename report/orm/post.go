@@ -17,7 +17,7 @@ type PostReportORM struct {
 }
 
 func (orm *PostReportORM) Insert(ctx context.Context, report *models.PostReportDao, opts *options.InsertOneOptions) error {
-	_, err := orm.Database.PostReportCol.InsertOne(ctx, report, opts)
+	_, err := orm.Database.PostReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
@@ -76,7 +76,7 @@ func (orm *PostReportORM) Find(ctx context.Context, filter interface{}, opts *op
 		pipeline5,
 	}
 
-	cur, err := orm.Database.PostReportCol.Aggregate(context.TODO(), pipeline, opts)
+	cur, err := orm.Database.PostReportCollection.Aggregate(context.TODO(), pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (orm *PostReportORM) Find(ctx context.Context, filter interface{}, opts *op
 }
 
 func (orm *PostReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.PostReportCol.UpdateOne(ctx, filter, update)
+	_, err := orm.Database.PostReportCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (orm *PostReportORM) Update(ctx context.Context, filter interface{}, update
 }
 
 func (orm *PostReportORM) Delete(ctx context.Context, filter interface{}) error {
-	_, err := orm.Database.PostReportCol.DeleteOne(ctx, filter)
+	_, err := orm.Database.PostReportCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

@@ -10,14 +10,14 @@ import (
 
 // Insert auth user into database
 func (a *Service) InsertUser(ctx context.Context, user *models.AuthUserDao) error {
-	a.Database.AuthCol.InsertOne(ctx, user)
+	a.Database.AuthCollection.InsertOne(ctx, user)
 	return nil
 }
 
 // Get auth user from database
 func (a *Service) FindUser(ctx context.Context, filter interface{}) (*models.AuthUser, error) {
 	var user models.AuthUser
-	err := a.Database.AuthCol.FindOne(ctx, filter).Decode(&user)
+	err := a.Database.AuthCollection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func (a *Service) FindUser(ctx context.Context, filter interface{}) (*models.Aut
 // get auth users from database
 func (a *Service) FindUsers(ctx context.Context, filter bson.M, users *[]models.AuthUser) error {
 
-	cursor, err := a.Database.AuthCol.Find(ctx, filter)
+	cursor, err := a.Database.AuthCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (a *Service) FindUsers(ctx context.Context, filter bson.M, users *[]models.
 func (a *Service) UpdateUser(ctx context.Context, uuid string, update bson.M) (*models.UserData, error) {
 
 	// update user
-	_, err := a.Database.AuthCol.UpdateOne(ctx, bson.M{"uuid": uuid}, update)
+	_, err := a.Database.AuthCollection.UpdateOne(ctx, bson.M{"uuid": uuid}, update)
 	if err != nil {
 		return nil, err
 	}
@@ -65,13 +65,13 @@ func (a *Service) UpdateUser(ctx context.Context, uuid string, update bson.M) (*
 func (a *Service) UpdateUsers(ctx context.Context, filter bson.M, update bson.M, users *[]models.AuthUser) error {
 
 	// update users
-	_, err := a.Database.AuthCol.UpdateMany(ctx, filter, update)
+	_, err := a.Database.AuthCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
 
 	// find updated users
-	cursor, err := a.Database.AuthCol.Find(ctx, filter)
+	cursor, err := a.Database.AuthCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (a *Service) UpdateUsers(ctx context.Context, filter bson.M, update bson.M,
 func (a *Service) DeleteUser(ctx context.Context, filter bson.M) error {
 
 	// delete user
-	_, err := a.Database.AuthCol.DeleteOne(ctx, filter)
+	_, err := a.Database.AuthCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (a *Service) DeleteUser(ctx context.Context, filter bson.M) error {
 func (a *Service) DeleteUsers(ctx context.Context, filter bson.M) error {
 
 	// delete users
-	_, err := a.Database.AuthCol.DeleteMany(ctx, filter)
+	_, err := a.Database.AuthCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

@@ -15,24 +15,24 @@ type Database struct {
 	Logger *logrus.Logger
 	Client *mongo.Client
 
-	AnnouncementCol *mongo.Collection
+	AnnouncementCollection *mongo.Collection
 
-	AuthCol          *mongo.Collection
-	UserCol          *mongo.Collection
+	AuthCollection   *mongo.Collection
+	UserCollection   *mongo.Collection
 	VenuesCollection *mongo.Collection
 
 	PostsCollection         *mongo.Collection
 	PostCommentsCollection  *mongo.Collection
 	PostReactionsCollection *mongo.Collection
 
-	ClubCol               *mongo.Collection
-	ClubInvitationCol     *mongo.Collection
-	ClubApplicationCol    *mongo.Collection
-	ClubMembersCollection *mongo.Collection
+	ClubCollection            *mongo.Collection
+	ClubInvitationCollection  *mongo.Collection
+	ClubApplicationCollection *mongo.Collection
+	ClubMembersCollection     *mongo.Collection
 
-	OrgCol                        *mongo.Collection
-	OrgInvitationCol              *mongo.Collection
-	OrgApplicationCol             *mongo.Collection
+	OrgCollection                 *mongo.Collection
+	OrgInvitationCollection       *mongo.Collection
+	OrgApplicationCollection      *mongo.Collection
 	OrganizationMembersCollection *mongo.Collection
 
 	EventsCollection                    *mongo.Collection
@@ -48,15 +48,15 @@ type Database struct {
 	ClubTransactionsCollection      *mongo.Collection
 	ClubFinancialAccountsCollection *mongo.Collection
 
-	BugReportCol    *mongo.Collection
-	PostReportCol   *mongo.Collection
-	MemberReportCol *mongo.Collection
-	VenueReportCol  *mongo.Collection
-	EventReportCol  *mongo.Collection
+	BugReportCollection    *mongo.Collection
+	PostReportCollection   *mongo.Collection
+	MemberReportCollection *mongo.Collection
+	VenueReportCollection  *mongo.Collection
+	EventReportCollection  *mongo.Collection
 
-	CountriesCol     *mongo.Collection
-	AdminAreasCol    *mongo.Collection
-	SubAdminAreasCol *mongo.Collection
+	CountriesCollection     *mongo.Collection
+	AdminAreasCollection    *mongo.Collection
+	SubAdminAreasCollection *mongo.Collection
 
 	TagsCollection   *mongo.Collection
 	SportsCollection *mongo.Collection

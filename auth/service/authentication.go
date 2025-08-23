@@ -103,7 +103,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		// Insert metadata into database
-		_, err = a.Database.UserCol.InsertOne(ctx, meta)
+		_, err = a.Database.UserCollection.InsertOne(ctx, meta)
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to insert user into the database: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to create user" }`, http.StatusInternalServerError)

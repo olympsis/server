@@ -37,6 +37,7 @@ func New(c *apns2.Client, l *logrus.Logger, db *database.Database) *Service {
 		database: db,
 	}
 	service.carousel = NewCarousel(l, service.processPushRequest)
+	service.carousel.Start()
 	return &service
 }
 

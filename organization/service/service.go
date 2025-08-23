@@ -365,7 +365,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 
 		// check for an existing application
 		var application models.OrganizationApplicationDao
-		err = e.Database.OrgApplicationCol.FindOne(context.Background(),
+		err = e.Database.OrgApplicationCollection.FindOne(context.Background(),
 			bson.M{
 				"club_id":         req.ClubID,
 				"organization_id": req.OrganizationID,
@@ -510,7 +510,7 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 					"parent_id": req.OrganizationID,
 				},
 			}
-			e.Database.ClubCol.UpdateOne(context.Background(), filter, updates)
+			e.Database.ClubCollection.UpdateOne(context.Background(), filter, updates)
 			// maybe notify club admins that their application was approved.
 		}
 
@@ -600,7 +600,7 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 
 		// fetch organization data
 		var org models.Organization
-		err = e.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": req.SubjectID}).Decode(&org)
+		err = e.Database.OrgCollection.FindOne(context.TODO(), bson.M{"_id": req.SubjectID}).Decode(&org)
 		if err != nil {
 			e.Logger.Error("Failed to fetch organization data: " + err.Error())
 			w.WriteHeader(http.StatusCreated)
@@ -670,7 +670,7 @@ func (e *Service) GetInvitations() http.HandlerFunc {
 
 		// fetch org data
 		var org models.Organization
-		err = e.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": oid}).Decode(&org)
+		err = e.Database.OrgCollection.FindOne(context.TODO(), bson.M{"_id": oid}).Decode(&org)
 		if err != nil {
 			e.Logger.Error("Failed to find organization: " + err.Error())
 			http.Error(w, `{"msg": "failed to get organization data"}`, http.StatusInternalServerError)
@@ -725,7 +725,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 			changes := bson.M{
 				"$push": bson.M{"members": member},
 			}
-			_, err = e.Database.OrgCol.UpdateOne(context.TODO(), bson.M{"_id": req.SubjectID}, changes)
+			_, err = e.Database.OrgCollection.UpdateOne(context.TODO(), bson.M{"_id": req.SubjectID}, changes)
 			if err != nil {
 				e.Logger.Error("Failed to add user to organization: " + err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
@@ -759,7 +759,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 				"organizations": req.SubjectID,
 			},
 		}
-		_, err = e.Database.UserCol.UpdateOne(context.TODO(), filter, updates)
+		_, err = e.Database.UserCollection.UpdateOne(context.TODO(), filter, updates)
 		if err != nil {
 			e.Logger.Error("Failed to update user data: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

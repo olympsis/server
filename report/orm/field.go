@@ -17,7 +17,7 @@ type FieldReportORM struct {
 }
 
 func (orm *FieldReportORM) Insert(ctx context.Context, report *models.VenueReportDao, opts *options.InsertOneOptions) error {
-	_, err := orm.Database.VenueReportCol.InsertOne(ctx, report, opts)
+	_, err := orm.Database.VenueReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
@@ -94,7 +94,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		pipeline5,
 	}
 
-	cur, err := orm.Database.VenueReportCol.Aggregate(context.TODO(), pipeline, opts)
+	cur, err := orm.Database.VenueReportCollection.Aggregate(context.TODO(), pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 }
 
 func (orm *FieldReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.VenueReportCol.UpdateOne(ctx, filter, update)
+	_, err := orm.Database.VenueReportCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (orm *FieldReportORM) Update(ctx context.Context, filter interface{}, updat
 }
 
 func (orm *FieldReportORM) Delete(ctx context.Context, filter interface{}) error {
-	_, err := orm.Database.VenueReportCol.DeleteOne(ctx, filter)
+	_, err := orm.Database.VenueReportCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

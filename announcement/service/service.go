@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/database"
+	"olympsis-server/notifications"
 	"olympsis-server/utils"
 	"time"
 
@@ -23,7 +24,7 @@ type Service struct {
 	Database     *database.Database
 	Logger       *logrus.Logger
 	Router       *mux.Router
-	Notification *utils.NotificationInterface
+	Notification *notifications.Service
 }
 
 /*
