@@ -1,4 +1,4 @@
-VERSION := v0.7.0
+VERSION := v0.8.0
 PROJECT_ID := olympsis-408521
 LOCATION := us-central1-docker.pkg.dev
 SERVICE_NAME := server
@@ -47,7 +47,7 @@ server: #Secure server with local CA certificates
 
 unsecure-server: #Un-secure server with http
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)-unsecure" | xargs -I {} docker rmi -f {}
-	docker build -f ./tools/Dockerfile.http.dev . -t $(SERVICE_NAME)-unsecure
+	docker build -f Dockerfile . -t $(SERVICE_NAME)-unsecure
 	docker run -p 80:80 $(SERVICE_NAME)-unsecure:latest
 
 dev-up: #Runs the docker-compose stack to set up local environment

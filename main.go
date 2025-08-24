@@ -21,6 +21,7 @@ import (
 	"olympsis-server/system"
 	"olympsis-server/user"
 	"olympsis-server/utils"
+	"olympsis-server/utils/secrets"
 
 	"olympsis-server/venue"
 	"os"
@@ -43,12 +44,14 @@ func main() {
 	// Set up Mux router
 	r := mux.NewRouter()
 
+	manager := secrets.New()
+
 	// Set up server configuration
-	config := utils.GetServerConfig()
+	config := utils.GetServerConfig(manager)
 
 	// Set up database
 	d := database.NewDatabase(l)
-	d.EstablishConnection(&config)
+	d.EstablishConnection(manager, &config)
 
 	// Set up redis
 	cache := redis.NewClient("", "", 0)
@@ -167,7 +170,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigs
 
-	l.Printf("Received Termination(%s), graceful shutdown \n", sig)
+	l.Infof("Received Termination(%s), graceful shutdown \n", sig)
 
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
 	defer c()

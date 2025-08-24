@@ -1282,3 +1282,12 @@ func createIndexes(collection *mongo.Collection, indexes []mongo.IndexModel, col
 
 	return nil
 }
+
+// Sets up notification collections
+func (d *Database) SetUpNotificationsCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
+	d.PushNotificationsCollection = db.Collection(config.NotificationsCollection)
+	d.NotificationLogsCollection = db.Collection(config.NotificationLogsCollection)
+	d.UserNotificationsCollection = db.Collection(config.UserNotificationsCollection)
+	d.NotificationTopicsCollection = db.Collection(config.NotificationTopicsCollection)
+	return nil
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"olympsis-server/utils"
+	"olympsis-server/utils/secrets"
 
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -73,14 +74,14 @@ func NewDatabase(l *logrus.Logger) *Database {
 	return &Database{Logger: l}
 }
 
-func (d *Database) EstablishConnection(config *utils.ServerConfig) {
+func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.ServerConfig) {
 
 	d.Logger.Info("Connecting to Database...")
 
 	/*
 		Connect to Mongo Database
 	*/
-	dbConfig := utils.GetDatabaseConfig()
+	dbConfig := utils.GetDatabaseConfig(manager)
 	collectionConfig := utils.GetCollectionsConfig()
 
 	switch config.Mode {
@@ -179,6 +180,13 @@ func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConf
 
 	// Initialize Application Config Collections
 	err = d.SetUpAppConfigCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Notification collections
+	noteDatabase := d.Client.Database(config.NotificationName)
+	err = d.SetUpNotificationsCollections(noteDatabase, collectionConfig)
 	if err != nil {
 		return err
 	}

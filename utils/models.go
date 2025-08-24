@@ -13,7 +13,6 @@ type ServerConfig struct {
 	MapKitToken string // Apple Mapkit token
 	StripeToken string // Stripe API token
 
-	NotifServiceURL   string
 	StorageServiceURL string
 
 	KeyFilePath  string // TLS key file
@@ -26,7 +25,8 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 
-	LocaleName string // Locale database name
+	LocaleName       string // Locale database name
+	NotificationName string // Notification database name
 }
 
 type CollectionsConfig struct {
@@ -91,4 +91,9 @@ type CollectionsConfig struct {
 
 	TagsCollections  string
 	SportsCollection string
+
+	NotificationsCollection      string
+	NotificationLogsCollection   string
+	UserNotificationsCollection  string
+	NotificationTopicsCollection string
 }

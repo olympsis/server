@@ -57,6 +57,7 @@ require (
 )
 
 require (
+	github.com/redis/go-redis/v9 v9.12.1
 	github.com/stripe/stripe-go/v82 v82.3.0
 	go.mongodb.org/mongo-driver v1.17.4
 )
@@ -66,7 +67,6 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
-	github.com/redis/go-redis/v9 v9.12.1 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 )
 

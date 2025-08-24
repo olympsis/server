@@ -35,8 +35,6 @@ services:
             - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
         environment:
             MODE: PRODUCTION
-            NOTIF_URL: http://notif
-            STORAGE_URL: http://storage
             FIREBASE_FILE_PATH: ./firebase-credentials.json
             STRIPE_TOKEN: sk_test_51P33HvRxf68pt9NZisRo9RRtCn4OJwspd4juCFnJEip0e7oSx0WPm7Cb2M7WJ7VRs7i5LZDSs9fuyV6QahQgPuaI00oYr8nc89
             MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw

@@ -1,0 +1,80 @@
+name: Build and Push to GCP Artifact Registry
+
+on:
+  push:
+    branches: [main]
+    
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: olympsis-408521
+  LOCATION: us-central1-docker.pkg.dev
+  SERVICE_NAME: server
+  REPO_NAME: main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ env.PROJECT_ID }}
+
+    - name: Configure Docker to use gcloud as credential helper
+      run: |
+        gcloud auth configure-docker ${{ env.LOCATION }}
+
+    - name: Get version from Makefile
+      id: version
+      run: |
+        VERSION=$(grep "VERSION := " Makefile | cut -d' ' -f3)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Build Docker image
+      run: |
+        docker build . \
+          -t ${{ env.SERVICE_NAME }} \
+          --platform linux/amd64 \
+          --build-arg VERSION=${{ steps.version.outputs.version }} \
+          --build-arg DB_USER=${{ secrets.MONGO_USER }} \
+          --build-arg DB_PASS=${{ secrets.MONGO_PASSWORD }} \
+          --build-arg DB_NAME=${{ secrets.MONGO_DB_NAME }} \
+          --build-arg DB_ADDR=${{ secrets.MONGO_ADDRESS }} \
+          --build-arg KEY_ID=${{ secrets.APPLE_KEY_ID }} \
+          --build-arg TEAM_ID=${{ secrets.APPLE_TEAM_ID }} \
+          --build-arg STORAGE_URL=${{ secrets.STORAGE_URL }}
+
+    - name: Tag Docker image
+      run: |
+        docker tag ${{ env.SERVICE_NAME }} \
+          ${{ env.LOCATION }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}
+        
+        docker tag ${{ env.SERVICE_NAME }} \
+          ${{ env.LOCATION }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest
+
+    - name: Push Docker image
+      run: |
+        docker push ${{ env.LOCATION }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}
+        docker push ${{ env.LOCATION }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest
+
+    - name: Output image URL
+      run: |
+        echo "Image pushed to: ${{ env.LOCATION }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}"
