@@ -52,15 +52,7 @@ jobs:
       run: |
         docker build . \
           -t ${{ env.SERVICE_NAME }} \
-          --platform linux/amd64 \
-          --build-arg VERSION=${{ steps.version.outputs.version }} \
-          --build-arg DB_USER=${{ secrets.MONGO_USER }} \
-          --build-arg DB_PASS=${{ secrets.MONGO_PASSWORD }} \
-          --build-arg DB_NAME=${{ secrets.MONGO_DB_NAME }} \
-          --build-arg DB_ADDR=${{ secrets.MONGO_ADDRESS }} \
-          --build-arg KEY_ID=${{ secrets.APPLE_KEY_ID }} \
-          --build-arg TEAM_ID=${{ secrets.APPLE_TEAM_ID }} \
-          --build-arg STORAGE_URL=${{ secrets.STORAGE_URL }}
+          --platform linux/amd64
 
     - name: Tag Docker image
       run: |

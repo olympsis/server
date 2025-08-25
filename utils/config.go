@@ -74,7 +74,7 @@ func GetServerConfig(manager *secrets.Manager) ServerConfig {
 	config.APNSFileURl = apnsFilePath
 
 	// Firebase config
-	firebase := os.Getenv("FIREBASE_CONFIG_PATH")
+	firebase := os.Getenv("FIREBASE_FILE_PATH")
 	if firebase == "" {
 		if config.Mode == "PRODUCTION" {
 			panic("firebase file path missing in config")
@@ -149,6 +149,18 @@ func GetDatabaseConfig(manager *secrets.Manager) DatabaseConfig {
 
 		LocaleName:       localeDB,
 		NotificationName: noteDB,
+	}
+}
+
+func GetRedisConfig(manager *secrets.Manager) RedisConfig {
+	address := manager.GetRequired("REDIS_ADDRESS")
+	username := manager.GetRequired("REDIS_USERNAME")
+	password := manager.GetRequired("REDIS_PASSWORD")
+
+	return RedisConfig{
+		Address:  address,
+		Username: username,
+		Password: password,
 	}
 }
 

@@ -29,6 +29,12 @@ type DatabaseConfig struct {
 	NotificationName string // Notification database name
 }
 
+type RedisConfig struct {
+	Address  string
+	Username string
+	Password string
+}
+
 type CollectionsConfig struct {
 	AnnouncementCollection string
 

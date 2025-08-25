@@ -55,7 +55,7 @@ func (p *EventPollingService) getEvents(start time.Time, end time.Time) []Stripp
 	filter := bson.M{
 		"start_time": bson.M{
 			"$gte": primitive.NewDateTimeFromTime(start),
-			"$let": primitive.NewDateTimeFromTime(end),
+			"$lte": primitive.NewDateTimeFromTime(end),
 		},
 	}
 	cursor, err := p.db.EventsCollection.Find(context.Background(), filter, options)

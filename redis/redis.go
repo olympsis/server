@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,12 +14,21 @@ type RedisDatabase struct {
 	logger *logrus.Logger
 }
 
-func NewClient(addr string, password string, db int) redis.UniversalClient {
-	return redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       db,
-	})
+func NewClient(addr string, username *string, password *string, db int) redis.UniversalClient {
+	opts := redis.Options{}
+	opts.Addr = addr
+	opts.DB = db
+
+	mode := os.Getenv("MODE")
+
+	if username != nil && mode == "PRODUCTION" {
+		opts.Username = *username
+	}
+	if password != nil && mode == "PRODUCTION" {
+		opts.Password = *password
+	}
+
+	return redis.NewClient(&opts)
 }
 
 func NewClusterClient(addrs []string, password string) redis.UniversalClient {

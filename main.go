@@ -54,10 +54,11 @@ func main() {
 	d.EstablishConnection(manager, &config)
 
 	// Set up redis
-	cache := redis.NewClient("", "", 0)
+	rConfig := utils.GetRedisConfig(manager)
+	cache := redis.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
 	cacheDB := redis.New(&cache, l)
-	if err := cache.Ping(context.Background()); err != nil {
-		l.Fatalf("Error setting up redis client. Error: %s", err.Err().Error())
+	if err := cache.Ping(context.Background()).Err(); err != nil {
+		l.Fatalf("Error setting up redis client. Error: %s", err.Error())
 		os.Exit(1)
 	}
 

@@ -50,12 +50,25 @@ func (m *Manager) readSecret(name string) (string, error) {
 	data, err := os.ReadFile(secretPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("secret '%s' not found", name)
+			value, err := m.readEnvironment(name)
+			if err != nil {
+				return "", fmt.Errorf("secret '%s' not found", name)
+			}
+			return strings.TrimSpace(string(value)), nil
 		}
 		return "", fmt.Errorf("failed to read secret '%s': %w", name, err)
 	}
 
 	return strings.TrimSpace(string(data)), nil
+}
+
+func (m *Manager) readEnvironment(name string) (string, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return "", fmt.Errorf("environment '%s' not found", name)
+	}
+
+	return value, nil
 }
 
 // GetRequired retrieves a secret and panics if not found (for critical secrets)
