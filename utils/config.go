@@ -154,13 +154,9 @@ func GetDatabaseConfig(manager *secrets.Manager) DatabaseConfig {
 
 func GetRedisConfig(manager *secrets.Manager) RedisConfig {
 	address := manager.GetRequired("REDIS_ADDRESS")
-	username := manager.GetRequired("REDIS_USERNAME")
-	password := manager.GetRequired("REDIS_PASSWORD")
 
 	return RedisConfig{
-		Address:  address,
-		Username: username,
-		Password: password,
+		Address: address,
 	}
 }
 
