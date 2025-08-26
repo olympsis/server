@@ -42,40 +42,34 @@ artifact: #Publish image to gcp docker-hub
 
 server: #Secure server with local CA certificates
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)" | xargs -I {} docker rmi {}
-	docker build -f Dockerfile.dev --secret id=crt,src=./tools/localhost.crt --secret id=key,src=./tools/localhost.key . -t $(SERVICE_NAME)
+	docker build -f Dockerfile --secret id=crt,src=./tools/localhost.crt --secret id=key,src=./tools/localhost.key . -t $(SERVICE_NAME)
 	docker run \
 		-e MONGO_ADDRESS="production.md0v8.mongodb.net" \
 		-e MONGO_USERNAME="server" \
 		-e MONGO_PASSWORD="RvmeTaUvkGs7Vc8e" \
-		-e MONGO_NAME="olympsis" \
 		-e REDIS_ADDRESS="localhost:6379" \
-		-e REDIS_USERNAME="default" \
-		-e REDIS_PASSWORD="default" \
-		-e LOCAL_NAME="locales" \
-		-e NOTIFICATIONS_NAME="notifications" \
 		-e APPLE_KEY_ID="5MP3VW78BZ" \
 		-e APPLE_TEAM_ID="5A6H49Q85D" \
+		-e STORAGE_URL="http://storage:8081" \
+		-e APNS_FILE_PATH="./AuthKey_5MP3VW78BZ.p8" \
+		-e FIREBASE_FILE_PATH="./firebase-credentials.json" \
 		-e STRIPE_TOKEN=sk_test_51P33HvRxf68pt9NZisRo9RRtCn4OJwspd4juCFnJEip0e7oSx0WPm7Cb2M7WJ7VRs7i5LZDSs9fuyV6QahQgPuaI00oYr8nc89 \
 		-e MAPKIT_TOKEN=eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw \
 		-p 443:443 $(SERVICE_NAME):latest
 
 unsecure-server: #Un-secure server with http
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "$(SERVICE_NAME)-unsecure" | xargs -I {} docker rmi -f {}
-	docker build -f Dockerfile.dev . -t $(SERVICE_NAME)-unsecure
+	docker build -f Dockerfile . -t $(SERVICE_NAME)-unsecure
 	docker run \
 		-v $(PWD)/files/AuthKey_5MP3VW78BZ.p8:/app/AuthKey_5MP3VW78BZ.p8:ro \
 		-v $(PWD)/files/firebase-credentials.json:/app/firebase-credentials.json:ro \
 		-e MONGO_ADDRESS="production.md0v8.mongodb.net" \
 		-e MONGO_USERNAME="server" \
 		-e MONGO_PASSWORD="RvmeTaUvkGs7Vc8e" \
-		-e MONGO_NAME="olympsis" \
 		-e REDIS_ADDRESS="host.docker.internal:6379" \
-		-e REDIS_USERNAME="default" \
-		-e REDIS_PASSWORD="default" \
-		-e LOCAL_NAME="locales" \
-		-e NOTIFICATIONS_NAME="notifications" \
 		-e APPLE_KEY_ID="5MP3VW78BZ" \
 		-e APPLE_TEAM_ID="5A6H49Q85D" \
+		-e STORAGE_URL="http://storage:8081" \
 		-e APNS_FILE_PATH="./AuthKey_5MP3VW78BZ.p8" \
 		-e FIREBASE_FILE_PATH="./firebase-credentials.json" \
 		-e STRIPE_TOKEN=sk_test_51P33HvRxf68pt9NZisRo9RRtCn4OJwspd4juCFnJEip0e7oSx0WPm7Cb2M7WJ7VRs7i5LZDSs9fuyV6QahQgPuaI00oYr8nc89 \
