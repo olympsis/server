@@ -408,6 +408,7 @@ func BuildEventCorePipeline() bson.A {
 			"body":                  1,
 			"sports":                1,
 			"tags":                  1,
+			"config":                1,
 			"format_config":         1,
 			"start_time":            1,
 			"stop_time":             1,
