@@ -1,92 +1,144 @@
 package utils
 
-import "os"
+import (
+	"errors"
+	"olympsis-server/utils/secrets"
+	"os"
+
+	"github.com/sideshow/apns2"
+	"github.com/sideshow/apns2/token"
+)
+
+// Create APNS2 Client
+func CreateApns2Client(keyID string, teamID string, fileName string) (*apns2.Client, error) {
+	key, err := token.AuthKeyFromFile(fileName)
+	if err != nil {
+		return nil, errors.New("failed to read key from file. Error: " + err.Error())
+	}
+
+	token := token.Token{
+		AuthKey: key,
+		KeyID:   keyID,
+		TeamID:  teamID,
+	}
+
+	mode := os.Getenv("MODE")
+	switch mode {
+	case "production":
+		return apns2.NewTokenClient(&token).Production(), nil
+	default:
+		return apns2.NewTokenClient(&token).Development(), nil
+	}
+}
 
 // Reads from OS environment variables to create server config object
-func GetServerConfig() ServerConfig {
+func GetServerConfig(manager *secrets.Manager) ServerConfig {
+	config := ServerConfig{}
+
+	// Port
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "80"
 	}
+	config.Port = port
 
+	// Server mode
 	mode := os.Getenv("MODE")
 	if mode == "" {
 		mode = "DEVELOPMENT"
 	}
+	config.Mode = mode
 
+	// Secure/Unsecure modes
 	http := os.Getenv("HTTP")
 	if http == "" {
 		http = "UNSECURE"
 	}
+	config.Http = http
 
+	// Apple Key ID
+	config.AppleKeyID = manager.GetRequired("APPLE_KEY_ID")
+
+	// Apple Team ID
+	config.AppleTeamID = manager.GetRequired("APPLE_TEAM_ID")
+
+	// p8 Key file path
+	apnsFilePath := os.Getenv("APNS_FILE_PATH")
+	if apnsFilePath == "" {
+		if config.Mode == "PRODUCTION" {
+			panic("No APNS key file path provided!")
+		} else {
+			apnsFilePath = "./files/AuthKey_5MP3VW78BZ.p8"
+		}
+	}
+	config.APNSFileURl = apnsFilePath
+
+	// Firebase config
 	firebase := os.Getenv("FIREBASE_FILE_PATH")
 	if firebase == "" {
-		panic("firebase file path missing in config")
+		if config.Mode == "PRODUCTION" {
+			panic("firebase file path missing in config")
+		} else {
+			firebase = "./files/firebase-credentials.json"
+		}
+	}
+	config.FirebaseFilePath = firebase
+
+	// Server SSL key & cert
+	if config.Http == "SECURE" {
+		keyPath := os.Getenv("KEY_FILE_PATH")
+		certPath := os.Getenv("CERT_FILE_PATH")
+		if keyPath == "" || certPath == "" {
+			panic("secure server requires a key and certificate file path env variable")
+		}
+
+		config.KeyFilePath = keyPath
+		config.CertFilePath = certPath
 	}
 
-	keyPath := os.Getenv("KEY_FILE_PATH")
-	certPath := os.Getenv("CERT_FILE_PATH")
-	if http == "SECURE" && (keyPath == "" || certPath == "") {
-		panic("secure server requires a key and certificate file path env variable")
-	}
-
-	notif := os.Getenv("NOTIF_URL")
+	// Storage url
 	storage := os.Getenv("STORAGE_URL")
+	config.StorageServiceURL = storage
 
 	// Set up MapKit token
-	mapkit := os.Getenv("MAPKIT_TOKEN")
-	if mapkit == "" {
-		panic("mapkit token missing in config")
-	}
+	config.MapKitToken = manager.GetRequired("MAPKIT_TOKEN")
 
 	// Set up Stripe token
-	stripe := os.Getenv("STRIPE_TOKEN")
-	if stripe == "" {
-		panic("stripe token missing in config")
-	}
+	config.StripeToken = manager.GetRequired("STRIPE_TOKEN")
 
-	return ServerConfig{
-		Port:             port,
-		Mode:             mode,
-		Http:             http,
-		FirebaseFilePath: firebase,
-
-		MapKitToken: mapkit,
-		StripeToken: stripe,
-
-		NotifServiceURL:   notif,
-		StorageServiceURL: storage,
-
-		KeyFilePath:  keyPath,
-		CertFilePath: certPath,
-	}
+	return config
 }
 
 // Reads from OS environment variables to create a database config object
-func GetDatabaseConfig() DatabaseConfig {
-	name := os.Getenv("DB_NAME")
+func GetDatabaseConfig(manager *secrets.Manager) DatabaseConfig {
+	name := manager.GetRequired("MONGO_NAME")
 	if name == "" {
 		panic("database name required in config")
 	}
 
-	addr := os.Getenv("DB_ADDR")
+	addr := manager.GetRequired("MONGO_ADDRESS")
 	if addr == "" {
 		panic("database address required in config")
 	}
 
-	user := os.Getenv("DB_USER")
+	user := manager.GetRequired("MONGO_USERNAME")
 	if user == "" {
 		panic("database user required in config")
 	}
 
-	pass := os.Getenv("DB_PASS")
+	pass := manager.GetRequired("MONGO_PASSWORD")
 	if pass == "" {
 		panic("database password required in config")
 	}
 
-	localeDB := os.Getenv("LOCALE_DB")
+	localeDB := manager.GetRequired("LOCAL_NAME")
 	if localeDB == "" {
 		panic("locale database name required in config")
+	}
+
+	noteDB := manager.GetRequired("NOTIFICATIONS_NAME")
+	if noteDB == "" {
+		panic("notifications database name required in config")
 	}
 
 	return DatabaseConfig{
@@ -95,7 +147,16 @@ func GetDatabaseConfig() DatabaseConfig {
 		User:     user,
 		Password: pass,
 
-		LocaleName: localeDB,
+		LocaleName:       localeDB,
+		NotificationName: noteDB,
+	}
+}
+
+func GetRedisConfig(manager *secrets.Manager) RedisConfig {
+	address := manager.GetRequired("REDIS_ADDRESS")
+
+	return RedisConfig{
+		Address: address,
 	}
 }
 
@@ -292,6 +353,26 @@ func GetCollectionsConfig() CollectionsConfig {
 		panic("sports collection name required in config")
 	}
 
+	notifications := os.Getenv("NOTIFICATIONS_COLLECTION")
+	if notifications == "" {
+		panic("notifications collection name required in config")
+	}
+
+	notificationLogs := os.Getenv("NOTIFICATION_LOGS_COLLECTION")
+	if notificationLogs == "" {
+		panic("notificationLogs collection name required in config")
+	}
+
+	userNotifications := os.Getenv("USER_NOTIFICATIONS_COLLECTION")
+	if userNotifications == "" {
+		panic("userNotifications collection name required in config")
+	}
+
+	notificationTopics := os.Getenv("NOTIFICATION_TOPICS_COLLECTION")
+	if notificationTopics == "" {
+		panic("notificationTopics collection name required in config")
+	}
+
 	return CollectionsConfig{
 		AnnouncementCollection: announcementCollection,
 
@@ -345,5 +426,10 @@ func GetCollectionsConfig() CollectionsConfig {
 
 		TagsCollections:  tagsCollection,
 		SportsCollection: sportsCollection,
+
+		NotificationsCollection:      notifications,
+		NotificationLogsCollection:   notificationLogs,
+		UserNotificationsCollection:  userNotifications,
+		NotificationTopicsCollection: notificationTopics,
 	}
 }

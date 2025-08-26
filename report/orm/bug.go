@@ -17,7 +17,7 @@ type BugReportORM struct {
 }
 
 func (orm *BugReportORM) Insert(ctx context.Context, report *models.BugReportDao, opts *options.InsertOneOptions) error {
-	_, err := orm.Database.BugReportCol.InsertOne(ctx, report, opts)
+	_, err := orm.Database.BugReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
@@ -81,7 +81,7 @@ func (orm *BugReportORM) Find(ctx context.Context, filter interface{}, opts *opt
 		pipeline5,
 	}
 
-	cur, err := orm.Database.BugReportCol.Aggregate(context.TODO(), pipeline, opts)
+	cur, err := orm.Database.BugReportCollection.Aggregate(context.TODO(), pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (orm *BugReportORM) Find(ctx context.Context, filter interface{}, opts *opt
 }
 
 func (orm *BugReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.BugReportCol.UpdateOne(ctx, filter, update)
+	_, err := orm.Database.BugReportCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (orm *BugReportORM) Update(ctx context.Context, filter interface{}, update 
 }
 
 func (orm *BugReportORM) Delete(ctx context.Context, filter interface{}) error {
-	_, err := orm.Database.BugReportCol.DeleteOne(ctx, filter)
+	_, err := orm.Database.BugReportCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

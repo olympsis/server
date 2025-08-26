@@ -8,16 +8,20 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
+	"olympsis-server/event/service"
 	"olympsis-server/health"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
+	"olympsis-server/notifications"
 	"olympsis-server/organization"
 	"olympsis-server/post"
+	"olympsis-server/redis"
 	"olympsis-server/report"
 	"olympsis-server/server"
 	"olympsis-server/system"
 	"olympsis-server/user"
 	"olympsis-server/utils"
+	"olympsis-server/utils/secrets"
 
 	"olympsis-server/venue"
 	"os"
@@ -40,28 +44,49 @@ func main() {
 	// Set up Mux router
 	r := mux.NewRouter()
 
+	manager := secrets.New()
+
 	// Set up server configuration
-	config := utils.GetServerConfig()
+	config := utils.GetServerConfig(manager)
 
 	// Set up database
 	d := database.NewDatabase(l)
-	d.EstablishConnection(&config)
+	d.EstablishConnection(manager, &config)
 
-	// Set up firebase authentication
+	// Set up redis
+	rConfig := utils.GetRedisConfig(manager)
+	cache := redis.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
+	cacheDB := redis.New(&cache, l)
+	if err := cache.Ping(context.Background()).Err(); err != nil {
+		l.Fatalf("Error setting up redis client. Error: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// Set up Firebase authentication
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
-		l.Fatalf("error starting firebase app: %s\n", err)
+		l.Fatalf("Error starting Firebase app: %s\n", err)
 		os.Exit(1)
 	}
 	client, err := app.Auth(context.TODO())
 	if err != nil {
-		l.Fatalf("error getting Auth client: %v\n", err)
+		l.Fatalf("Error getting Firebase Auth client: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Create APNS client
+	apnsClient, err := utils.CreateApns2Client(config.AppleKeyID, config.AppleTeamID, config.APNSFileURl)
+	if err != nil {
+		l.Fatalf("Failed to create Apns2 client. Error: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// Set up Notification Service
+	notif := notifications.New(apnsClient, l, d)
+
 	// Set up search service
-	sh := search.NewSearchService(l, d.AuthCol, d.UserCol)
+	sh := search.NewSearchService(l, d.AuthCollection, d.UserCollection)
 
 	// Set up stripe API
 	sc := stripe.NewClient(config.StripeToken)
@@ -76,7 +101,7 @@ func main() {
 		Auth:   client, // firebase
 		Search: sh,     // search
 
-		Notification: utils.NewNotificationInterface(config.NotifServiceURL, l),
+		Notification: notif, // notifications
 	}
 
 	// Set up API
@@ -108,6 +133,10 @@ func main() {
 	healthAPI.Ready()
 	snapShotAPI.Ready()
 	systemAPI.Ready()
+
+	// Set up event polling
+	eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
+	go eventPolling.Start(context.Background())
 
 	// Set up server configuration
 	s := &http.Server{
@@ -142,7 +171,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigs
 
-	l.Printf("Received Termination(%s), graceful shutdown \n", sig)
+	l.Infof("Received Termination(%s), graceful shutdown \n", sig)
 
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
 	defer c()

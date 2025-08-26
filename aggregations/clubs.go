@@ -28,7 +28,7 @@ func AggregateClub(id primitive.ObjectID, database *database.Database) (*models.
 	completePipeline := append(bson.A{idPipeline}, corePipeline...)
 
 	// Execute the aggregation
-	cur, err := database.ClubCol.Aggregate(ctx, completePipeline)
+	cur, err := database.ClubCollection.Aggregate(ctx, completePipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func AggregateClubs(
 	)
 
 	// Execute the aggregation
-	cur, err := database.ClubCol.Aggregate(ctx, pipeline)
+	cur, err := database.ClubCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func AggregateClubApplication(id *primitive.ObjectID, database *database.Databas
 		cleanUp,
 	}
 
-	cur, err := database.ClubApplicationCol.Aggregate(ctx, pipeline)
+	cur, err := database.ClubApplicationCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func AggregateClubApplications(clubId *primitive.ObjectID, status string, databa
 		cleanUp,
 	}
 
-	cur, err := database.ClubApplicationCol.Aggregate(ctx, pipeline)
+	cur, err := database.ClubApplicationCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}

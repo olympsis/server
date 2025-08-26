@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/server"
+	"olympsis-server/utils"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -46,7 +47,6 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 
 		uuid := r.Header.Get("UUID")
 		isRecurring := req.Recurrence != nil
-		authToken := r.Header.Get("Authorization")
 		timestamp := primitive.NewDateTimeFromTime(time.Now())
 
 		// Create base event
@@ -63,6 +63,12 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 				return
 			}
 
+			// Create notification topic
+			err = s.Notification.CreateTopic(id.Hex(), []string{uuid})
+			if err != nil {
+				s.Logger.Errorf("Failed to create new event topic. Event ID: %s - Error: %s", id, err.Error())
+			}
+
 			// Add the host as the participant
 			if req.IncludeHost != nil && *req.IncludeHost {
 				rsvp := models.RSVPYes
@@ -76,31 +82,6 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 				if err != nil {
 					s.Logger.Error("Failed to add host as participant. Error: ", err.Error())
 				}
-
-				// Add participant to notifications
-				s.Notification.ModifyTopic(authToken, id.Hex(), models.NotificationTopicUpdateRequest{
-					Action: "subscribe",
-					Users:  []string{uuid},
-				})
-			}
-
-			// Create event topic
-			eventID := id.Hex()
-			err = s.Notification.CreateTopic(
-				authToken,
-				models.NotificationTopicDao{
-					Name:  &eventID,
-					Users: &[]string{uuid},
-				},
-			)
-			if err != nil {
-				s.Logger.Errorf("Failed to create new event topic. Error: %s", err.Error())
-			}
-
-			// Notify group members
-			note := GenerateNewEventNotification(eventID, *event.Title)
-			if event.Organizers != nil {
-				notifyOrganizers(*event.Organizers, &note, authToken, s.Notification)
 			}
 
 			rw.WriteHeader(http.StatusCreated)
@@ -203,7 +184,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 			} else {
 				venues = venueIDs
 			}
-		} else if queryParams.VenueIDs != nil && len(queryParams.VenueIDs) > 0 {
+		} else if len(queryParams.VenueIDs) > 0 {
 			// Use directly provided venue IDs
 			venues = queryParams.VenueIDs
 		}
@@ -234,7 +215,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 		} else {
 			// Handle unauthenticated case or failed user data retrieval
 			// Convert sports string to array if provided in query
-			if queryParams.Sports != nil && len(queryParams.Sports) > 0 {
+			if len(queryParams.Sports) > 0 {
 				sportsList = queryParams.Sports
 			}
 
@@ -523,10 +504,54 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		// Cleanup notifications
 		// TODO - CLEAN UP NOTIF OF REPEATED CHILD EVENTS
 		e.Logger.Info("Deleting single event notification topic:", id)
-		e.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
+		err = e.Notification.RemoveTopic(id)
+		if err != nil {
+			e.Logger.Errorf("Failed to delete notification topic. Error: %s", err.Error())
+		}
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "OK" }`))
+	}
+}
+
+func (s *Service) Cancel() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			s.Logger.Errorf("Failed to validate event ID. Error: %s", err.Error())
+			http.Error(w, `{"msg": "bad id"}`, http.StatusBadRequest)
+		}
+
+		uuid := r.Header.Get("UUID")
+
+		filter := bson.M{
+			"_id": oid,
+		}
+		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		update := bson.M{
+			"$set": bson.M{
+				"canceled_at": timestamp,
+			},
+		}
+		if err = s.UpdateEvent(r.Context(), filter, update); err != nil {
+			s.Logger.Errorf("Failed to update event. Event ID: %s - Error: %s", id, err.Error())
+			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Notify participants
+		if err = s.Notification.CancelEvent(&oid, uuid); err != nil {
+			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
+		}
+
+		// Disable notification topic
+		if err = s.Notification.DisableTopic(id); err != nil {
+			s.Logger.Errorf("Failed to disable notification topic. Topic ID: %s - Error: %s", id, err.Error())
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"msg": "OK"}`))
 	}
 }
 
@@ -534,7 +559,6 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		uuid := r.Header.Get("UUID")
-		token := r.Header.Get("Authorization")
 
 		// Grab event id from path
 		vars := mux.Vars(r)
@@ -614,10 +638,10 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 					}
 
 					// Add participant to notifications
-					e.Notification.ModifyTopic(r.Header.Get("Authorization"), id, models.NotificationTopicUpdateRequest{
-						Action: "subscribe",
-						Users:  []string{uuid},
-					})
+					err = e.Notification.AddUsersToTopic(id, []string{uuid})
+					if err != nil {
+						e.Logger.Errorf("Failed to add user to event notifications topic. Event ID: %s - Error: %s", id, err.Error())
+					}
 
 					rw.WriteHeader(http.StatusOK)
 					rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
@@ -635,22 +659,9 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		}
 
 		// Add participant to notifications
-		e.Notification.ModifyTopic(token, id, models.NotificationTopicUpdateRequest{
-			Action: "subscribe",
-			Users:  []string{uuid},
-		})
-
-		// Notify event participants
-		status := "yes"
-		if *req.Status == 0 {
-			status = "maybe"
+		if err = e.Notification.AddUsersToTopic(id, []string{uuid}); err != nil {
+			e.Logger.Errorf("Failed to add user to notifications topic. EventID: %s - Error: %s", id, err.Error())
 		}
-		topicName := oid.Hex()
-		note := generateNewParticipantNotification(oid.Hex(), *event.Title, status)
-		e.Notification.SendNotification(token, models.NotificationPushRequest{
-			Topic:        &topicName,
-			Notification: note,
-		})
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
@@ -664,7 +675,6 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		defer cancel()
 
 		uuid := r.Header.Get("UUID")
-		token := r.Header.Get("Authorization")
 
 		// grab ids from path
 		vars := mux.Vars(r)
@@ -701,42 +711,28 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 				return
 			}
 
-			// Notification model
-			notif := models.PushNotification{
-				Title:    *event.Title,
-				Body:     "You've been kicked from the participants list!",
-				Type:     "push",
-				Category: "events",
-				Data: map[string]any{
-					"type": "event_update",
-					"id":   eventID,
-				},
+			// Remove user from the topic
+			if err = e.Notification.RemoveUsersFromTopic(eventID, []string{*participant.UserID}); err != nil {
+				e.Logger.Errorf("Failed to remove user from notification topic. Event: %s - Error: %s", eventID, err.Error())
 			}
 
 			// Notify the user that they have been removed
-			e.Notification.SendNotification(token, models.NotificationPushRequest{
-				Users:        &[]string{*participant.UserID},
-				Notification: notif,
-			})
-
-			// Unsubscribe user from topic
-			e.Notification.ModifyTopic(token, eventID, models.NotificationTopicUpdateRequest{
-				Action: "unsubscribe",
-				Users:  []string{*participant.UserID},
-			})
+			if err = e.Notification.ParticipantKick(event, participant); err != nil {
+				e.Logger.Errorf("Failed to notify user. Event ID: %s - Error: %s", eventID, err.Error())
+			}
 		} else { // User removing themselves from the list
 
 			// Remove participant
 			err = e.DeleteParticipant(ctx, bson.M{"user_id": uuid, "event_id": oid})
 			if err != nil {
 				e.Logger.Errorf("Failed to delete event participant. Error: %s", err.Error())
+				http.Error(rw, `{"msg": "failed to remove participant"}`, http.StatusInternalServerError)
 			}
 
-			// Unsubscribe user from topic
-			e.Notification.ModifyTopic(token, eventID, models.NotificationTopicUpdateRequest{
-				Action: "unsubscribe",
-				Users:  []string{uuid},
-			})
+			// Remove user from the topic
+			if err = e.Notification.RemoveUsersFromTopic(eventID, []string{uuid}); err != nil {
+				e.Logger.Errorf("Failed to remove user from notification topic. Event: %s - Error: %s", eventID, err.Error())
+			}
 		}
 
 		// Check waitlist and see if we need to promote another participant
@@ -750,25 +746,12 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			err := e.UpdateParticipant(ctx, bson.M{"_id": participant.ID}, bson.M{"status": models.RSVPYes})
 			if err != nil {
 				e.Logger.Error("Failed to promote participant from waitlist. Error: ", err.Error())
+			} else {
+				// Notify the user that they have been promoted
+				if err = e.Notification.WaitlistPromotion(event, &participant); err != nil {
+					e.Logger.Errorf("Failed to notify user. Event: %s - Error: %s", eventID, err.Error())
+				}
 			}
-
-			// Notification model
-			notif := models.PushNotification{
-				Title:    *event.Title,
-				Body:     "You've been promoted from the waitlist!",
-				Type:     "push",
-				Category: "events",
-				Data: map[string]any{
-					"type": "event_update",
-					"id":   eventID,
-				},
-			}
-
-			// Notify the user that they have been promoted
-			e.Notification.SendNotification(token, models.NotificationPushRequest{
-				Users:        &[]string{*participant.UserID},
-				Notification: notif,
-			})
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -796,53 +779,14 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 			return
 		}
 
-		e.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
+		request := models.NotificationPushRequest{
 			Topic:        &id,
 			Notification: req,
-		})
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "OK" }`))
-	}
-}
-
-func (e *Service) NotifyOrganizers() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		// grab id from path
-		vars := mux.Vars(r)
-		id := vars["id"]
-		if len(vars["id"]) < 24 {
-			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
-			return
 		}
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			http.Error(rw, `{ "msg": "failed to encode id to OID" }`, http.StatusBadRequest)
+		if err = e.Notification.AddNoteToCarousel(2, &request); err != nil {
+			e.Logger.Errorf("Failed to send notification. Event ID: %s - Error: %s", id, err.Error())
+			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
-		}
-
-		// Decode request
-		var req models.PushNotification
-		err = json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
-			return
-		}
-
-		// Grab event dao object
-		event, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{ "msg": "event not found" }`, http.StatusNotFound)
-				return
-			}
-			e.Logger.Error("failed to find event", err.Error())
-			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
-			return
-		}
-
-		// Notify organizers
-		if event.Organizers != nil {
-			notifyOrganizers(*event.Organizers, &req, r.Header.Get("Authorization"), e.Notification)
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -892,29 +836,10 @@ func (s *Service) AddComment() http.HandlerFunc {
 			http.Error(w, `{"msg": "failed to create comment"}`, http.StatusInternalServerError)
 		}
 
-		// Notify users of a new comment
-		event, err := s.FindEvent(ctx, bson.M{"_id": oid})
-		if err != nil {
-			s.Logger.Errorf("Failed to get event for notification. Error: %s", err.Error())
-			w.WriteHeader(http.StatusCreated)
-			w.Write(fmt.Appendf(nil, `{"id": "%s"}`, cid.Hex()))
-			return
+		// Notify participants
+		if err = s.Notification.NewEventComment(oid, *req.Text); err != nil {
+			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
 		}
-
-		notif := models.PushNotification{
-			Title:    *event.Title,
-			Body:     "A new comment was posted!",
-			Type:     "push",
-			Category: "events",
-			Data: map[string]any{
-				"type":     models.NewEventCommentType,
-				"event_id": id,
-			},
-		}
-		s.Notification.SendNotification(r.Header.Get("Authorization"), models.NotificationPushRequest{
-			Notification: notif,
-			Topic:        &id,
-		})
 
 		w.WriteHeader(http.StatusCreated)
 		w.Write(fmt.Appendf(nil, `{"id": "%s"}`, cid.Hex()))

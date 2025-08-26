@@ -17,7 +17,7 @@ type EventReportORM struct {
 }
 
 func (orm *EventReportORM) Insert(ctx context.Context, report *models.EventReportDao, opts *options.InsertOneOptions) error {
-	_, err := orm.Database.EventReportCol.InsertOne(ctx, report, opts)
+	_, err := orm.Database.EventReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
@@ -168,7 +168,7 @@ func (orm *EventReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		pipeline12,
 	}
 
-	cur, err := orm.Database.EventReportCol.Aggregate(context.TODO(), pipeline, opts)
+	cur, err := orm.Database.EventReportCollection.Aggregate(context.TODO(), pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (orm *EventReportORM) Find(ctx context.Context, filter interface{}, opts *o
 }
 
 func (orm *EventReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.EventReportCol.UpdateOne(ctx, filter, update)
+	_, err := orm.Database.EventReportCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (orm *EventReportORM) Update(ctx context.Context, filter interface{}, updat
 }
 
 func (orm *EventReportORM) Delete(ctx context.Context, filter interface{}) error {
-	_, err := orm.Database.EventReportCol.DeleteOne(ctx, filter)
+	_, err := orm.Database.EventReportCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

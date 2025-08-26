@@ -70,7 +70,7 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 		// find user data in database
 		var user models.User
 		filter := bson.D{primitive.E{Key: "username", Value: userName}}
-		err := u.Database.UserCol.FindOne(context.TODO(), filter).Decode(&user)
+		err := u.Database.UserCollection.FindOne(context.TODO(), filter).Decode(&user)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				rw.WriteHeader(http.StatusOK)
@@ -172,7 +172,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			// First get the current user to access existing devices
 			filter := bson.M{"uuid": uuid}
 			var currentUser models.User
-			err = s.Database.UserCol.FindOne(context.Background(), filter).Decode(&currentUser)
+			err = s.Database.UserCollection.FindOne(context.Background(), filter).Decode(&currentUser)
 			if err != nil {
 				s.Log.Error(fmt.Sprintf("Failed to find user: %s\n", err.Error()))
 				http.Error(w, `{ "msg": "failed to find user" }`, http.StatusInternalServerError)
@@ -349,7 +349,7 @@ func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
 		}
 
 		var invitations []models.Invitation
-		cursor, err := u.Database.OrgInvitationCol.Find(context.TODO(), filter)
+		cursor, err := u.Database.OrgInvitationCollection.Find(context.TODO(), filter)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			u.Log.Error("Failed to fetch invitations: " + err.Error())
@@ -362,7 +362,7 @@ func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
 				u.Log.Error("Failed to decode invitation: " + err.Error())
 			}
 			var org models.Organization
-			err = u.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": invite.SubjectID}).Decode(&org)
+			err = u.Database.OrgCollection.FindOne(context.TODO(), bson.M{"_id": invite.SubjectID}).Decode(&org)
 			if err != nil {
 				u.Log.Error("Failed to fetch org data: " + err.Error())
 			}
@@ -402,7 +402,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 		var users []models.UserData
 		regex := primitive.Regex{Pattern: userName, Options: "i"}
 		filter := bson.M{"username": regex}
-		cur, err := u.Database.UserCol.Find(context.TODO(), filter)
+		cur, err := u.Database.UserCollection.Find(context.TODO(), filter)
 		if err != nil {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -437,7 +437,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 		// fetch first and last name
 		for i := range users {
 			var auth models.AuthUser
-			err := u.Database.AuthCol.FindOne(context.TODO(), bson.M{"uuid": users[i].UUID}).Decode(&auth)
+			err := u.Database.AuthCollection.FindOne(context.TODO(), bson.M{"uuid": users[i].UUID}).Decode(&auth)
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
@@ -475,14 +475,14 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 		// find and decode auth user data
 		var auth models.AuthUser
-		err := u.Database.AuthCol.FindOne(ctx, filter).Decode(&auth)
+		err := u.Database.AuthCollection.FindOne(ctx, filter).Decode(&auth)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 		}
 
 		// find and decode user metadata
 		var user models.User
-		err = u.Database.UserCol.FindOne(ctx, filter, &opts).Decode(&user)
+		err = u.Database.UserCollection.FindOne(ctx, filter, &opts).Decode(&user)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 		}

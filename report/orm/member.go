@@ -17,7 +17,7 @@ type MemberReportORM struct {
 }
 
 func (orm *MemberReportORM) Insert(ctx context.Context, report *models.MemberReportDao, opts *options.InsertOneOptions) error {
-	_, err := orm.Database.MemberReportCol.InsertOne(ctx, report, opts)
+	_, err := orm.Database.MemberReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
@@ -96,7 +96,7 @@ func (orm *MemberReportORM) Find(ctx context.Context, filter interface{}, opts *
 		pipeline6,
 	}
 
-	cur, err := orm.Database.MemberReportCol.Aggregate(context.TODO(), pipeline, opts)
+	cur, err := orm.Database.MemberReportCollection.Aggregate(context.TODO(), pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (orm *MemberReportORM) Find(ctx context.Context, filter interface{}, opts *
 }
 
 func (orm *MemberReportORM) Update(ctx context.Context, filter interface{}, update interface{}) error {
-	_, err := orm.Database.MemberReportCol.UpdateOne(ctx, filter, update)
+	_, err := orm.Database.MemberReportCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (orm *MemberReportORM) Update(ctx context.Context, filter interface{}, upda
 }
 
 func (orm *MemberReportORM) Delete(ctx context.Context, filter interface{}) error {
-	_, err := orm.Database.MemberReportCol.DeleteOne(ctx, filter)
+	_, err := orm.Database.MemberReportCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

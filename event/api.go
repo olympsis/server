@@ -96,6 +96,16 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("PUT", "OPTIONS")
 
+	// cancel an event
+	e.Router.Handle("/v1/events/{id}/cancel",
+		middleware.Chain(
+			e.Service.Cancel(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+			middleware.CORS(),
+		),
+	).Methods("PUT", "OPTIONS")
+
 	// delete an event
 	e.Router.Handle("/v1/events/{id}",
 		middleware.Chain(
@@ -172,16 +182,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	e.Router.Handle("/v1/events/{id}/notify/participants",
 		middleware.Chain(
 			e.Service.NotifyParticipants(),
-			middleware.Logging(),
-			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
-		),
-	).Methods("POST", "OPTIONS")
-
-	// notify club members
-	e.Router.Handle("/v1/events/{id}/notify/organizers",
-		middleware.Chain(
-			e.Service.NotifyOrganizers(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
 			middleware.CORS(),

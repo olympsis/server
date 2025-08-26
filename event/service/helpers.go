@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"olympsis-server/utils"
 	"time"
 
 	"github.com/olympsis/models"
@@ -195,47 +193,6 @@ func GenerateEventInstancesBatched(parentID primitive.ObjectID, baseEvent *model
 	}
 
 	return instances
-}
-
-// Helper function to send notifications to an event's organizers
-func notifyOrganizers(organizers []models.Organizer, note *models.PushNotification, token string, service *utils.NotificationInterface) {
-	for _, v := range organizers {
-		ID := v.ID.Hex()
-		err := service.SendNotification(token, models.NotificationPushRequest{
-			Topic:        &ID,
-			Notification: *note,
-		})
-
-		if err != nil {
-			service.Logger.Errorf("Failed to send notification. Error: %s", err.Error())
-		}
-	}
-}
-
-func GenerateNewEventNotification(id string, title string) models.PushNotification {
-	return models.PushNotification{
-		Title:    "New Event Created!",
-		Body:     title,
-		Type:     "push",
-		Category: "events",
-		Data: map[string]interface{}{
-			"type":     models.ClubNewEventType,
-			"event_id": id,
-		},
-	}
-}
-
-func generateNewParticipantNotification(id string, title string, status string) models.PushNotification {
-	return models.PushNotification{
-		Title:    title,
-		Body:     fmt.Sprintf("New Participant RSVP'ed %s", status),
-		Type:     "push",
-		Category: "events",
-		Data: map[string]interface{}{
-			"type":     models.EventParticipantUpdateType,
-			"event_id": id,
-		},
-	}
 }
 
 // Find nearby venues based on location, sports, and radius

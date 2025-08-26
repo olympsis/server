@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/database"
+	"olympsis-server/notifications"
 	"olympsis-server/server"
 	"olympsis-server/utils"
 	"time"
@@ -36,7 +37,7 @@ type Service struct {
 	SearchService *search.Service
 
 	// notification service
-	Notification *utils.NotificationInterface
+	Notification *notifications.Service
 }
 
 /*
@@ -123,39 +124,14 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			}
 		}
 
-		// update user data
-		// NOTICE: - WILL REMOVE THIS SOON
-		update := bson.M{
-			"$push": bson.M{
-				"organizations": id,
-			},
-		}
-		_, err = e.Database.UserCol.UpdateOne(context.Background(), bson.M{"uuid": uuid}, update)
-		if err != nil {
-			e.Logger.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
-		}
-		// NOTICE: END
-
-		// create notification topics
+		// Create notification topics
 		topicName := id.Hex()
 		adminName := id.Hex() + "_admin"
-		orgTopic := models.NotificationTopicDao{
-			Name:  &topicName,
-			Users: &[]string{uuid},
+		if err = e.Notification.CreateTopic(topicName, []string{uuid}); err != nil {
+			e.Logger.Errorf("Failed to create club topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
-		adminTopic := models.NotificationTopicDao{
-			Name:  &adminName,
-			Users: &[]string{uuid},
-		}
-
-		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), orgTopic)
-		if err != nil {
-			e.Logger.Error("Failed to create organization topic: ", err.Error())
-		}
-
-		err = e.Notification.CreateTopic(r.Header.Get("Authorization"), adminTopic)
-		if err != nil {
-			e.Logger.Error("Failed to create organization admin topic: ", err.Error())
+		if err = e.Notification.CreateTopic(adminName, []string{uuid}); err != nil {
+			e.Logger.Errorf("Failed to create club admin topic. Club ID: %s - Error: %s ", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusCreated)
@@ -318,6 +294,7 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -355,13 +332,11 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 		}
 
 		// Delete notification topics
-		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id)
-		if err != nil {
-			e.Logger.Error("Failed to delete topic: ", err.Error())
+		if err = e.Notification.RemoveTopic(id); err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to delete topic. ID: %s - Error: %s", id, err.Error()))
 		}
-		err = e.Notification.DeleteTopic(r.Header.Get("Authorization"), id+"_admin")
-		if err != nil {
-			e.Logger.Error("Failed to delete topic: ", err.Error())
+		if err = e.Notification.RemoveTopic(id + "_admin"); err != nil {
+			e.Logger.Error(fmt.Sprintf("Failed to delete admin topic. ID: %s - Error: %s", id, err.Error()))
 		}
 
 		rw.WriteHeader(http.StatusOK)
@@ -390,7 +365,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 
 		// check for an existing application
 		var application models.OrganizationApplicationDao
-		err = e.Database.OrgApplicationCol.FindOne(context.Background(),
+		err = e.Database.OrgApplicationCollection.FindOne(context.Background(),
 			bson.M{
 				"club_id":         req.ClubID,
 				"organization_id": req.OrganizationID,
@@ -429,7 +404,9 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 			Topic:        &orgID,
 			Notification: notification,
 		}
-		e.Notification.SendNotification(r.Header.Get("Authorization"), request)
+		if err = e.Notification.AddNoteToCarousel(1, &request); err != nil {
+			e.Logger.Errorf("Failed to notify organization members. Org ID: %s - Error: %s", id, err.Error())
+		}
 
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, id.Hex()))
@@ -533,7 +510,7 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 					"parent_id": req.OrganizationID,
 				},
 			}
-			e.Database.ClubCol.UpdateOne(context.Background(), filter, updates)
+			e.Database.ClubCollection.UpdateOne(context.Background(), filter, updates)
 			// maybe notify club admins that their application was approved.
 		}
 
@@ -545,6 +522,7 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -571,6 +549,7 @@ func (e *Service) DeleteApplication() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -621,7 +600,7 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 
 		// fetch organization data
 		var org models.Organization
-		err = e.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": req.SubjectID}).Decode(&org)
+		err = e.Database.OrgCollection.FindOne(context.TODO(), bson.M{"_id": req.SubjectID}).Decode(&org)
 		if err != nil {
 			e.Logger.Error("Failed to fetch organization data: " + err.Error())
 			w.WriteHeader(http.StatusCreated)
@@ -691,7 +670,7 @@ func (e *Service) GetInvitations() http.HandlerFunc {
 
 		// fetch org data
 		var org models.Organization
-		err = e.Database.OrgCol.FindOne(context.TODO(), bson.M{"_id": oid}).Decode(&org)
+		err = e.Database.OrgCollection.FindOne(context.TODO(), bson.M{"_id": oid}).Decode(&org)
 		if err != nil {
 			e.Logger.Error("Failed to find organization: " + err.Error())
 			http.Error(w, `{"msg": "failed to get organization data"}`, http.StatusInternalServerError)
@@ -746,7 +725,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 			changes := bson.M{
 				"$push": bson.M{"members": member},
 			}
-			_, err = e.Database.OrgCol.UpdateOne(context.TODO(), bson.M{"_id": req.SubjectID}, changes)
+			_, err = e.Database.OrgCollection.UpdateOne(context.TODO(), bson.M{"_id": req.SubjectID}, changes)
 			if err != nil {
 				e.Logger.Error("Failed to add user to organization: " + err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
@@ -780,7 +759,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 				"organizations": req.SubjectID,
 			},
 		}
-		_, err = e.Database.UserCol.UpdateOne(context.TODO(), filter, updates)
+		_, err = e.Database.UserCollection.UpdateOne(context.TODO(), filter, updates)
 		if err != nil {
 			e.Logger.Error("Failed to update user data: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -806,11 +785,12 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 			Topic:        &clubID,
 			Notification: notification,
 		}
-		err = e.Notification.SendNotification(r.Header.Get("Authorization"), request)
-		if err != nil {
+		if err = e.Notification.AddNoteToCarousel(1, &request); err != nil {
 			e.Logger.Error("Failed to send notification: " + err.Error())
 		}
+
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -837,6 +817,7 @@ func (e *Service) DeleteInvitation() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 
@@ -861,14 +842,14 @@ func (s *Service) PinOrgPost() http.HandlerFunc {
 		}
 
 		// update club data to reflect new post
-		ok := s.PinPost(&id, &postID)
-		if ok {
-			w.WriteHeader(http.StatusOK)
-			return
-		} else {
+		if ok := s.PinPost(&id, &postID); !ok {
 			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{ "msg": "OK" }`))
 			return
 		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "msg": "OK" }`))
 	}
 }
 

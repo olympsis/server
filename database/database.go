@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"olympsis-server/utils"
+	"olympsis-server/utils/secrets"
 
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -12,28 +13,27 @@ import (
 )
 
 type Database struct {
-	Logger      *logrus.Logger
-	Client      *mongo.Client
-	NotifClient *mongo.Client
+	Logger *logrus.Logger
+	Client *mongo.Client
 
-	AnnouncementCol *mongo.Collection
+	AnnouncementCollection *mongo.Collection
 
-	AuthCol          *mongo.Collection
-	UserCol          *mongo.Collection
+	AuthCollection   *mongo.Collection
+	UserCollection   *mongo.Collection
 	VenuesCollection *mongo.Collection
 
 	PostsCollection         *mongo.Collection
 	PostCommentsCollection  *mongo.Collection
 	PostReactionsCollection *mongo.Collection
 
-	ClubCol               *mongo.Collection
-	ClubInvitationCol     *mongo.Collection
-	ClubApplicationCol    *mongo.Collection
-	ClubMembersCollection *mongo.Collection
+	ClubCollection            *mongo.Collection
+	ClubInvitationCollection  *mongo.Collection
+	ClubApplicationCollection *mongo.Collection
+	ClubMembersCollection     *mongo.Collection
 
-	OrgCol                        *mongo.Collection
-	OrgInvitationCol              *mongo.Collection
-	OrgApplicationCol             *mongo.Collection
+	OrgCollection                 *mongo.Collection
+	OrgInvitationCollection       *mongo.Collection
+	OrgApplicationCollection      *mongo.Collection
 	OrganizationMembersCollection *mongo.Collection
 
 	EventsCollection                    *mongo.Collection
@@ -49,32 +49,39 @@ type Database struct {
 	ClubTransactionsCollection      *mongo.Collection
 	ClubFinancialAccountsCollection *mongo.Collection
 
-	BugReportCol    *mongo.Collection
-	PostReportCol   *mongo.Collection
-	MemberReportCol *mongo.Collection
-	VenueReportCol  *mongo.Collection
-	EventReportCol  *mongo.Collection
+	BugReportCollection    *mongo.Collection
+	PostReportCollection   *mongo.Collection
+	MemberReportCollection *mongo.Collection
+	VenueReportCollection  *mongo.Collection
+	EventReportCollection  *mongo.Collection
 
-	CountriesCol     *mongo.Collection
-	AdminAreasCol    *mongo.Collection
-	SubAdminAreasCol *mongo.Collection
+	CountriesCollection     *mongo.Collection
+	AdminAreasCollection    *mongo.Collection
+	SubAdminAreasCollection *mongo.Collection
 
 	TagsCollection   *mongo.Collection
 	SportsCollection *mongo.Collection
+
+	// NOTIFICATIONS
+	NotificationsClient          *mongo.Client
+	NotificationTopicsCollection *mongo.Collection
+	NotificationLogsCollection   *mongo.Collection
+	UserNotificationsCollection  *mongo.Collection
+	PushNotificationsCollection  *mongo.Collection
 }
 
 func NewDatabase(l *logrus.Logger) *Database {
 	return &Database{Logger: l}
 }
 
-func (d *Database) EstablishConnection(config *utils.ServerConfig) {
+func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.ServerConfig) {
 
 	d.Logger.Info("Connecting to Database...")
 
 	/*
 		Connect to Mongo Database
 	*/
-	dbConfig := utils.GetDatabaseConfig()
+	dbConfig := utils.GetDatabaseConfig(manager)
 	collectionConfig := utils.GetCollectionsConfig()
 
 	switch config.Mode {
@@ -173,6 +180,13 @@ func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConf
 
 	// Initialize Application Config Collections
 	err = d.SetUpAppConfigCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Notification collections
+	noteDatabase := d.Client.Database(config.NotificationName)
+	err = d.SetUpNotificationsCollections(noteDatabase, collectionConfig)
 	if err != nil {
 		return err
 	}

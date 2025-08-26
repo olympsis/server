@@ -9,7 +9,7 @@ import (
 
 func (s *Service) FindCountries(ctx context.Context, filter bson.M) (*[]models.Country, error) {
 	var countries []models.Country
-	cursor, err := s.Database.CountriesCol.Find(ctx, filter)
+	cursor, err := s.Database.CountriesCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func (s *Service) FindCountries(ctx context.Context, filter bson.M) (*[]models.C
 
 func (s *Service) FindAdministrativeAreas(ctx context.Context, filter bson.M) (*[]models.AdministrativeArea, error) {
 	var adminAreas []models.AdministrativeArea
-	cursor, err := s.Database.AdminAreasCol.Find(ctx, filter)
+	cursor, err := s.Database.AdminAreasCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s *Service) FindAdministrativeAreas(ctx context.Context, filter bson.M) (*
 
 func (s *Service) FindSubAdministrativeAreas(ctx context.Context, filter bson.M) (*[]models.SubAdministrativeArea, error) {
 	var subAdminAreas []models.SubAdministrativeArea
-	cursor, err := s.Database.SubAdminAreasCol.Find(ctx, filter)
+	cursor, err := s.Database.SubAdminAreasCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

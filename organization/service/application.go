@@ -9,7 +9,7 @@ import (
 
 // Insert a new organization application into the database
 func (s *Service) InsertApplication(ctx context.Context, event *models.OrganizationApplicationDao) (*primitive.ObjectID, error) {
-	res, err := s.Database.OrgApplicationCol.InsertOne(ctx, event)
+	res, err := s.Database.OrgApplicationCollection.InsertOne(ctx, event)
 	if err != nil {
 		return nil, err
 	}
@@ -19,14 +19,14 @@ func (s *Service) InsertApplication(ctx context.Context, event *models.Organizat
 
 // Get an organization application from database
 func (s *Service) FindApplication(ctx context.Context, filter interface{}, organization *models.OrganizationApplicationDao) error {
-	s.Database.OrgApplicationCol.FindOne(ctx, filter).Decode(&organization)
+	s.Database.OrgApplicationCollection.FindOne(ctx, filter).Decode(&organization)
 	return nil
 }
 
 // Get organizations application from database
 func (s *Service) FindApplications(ctx context.Context, filter interface{}, organizations *[]models.OrganizationApplication) error {
 
-	cursor, err := s.Database.OrgApplicationCol.Find(ctx, filter)
+	cursor, err := s.Database.OrgApplicationCollection.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (s *Service) FindApplications(ctx context.Context, filter interface{}, orga
 func (s *Service) UpdateAnApplication(ctx context.Context, filter interface{}, update interface{}, invitation *models.OrganizationApplicationDao) error {
 
 	// update application
-	_, err := s.Database.OrgApplicationCol.UpdateOne(ctx, filter, update)
+	_, err := s.Database.OrgApplicationCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func (s *Service) UpdateAnApplication(ctx context.Context, filter interface{}, u
 func (s *Service) UpdateApplications(ctx context.Context, filter interface{}, update interface{}, organizations *[]models.OrganizationApplication) error {
 
 	// update application
-	_, err := s.Database.OrgApplicationCol.UpdateMany(ctx, filter, update)
+	_, err := s.Database.OrgApplicationCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (s *Service) UpdateApplications(ctx context.Context, filter interface{}, up
 func (s *Service) DeleteAnApplication(ctx context.Context, filter interface{}) error {
 
 	// delete user
-	_, err := s.Database.OrgApplicationCol.DeleteOne(ctx, filter)
+	_, err := s.Database.OrgApplicationCollection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (s *Service) DeleteAnApplication(ctx context.Context, filter interface{}) e
 func (s *Service) DeleteApplications(ctx context.Context, filter interface{}) error {
 
 	// delete applications
-	_, err := s.Database.OrgApplicationCol.DeleteMany(ctx, filter)
+	_, err := s.Database.OrgApplicationCollection.DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}

@@ -231,7 +231,7 @@ func CheckInUser(uuid string, database *database.Database) (*models.CheckIn, err
 		project,
 	}
 
-	cur, err := database.UserCol.Aggregate(ctx, pipeline)
+	cur, err := database.UserCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func FindUser(uuid string, database *database.Database) (*models.UserData, error
 		authAddFields,
 	}
 
-	cur, err := database.UserCol.Aggregate(ctx, pipeline)
+	cur, err := database.UserCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
