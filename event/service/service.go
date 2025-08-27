@@ -616,10 +616,11 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 
 		// New participant object
 		participant := &models.ParticipantDao{
-			UserID:    &uuid,
-			EventID:   req.EventID,
-			Status:    req.Status,
-			CreatedAt: &timestamp,
+			UserID:      &uuid,
+			EventID:     req.EventID,
+			Status:      req.Status,
+			IsAnonymous: req.IsAnonymous,
+			CreatedAt:   &timestamp,
 		}
 
 		// If event is full add the user to the wait-list
