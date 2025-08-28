@@ -1,8 +1,10 @@
 package notifications
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"olympsis-server/database"
 	"sync"
 	"time"
@@ -197,5 +199,24 @@ func (n *Service) pushAppleNote(note *models.PushNotification, token string) err
 	} else {
 		errString := fmt.Sprintf("Not Sent: %v %v %v\n", res.StatusCode, res.ApnsID, res.Reason)
 		return errors.New(errString)
+	}
+}
+
+func (n *Service) HandleNotificationRequest() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		var request models.NotificationPushRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			n.logger.Errorf("Failed to decode request. Error: %s", err.Error())
+			http.Error(rw, `{"msg": "bad request"}`, http.StatusBadRequest)
+		}
+
+		if err := n.AddNoteToCarousel(1, &request); err != nil {
+			n.logger.Errorf("Failed to add note to carousel. Error: %s", err.Error())
+			http.Error(rw, `{"msg": "failed to handle notif"}`, http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"msg": "OK"}`))
 	}
 }

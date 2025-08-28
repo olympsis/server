@@ -12,6 +12,7 @@ import (
 	"olympsis-server/health"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
+	"olympsis-server/middleware"
 	"olympsis-server/notifications"
 	"olympsis-server/organization"
 	"olympsis-server/post"
@@ -133,6 +134,13 @@ func main() {
 	healthAPI.Ready()
 	snapShotAPI.Ready()
 	systemAPI.Ready()
+
+	// Handling raw notification requests
+	r.Handle("v1/notifications", middleware.Chain(
+		serverInterface.Notification.HandleNotificationRequest(),
+		middleware.Logging(),
+		middleware.CORS(),
+	)).Methods("POST", "OPTIONS")
 
 	// Set up event polling
 	eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
