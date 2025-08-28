@@ -136,7 +136,7 @@ func main() {
 	systemAPI.Ready()
 
 	// Handling raw notification requests
-	r.Handle("v1/notifications", middleware.Chain(
+	r.Handle("/v1/notifications", middleware.Chain(
 		serverInterface.Notification.HandleNotificationRequest(),
 		middleware.Logging(),
 		middleware.CORS(),
