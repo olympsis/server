@@ -33,7 +33,7 @@ run:
 	go run -x main.go
 
 docker-build:
-	docker build -f ./tools/Dockerfile.http.dev . -t $(SERVICE_NAME)-unsecure
+	docker build -f Dockerfile . -t $(SERVICE_NAME)-unsecure
 
 artifact: #Publish image to gcp docker-hub
 	docker build . -t $(SERVICE_NAME) --platform linux/amd64 --build-arg VERSION=$(VERSION)
@@ -78,16 +78,16 @@ unsecure-server: #Un-secure server with http
 
 dev-up: #Runs the docker-compose stack to set up local environment
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-server" | xargs -I {} docker rmi {}
-	docker-compose -f tools/compose.dev.yaml up -d
+	docker-compose -f compose.dev.yaml up -d
 
 dev-down: #Takes down the docker-compose stack
-	docker-compose -f tools/compose.dev.yaml down
+	docker-compose -f compose.dev.yaml down
 
 prod-up:
-	docker-compose -f tools/compose.yaml up -d
+	docker-compose -f compose.yaml up -d
 
 prod-down:
-	docker-compose -f tools/compose.yaml down
+	docker-compose -f compose.yaml down
 
 update-service: #Updates the linux service
 	make build && \
