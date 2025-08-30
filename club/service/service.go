@@ -139,7 +139,7 @@ func (c *Service) GetClub() http.HandlerFunc {
 		}
 
 		// If club object is malformed
-		if utils.ValidateClubObject(club) {
+		if !utils.ValidateClubObject(club) {
 			http.Error(rw, `{ "msg": "something went wrong" }`, http.StatusInternalServerError)
 			c.Logger.Error(fmt.Sprintf("Club Object is malformed. ID: %s", id))
 			return
