@@ -24,7 +24,7 @@ func CreateApns2Client(keyID string, teamID string, fileName string) (*apns2.Cli
 
 	mode := os.Getenv("MODE")
 	switch mode {
-	case "production":
+	case "PRODUCTION":
 		return apns2.NewTokenClient(&token).Production(), nil
 	default:
 		return apns2.NewTokenClient(&token).Development(), nil
