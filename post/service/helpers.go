@@ -1,15 +1,9 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"olympsis-server/database"
 	"strconv"
-
-	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Query parameters structure for cleaner handling
@@ -65,43 +59,43 @@ func parsePostQueryParams(r *http.Request) (*PostQueryParams, error) {
 	return params, nil
 }
 
-func generateNewPostNotification(id string, title string, username string) models.PushNotification {
-	return models.PushNotification{
-		Title:    fmt.Sprintf("[%s] New Post", title),
-		Body:     username + " created a new post!",
-		Type:     "push",
-		Category: "club",
-		Data: map[string]interface{}{
-			"type":    models.NewPostType,
-			"club_id": id,
-		},
-	}
-}
+// func generateNewPostNotification(id string, title string, username string) models.PushNotification {
+// 	return models.PushNotification{
+// 		Title:    fmt.Sprintf("[%s] New Post", title),
+// 		Body:     username + " created a new post!",
+// 		Type:     "push",
+// 		Category: "club",
+// 		Data: map[string]interface{}{
+// 			"type":    models.NewPostType,
+// 			"club_id": id,
+// 		},
+// 	}
+// }
 
-func generateNewAnnouncementNotification(id string, title string) models.PushNotification {
-	return models.PushNotification{
-		Title:    title,
-		Body:     "New Announcement!",
-		Type:     "push",
-		Category: "organization",
-		Data: map[string]interface{}{
-			"type":   models.NewAnnouncementType,
-			"org_id": id,
-		},
-	}
-}
+// func generateNewAnnouncementNotification(id string, title string) models.PushNotification {
+// 	return models.PushNotification{
+// 		Title:    title,
+// 		Body:     "New Announcement!",
+// 		Type:     "push",
+// 		Category: "organization",
+// 		Data: map[string]interface{}{
+// 			"type":   models.NewAnnouncementType,
+// 			"org_id": id,
+// 		},
+// 	}
+// }
 
-func findOrganizationMembers(ctx *context.Context, id *primitive.ObjectID, db *database.Database) (*[]models.MemberDao, error) {
-	var members []models.MemberDao
-	cur, err := db.ClubMembersCollection.Find(*ctx, bson.M{"org_id": id})
-	if err != nil {
-		return nil, err
-	}
+// func findOrganizationMembers(ctx *context.Context, id *primitive.ObjectID, db *database.Database) (*[]models.MemberDao, error) {
+// 	var members []models.MemberDao
+// 	cur, err := db.ClubMembersCollection.Find(*ctx, bson.M{"org_id": id})
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	err = cur.All(*ctx, members)
-	if err != nil {
-		return nil, err
-	}
+// 	err = cur.All(*ctx, members)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return &members, nil
-}
+// 	return &members, nil
+// }
