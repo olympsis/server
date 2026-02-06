@@ -5,7 +5,6 @@ import (
 	"olympsis-server/notifications"
 
 	"github.com/gorilla/mux"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,9 +21,6 @@ type Service struct {
 
 	// mux Router to complete http requests
 	Router *mux.Router
-
-	// Search service
-	SearchService *search.Service
 
 	// Notification service
 	Notification *notifications.Service

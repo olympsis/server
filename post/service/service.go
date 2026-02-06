@@ -24,11 +24,10 @@ Create new Post service struct
 */
 func NewPostService(i *server.ServerInterface) *Service {
 	return &Service{
-		Logger:        i.Logger,
-		Router:        i.Router,
-		Database:      i.Database,
-		SearchService: i.Search,
-		Notification:  i.Notification,
+		Logger:       i.Logger,
+		Router:       i.Router,
+		Database:     i.Database,
+		Notification: i.Notification,
 	}
 }
 

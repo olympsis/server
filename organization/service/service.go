@@ -14,7 +14,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -33,9 +32,6 @@ type Service struct {
 	// mux Router to complete http requests
 	Router *mux.Router
 
-	// search service
-	SearchService *search.Service
-
 	// notification service
 	Notification *notifications.Service
 }
@@ -45,11 +41,10 @@ Create new organization service struct
 */
 func NewOrgService(i *server.ServerInterface) *Service {
 	return &Service{
-		Logger:        i.Logger,
-		Router:        i.Router,
-		Database:      i.Database,
-		SearchService: i.Search,
-		Notification:  i.Notification,
+		Logger:       i.Logger,
+		Router:       i.Router,
+		Database:     i.Database,
+		Notification: i.Notification,
 	}
 }
 
@@ -767,27 +762,27 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 		}
 
 		// fetch user data
-		usr, err := e.SearchService.SearchUserByUUID(req.Recipient)
-		if err != nil {
-			e.Logger.Error("Failed to find user data: " + err.Error())
-		}
+		// usr, err := e.SearchService.SearchUserByUUID(req.Recipient)
+		// if err != nil {
+		// 	e.Logger.Error("Failed to find user data: " + err.Error())
+		// }
 
-		// notify club admins
-		clubID := req.SubjectID.Hex()
-		notification := models.PushNotification{
-			Title: "Invitation Status",
-			Body:  usr.Username + " " + req.Status + " their invite.",
-			Data: map[string]interface{}{
-				"club_id": clubID,
-			},
-		}
-		request := models.NotificationPushRequest{
-			Topic:        &clubID,
-			Notification: notification,
-		}
-		if err = e.Notification.AddNoteToCarousel(1, &request); err != nil {
-			e.Logger.Error("Failed to send notification: " + err.Error())
-		}
+		// // notify club admins
+		// clubID := req.SubjectID.Hex()
+		// notification := models.PushNotification{
+		// 	Title: "Invitation Status",
+		// 	Body:  usr.Username + " " + req.Status + " their invite.",
+		// 	Data: map[string]interface{}{
+		// 		"club_id": clubID,
+		// 	},
+		// }
+		// request := models.NotificationPushRequest{
+		// 	Topic:        &clubID,
+		// 	Notification: notification,
+		// }
+		// if err = e.Notification.AddNoteToCarousel(1, &request); err != nil {
+		// 	e.Logger.Error("Failed to send notification: " + err.Error())
+		// }
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{ "msg": "OK" }`))

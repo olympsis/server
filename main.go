@@ -30,7 +30,6 @@ import (
 
 	firebase "firebase.google.com/go"
 	"github.com/gorilla/mux"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"github.com/stripe/stripe-go/v82"
 	"google.golang.org/api/option"
@@ -84,9 +83,6 @@ func main() {
 	// Set up Notification Service
 	notif := notifications.New(apnsClient, l, d)
 
-	// Set up search service
-	sh := search.NewSearchService(l, d.AuthCollection, d.UserCollection)
-
 	// Set up stripe API
 	sc := stripe.NewClient(config.StripeToken)
 
@@ -98,7 +94,6 @@ func main() {
 
 		Stripe: sc,     // stripe
 		Auth:   client, // firebase
-		Search: sh,     // search
 
 		Notification: notif, // notifications
 	}

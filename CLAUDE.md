@@ -9,7 +9,6 @@ This is the Olympsis backend server written in Go. It's a REST API server that h
 - Social features (clubs, organizations, posts, events)
 - Location-based services (venues, map snapshots)
 - Notification system
-- Search functionality
 - Report management
 
 ## Architecture
@@ -29,7 +28,7 @@ Each domain has its own directory with `api.go` (HTTP handlers) and `service/` s
 - **club/** - Club management, membership, applications
 - **organization/** - Organization management and membership
 - **post/** - Social posts, comments, reactions
-- **event/** - Event management, participants, teams, waitlists
+- **event/** - Event management, participants, teams, wait-lists
 - **venue/** - Location/venue management
 - **announcement/** - System announcements
 - **report/** - Bug reports and content moderation
@@ -95,7 +94,6 @@ The `ServerInterface` provides shared access to:
 - Logger (logrus)
 - Database collections
 - Firebase Auth client
-- Search service
 - Notification interface
 - HTTP router
 

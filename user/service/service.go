@@ -32,11 +32,10 @@ Returns:
 */
 func NewUserService(i *server.ServerInterface) *Service {
 	return &Service{
-		Log:           i.Logger,
-		Router:        i.Router,
-		Database:      i.Database,
-		SearchService: i.Search,
-		Notification:  i.Notification,
+		Log:          i.Logger,
+		Router:       i.Router,
+		Database:     i.Database,
+		Notification: i.Notification,
 	}
 }
 

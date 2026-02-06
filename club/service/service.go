@@ -14,7 +14,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
 	"github.com/stripe/stripe-go/v82"
 	"go.mongodb.org/mongo-driver/bson"
@@ -22,23 +21,21 @@ import (
 )
 
 type Service struct {
-	Database      *database.Database
-	Logger        *logrus.Logger
-	Router        *mux.Router
-	StripeClient  *stripe.Client
-	SearchService *search.Service
-	Notification  *notifications.Service
+	Database     *database.Database
+	Logger       *logrus.Logger
+	Router       *mux.Router
+	StripeClient *stripe.Client
+	Notification *notifications.Service
 }
 
 // Creates a new club service object
 func NewClubService(i *server.ServerInterface) *Service {
 	return &Service{
-		Logger:        i.Logger,
-		Router:        i.Router,
-		Database:      i.Database,
-		SearchService: i.Search,
-		StripeClient:  i.Stripe,
-		Notification:  i.Notification,
+		Logger:       i.Logger,
+		Router:       i.Router,
+		Database:     i.Database,
+		StripeClient: i.Stripe,
+		Notification: i.Notification,
 	}
 }
 
