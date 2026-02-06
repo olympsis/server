@@ -8,7 +8,6 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
-	"olympsis-server/event/service"
 	"olympsis-server/health"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
@@ -16,7 +15,6 @@ import (
 	"olympsis-server/notifications"
 	"olympsis-server/organization"
 	"olympsis-server/post"
-	"olympsis-server/redis"
 	"olympsis-server/report"
 	"olympsis-server/server"
 	"olympsis-server/system"
@@ -55,13 +53,13 @@ func main() {
 	d.EstablishConnection(manager, &config)
 
 	// Set up redis
-	rConfig := utils.GetRedisConfig(manager)
-	cache := redis.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
-	cacheDB := redis.New(&cache, l)
-	if err := cache.Ping(context.Background()).Err(); err != nil {
-		l.Fatalf("Error setting up redis client. Error: %s", err.Error())
-		os.Exit(1)
-	}
+	// rConfig := utils.GetRedisConfig(manager)
+	// cache := redis.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
+	// cacheDB := redis.New(&cache, l)
+	// if err := cache.Ping(context.Background()).Err(); err != nil {
+	// 	l.Fatalf("Error setting up redis client. Error: %s", err.Error())
+	// 	os.Exit(1)
+	// }
 
 	// Set up Firebase authentication
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
@@ -143,8 +141,8 @@ func main() {
 	)).Methods("POST", "OPTIONS")
 
 	// Set up event polling
-	eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
-	go eventPolling.Start(context.Background())
+	// eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
+	// go eventPolling.Start(context.Background())
 
 	// Set up server configuration
 	s := &http.Server{
