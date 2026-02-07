@@ -7,28 +7,26 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/olympsis/search"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type Service struct {
-	Database      *database.Database
-	Logger        *logrus.Logger
-	Router        *mux.Router
-	SearchService *search.Service
-	Notification  *notifications.Service
+	Database     *database.Database
+	Logger       *logrus.Logger
+	Router       *mux.Router
+	Notification *notifications.Service
 }
 
 // Insert one post into database
-func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *options.InsertOneOptions) (*primitive.ObjectID, error) {
+func (s *Service) InsertPost(ctx context.Context, post *models.PostDao, opts *options.InsertOneOptionsBuilder) (*bson.ObjectID, error) {
 	id, err := s.Database.PostsCollection.InsertOne(ctx, post, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	oid := id.InsertedID.(primitive.ObjectID)
+	oid := id.InsertedID.(bson.ObjectID)
 	return &oid, nil
 }
 

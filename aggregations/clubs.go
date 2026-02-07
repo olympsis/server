@@ -5,13 +5,12 @@ import (
 	"olympsis-server/database"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // AggregateClub gets a single club by ID with all related data
-func AggregateClub(id primitive.ObjectID, database *database.Database) (*models.Club, error) {
+func AggregateClub(id bson.ObjectID, database *database.Database) (*models.Club, error) {
 	ctx := context.Background()
 
 	// Create ID filter pipeline stage
@@ -120,7 +119,7 @@ func AggregateClubs(
 	return &response, nil
 }
 
-func AggregateClubApplication(id *primitive.ObjectID, database *database.Database) (*models.ClubApplication, error) {
+func AggregateClubApplication(id *bson.ObjectID, database *database.Database) (*models.ClubApplication, error) {
 
 	ctx := context.Background()
 
@@ -225,7 +224,7 @@ func AggregateClubApplication(id *primitive.ObjectID, database *database.Databas
 	return &application, nil
 }
 
-func AggregateClubApplications(clubId *primitive.ObjectID, status string, database *database.Database) (*[]models.ClubApplication, error) {
+func AggregateClubApplications(clubId *bson.ObjectID, status string, database *database.Database) (*[]models.ClubApplication, error) {
 
 	ctx := context.Background()
 

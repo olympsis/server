@@ -9,9 +9,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func (s *Service) CreateFieldReport() http.HandlerFunc {
@@ -24,24 +23,24 @@ func (s *Service) CreateFieldReport() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
-		if req.VenueID == nil || req.VenueID == &primitive.NilObjectID {
+		if req.VenueID == nil || req.VenueID == &bson.NilObjectID {
 			http.Error(rw, `{ "msg": "field ID not found in body" }`, http.StatusBadRequest)
 			return
 		}
 
 		// set necessary data
-		id := primitive.NewObjectID()
+		id := bson.NewObjectID()
 		uuid := r.Header.Get("UUID")
 		status := "pending"
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		options := options.InsertOneOptions{}
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		opts := options.InsertOne()
 		req.ID = &id
 		req.User = &uuid
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
 		// insert model into database
-		err = s.FieldReport.Insert(context.Background(), &req, &options)
+		err = s.FieldReport.Insert(context.Background(), &req, opts)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to create report" }`, http.StatusInternalServerError)
 			s.Logger.Error(fmt.Sprintf(`failed to insert report: %s`, err.Error()))
@@ -59,13 +58,13 @@ func (s *Service) ReadFieldReports() http.HandlerFunc {
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}
-		options := options.AggregateOptions{}
+		opts := options.Aggregate()
 
 		if status != "" {
 			filter["status"] = status
 		}
 
-		reports, err := s.FieldReport.Find(context.Background(), bson.M{"$match": filter}, &options)
+		reports, err := s.FieldReport.Find(context.Background(), bson.M{"$match": filter}, opts)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf("failed to find reports: %s", err.Error()))
 			http.Error(rw, `{ "msg": "failed to find reports" }`, http.StatusInternalServerError)
@@ -102,7 +101,7 @@ func (s *Service) UpdateFieldReport() http.HandlerFunc {
 		}
 
 		// handle updates
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}
@@ -140,7 +139,7 @@ func (s *Service) DeleteFieldReport() http.HandlerFunc {
 		}
 
 		// convert id -> object id
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}

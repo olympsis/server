@@ -12,9 +12,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 /*
@@ -55,7 +54,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		}
 
 		filter := bson.M{}
-		groupID, err := primitive.ObjectIDFromHex(params.GroupID)
+		groupID, err := bson.ObjectIDFromHex(params.GroupID)
 		if err != nil {
 			p.Logger.Error("Failed to encode group id to object id: ", err.Error())
 			http.Error(rw, `{ "msg" : "bad group id found in request"}`, http.StatusBadRequest)
@@ -63,7 +62,7 @@ func (p *Service) GetPosts() http.HandlerFunc {
 		}
 
 		if params.ParentID != nil && *params.ParentID != "" {
-			parentID, _ := primitive.ObjectIDFromHex(*params.ParentID)
+			parentID, _ := bson.ObjectIDFromHex(*params.ParentID)
 			filter["$or"] = bson.A{
 				bson.M{"group_id": groupID},
 				bson.M{"group_id": parentID},
@@ -113,7 +112,7 @@ func (p *Service) GetPost() http.HandlerFunc {
 		}
 
 		// convert id to objectID
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		// run aggregation pipeline to fetch post
 		post, err := aggregations.AggregatePost(oid, p.Database)
@@ -163,7 +162,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 		}
 
 		// Add additional data to post model
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		req.CreatedAt = &timestamp
 		post := models.PostDao{
 			Type:         req.Type,
@@ -250,7 +249,7 @@ func (p *Service) ModifyPost() http.HandlerFunc {
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
 		change := bson.M{}
 		update := bson.M{"$set": change}
@@ -358,8 +357,8 @@ func (p *Service) AddLike() http.HandlerFunc {
 			return
 		}
 
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		oid, _ := primitive.ObjectIDFromHex(id)
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		oid, _ := bson.ObjectIDFromHex(id)
 		like := models.ReactionDao{
 			UserID:    &uuid,
 			PostID:    &oid,
@@ -412,8 +411,8 @@ func (p *Service) RemoveLike() http.HandlerFunc {
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
-		loid, _ := primitive.ObjectIDFromHex(lId)
+		oid, _ := bson.ObjectIDFromHex(id)
+		loid, _ := bson.ObjectIDFromHex(lId)
 
 		match := bson.M{"_id": oid}
 		change := bson.M{"$pull": bson.M{"likes": bson.M{"_id": loid}}}
@@ -469,8 +468,8 @@ func (p *Service) AddComment() http.HandlerFunc {
 			return
 		}
 
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		oid, _ := primitive.ObjectIDFromHex(id)
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		oid, _ := bson.ObjectIDFromHex(id)
 		req.UserID = &uuid
 		req.PostID = &oid
 		req.CreatedAt = &timestamp
@@ -528,8 +527,8 @@ func (p *Service) DeleteComment() http.HandlerFunc {
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
-		coid, _ := primitive.ObjectIDFromHex(cId)
+		oid, _ := bson.ObjectIDFromHex(id)
+		coid, _ := bson.ObjectIDFromHex(cId)
 
 		err := p.RemoveComment(ctx, bson.M{"_id": coid, "post_id": oid})
 		if err != nil {

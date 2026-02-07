@@ -4,17 +4,17 @@ import (
 	"errors"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func ValidateObjectID(id string) (primitive.ObjectID, error) {
+func ValidateObjectID(id string) (bson.ObjectID, error) {
 	if id == "" {
-		return primitive.NilObjectID, errors.New("invalid ID")
+		return bson.NilObjectID, errors.New("invalid ID")
 	}
 
-	oid, err := primitive.ObjectIDFromHex(id)
+	oid, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		return primitive.NilObjectID, err
+		return bson.NilObjectID, err
 	}
 
 	return oid, nil

@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func (s *Service) InsertClub(ctx context.Context, club *models.ClubDao) (*primitive.ObjectID, error) {
+func (s *Service) InsertClub(ctx context.Context, club *models.ClubDao) (*bson.ObjectID, error) {
 	resp, err := s.Database.ClubCollection.InsertOne(ctx, club)
 	if err != nil {
 		return nil, err
 	}
-	id := resp.InsertedID.(primitive.ObjectID)
+	id := resp.InsertedID.(bson.ObjectID)
 	return &id, err
 }
 

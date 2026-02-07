@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func (s *Service) FindCountries(ctx context.Context, filter bson.M) (*[]models.Country, error) {

@@ -5,12 +5,11 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // New event created
-func (n *Service) NewEvent(id *primitive.ObjectID, event *models.EventDao) error {
+func (n *Service) NewEvent(id *bson.ObjectID, event *models.EventDao) error {
 	// Lets notify all of the group organizers and their members
 	if event.Organizers == nil {
 		return errors.New("no event organizers found")
@@ -55,9 +54,9 @@ func (n *Service) NewEvent(id *primitive.ObjectID, event *models.EventDao) error
 		return err
 	}
 
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "New event created!",
 		Body:     *event.Title,
 		Type:     "push",
@@ -82,7 +81,7 @@ func (n *Service) NewEvent(id *primitive.ObjectID, event *models.EventDao) error
 }
 
 // Cancels an event
-func (n *Service) CancelEvent(id *primitive.ObjectID, actor string) error {
+func (n *Service) CancelEvent(id *bson.ObjectID, actor string) error {
 	// Fetch event data
 	event, err := n.findEvent(*id)
 	if err != nil {
@@ -126,9 +125,9 @@ func (n *Service) CancelEvent(id *primitive.ObjectID, actor string) error {
 		users = append(users, k)
 	}
 
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "Event has been cancelled!",
 		Body:     *event.Title,
 		Type:     "push",
@@ -151,7 +150,7 @@ func (n *Service) CancelEvent(id *primitive.ObjectID, actor string) error {
 }
 
 // Someone commented
-func (n *Service) NewEventComment(id primitive.ObjectID, comment string) error {
+func (n *Service) NewEventComment(id bson.ObjectID, comment string) error {
 	// Fetch event data
 	event, err := n.findEvent(id)
 	if err != nil {
@@ -203,9 +202,9 @@ func (n *Service) NewEventComment(id primitive.ObjectID, comment string) error {
 	}
 
 	// Create notification object
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "New Event Comment!",
 		Body:     *event.Title,
 		Type:     "push",
@@ -233,7 +232,7 @@ func (n *Service) NewEventComment(id primitive.ObjectID, comment string) error {
 // Event starts soon
 func (n *Service) EventReminder(id string) error {
 	// Fetch event data
-	oid, err := primitive.ObjectIDFromHex(id)
+	oid, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return err
 	}
@@ -244,9 +243,9 @@ func (n *Service) EventReminder(id string) error {
 	}
 
 	// Create notification object
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "Event starts in 30 minutes!",
 		Body:     *event.Title,
 		Type:     "push",
@@ -271,9 +270,9 @@ func (n *Service) EventReminder(id string) error {
 // Event participant kicked
 func (n *Service) ParticipantKick(event *models.EventDao, participant *models.ParticipantDao) error {
 	// Create notification object
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "You've been kicked from the participants list.",
 		Body:     *event.Title,
 		Type:     "push",
@@ -299,9 +298,9 @@ func (n *Service) ParticipantKick(event *models.EventDao, participant *models.Pa
 // Event participant waitlist promotion
 func (n *Service) WaitlistPromotion(event *models.EventDao, participant *models.ParticipantDao) error {
 	// Create notification object
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "You've been promoted from the waitlist.",
 		Body:     *event.Title,
 		Type:     "push",

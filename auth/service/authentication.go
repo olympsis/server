@@ -11,9 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func NewAuthService(serverInterface *server.ServerInterface) *Service {
@@ -71,7 +70,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		// New AuthUser
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		user := &models.AuthUserDao{
 			UUID:      &token.UID,
 			FirstName: request.FirstName,
@@ -94,7 +93,7 @@ func (a *Service) Register() http.HandlerFunc {
 		acceptedEULA := true
 		visibility := "public"
 		meta := models.User{
-			ID:           primitive.NewObjectID(),
+			ID:           bson.NewObjectID(),
 			UUID:         token.UID,
 			UserName:     tempUsername,
 			Visibility:   visibility,

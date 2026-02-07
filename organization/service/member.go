@@ -4,16 +4,15 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func (s *Service) InsertMember(ctx context.Context, member *models.MemberDao) (*primitive.ObjectID, error) {
+func (s *Service) InsertMember(ctx context.Context, member *models.MemberDao) (*bson.ObjectID, error) {
 	resp, err := s.Database.OrganizationMembersCollection.InsertOne(ctx, member)
 	if err != nil {
 		return nil, err
 	}
-	id := resp.InsertedID.(primitive.ObjectID)
+	id := resp.InsertedID.(bson.ObjectID)
 	return &id, nil
 }
 

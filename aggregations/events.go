@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // AggregateEvent gets a single event by ID with all related data
-func AggregateEvent(id primitive.ObjectID, database *database.Database) (*models.Event, error) {
+func AggregateEvent(id bson.ObjectID, database *database.Database) (*models.Event, error) {
 	ctx := context.Background()
 
 	// Create ID filter pipeline stage
@@ -53,9 +52,9 @@ func AggregateEvents(
 	userID *string,
 	sports *[]string,
 	location *models.GeoJSON,
-	venues *[]primitive.ObjectID,
-	clubs *[]primitive.ObjectID,
-	orgs *[]primitive.ObjectID,
+	venues *[]bson.ObjectID,
+	clubs *[]bson.ObjectID,
+	orgs *[]bson.ObjectID,
 	radius float64,
 	limit int,
 	skip int,
@@ -457,15 +456,15 @@ func BuildEventsAggregation(
 	userID *string,
 	sports *[]string,
 	location *models.GeoJSON,
-	venues *[]primitive.ObjectID,
-	clubs *[]primitive.ObjectID,
-	orgs *[]primitive.ObjectID,
+	venues *[]bson.ObjectID,
+	clubs *[]bson.ObjectID,
+	orgs *[]bson.ObjectID,
 	radius float64,
 	limit int,
 	skip int,
 ) bson.A {
-	// Get current time as primitive.DateTime for comparison
-	currentTime := primitive.NewDateTimeFromTime(time.Now())
+	// Get current time as bson.DateTime for comparison
+	currentTime := bson.NewDateTimeFromTime(time.Now())
 
 	// Pipeline to get events that have not ended yet (future events)
 	timePipeline := bson.M{
@@ -655,7 +654,7 @@ func AggregateUserPastEvents(
 
 // AggregateGroupPastEvents fetches past events for a specific group (club or org)
 func AggregateGroupPastEvents(
-	groupID primitive.ObjectID,
+	groupID bson.ObjectID,
 	limit int,
 	skip int,
 	database *database.Database,
@@ -693,8 +692,8 @@ func BuildUserPastEventsAggregation(
 	limit int,
 	skip int,
 ) bson.A {
-	// Get current time as primitive.DateTime for comparison
-	currentTime := primitive.NewDateTimeFromTime(time.Now())
+	// Get current time as bson.DateTime for comparison
+	currentTime := bson.NewDateTimeFromTime(time.Now())
 
 	// Pipeline to get events that have already ended (past events)
 	timePipeline := bson.M{
@@ -773,12 +772,12 @@ func BuildUserPastEventsAggregation(
 
 // Builds a pipeline for filtering and returning a group's past events
 func BuildGroupPastEventsAggregation(
-	groupID primitive.ObjectID,
+	groupID bson.ObjectID,
 	limit int,
 	skip int,
 ) bson.A {
-	// Get current time as primitive.DateTime for comparison
-	currentTime := primitive.NewDateTimeFromTime(time.Now())
+	// Get current time as bson.DateTime for comparison
+	currentTime := bson.NewDateTimeFromTime(time.Now())
 
 	// Pipeline to get events that have already ended (past events)
 	timePipeline := bson.M{

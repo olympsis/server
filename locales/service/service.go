@@ -10,8 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 /*
@@ -61,7 +60,7 @@ func (s *Service) GetAdministrativeAreas() http.HandlerFunc {
 			return
 		}
 
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf(`Failed to create object id from URL: %s`, err.Error()))
 			http.Error(w, `{ "msg": "Failed to create object id from URL" }`, http.StatusBadRequest)
@@ -89,7 +88,7 @@ func (s *Service) GetSubAdministrativeAreas() http.HandlerFunc {
 			return
 		}
 
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf(`Failed to create object id from URL: %s`, err.Error()))
 			http.Error(w, `{ "msg": "Failed to create object id from URL" }`, http.StatusBadRequest)

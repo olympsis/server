@@ -7,9 +7,9 @@ import (
 	"olympsis-server/utils/secrets"
 
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 type Database struct {
@@ -87,7 +87,7 @@ func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.S
 	switch config.Mode {
 	case "PRODUCTION":
 		opts := options.Client().ApplyURI(`mongodb+srv://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
-		client, err := mongo.Connect(context.Background(), opts)
+		client, err := mongo.Connect(opts)
 		if err != nil {
 			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 		}
@@ -100,7 +100,7 @@ func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.S
 		d.Client = client
 	default:
 		opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
-		client, err := mongo.Connect(context.Background(), opts)
+		client, err := mongo.Connect(opts)
 		if err != nil {
 			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 		}

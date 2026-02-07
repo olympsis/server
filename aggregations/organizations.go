@@ -5,13 +5,12 @@ import (
 	"olympsis-server/database"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // AggregateOrganization gets a single organization by ID with all related data
-func AggregateOrganization(id primitive.ObjectID, database *database.Database) (*models.Organization, error) {
+func AggregateOrganization(id bson.ObjectID, database *database.Database) (*models.Organization, error) {
 	ctx := context.Background()
 
 	// Create ID filter pipeline stage
@@ -98,7 +97,7 @@ func AggregateOrganizations(
 	return &response, nil
 }
 
-func AggregateOrganizationApplication(id *primitive.ObjectID, database *database.Database) (*models.OrganizationApplication, error) {
+func AggregateOrganizationApplication(id *bson.ObjectID, database *database.Database) (*models.OrganizationApplication, error) {
 
 	ctx := context.Background()
 
@@ -161,7 +160,7 @@ func AggregateOrganizationApplication(id *primitive.ObjectID, database *database
 	return &application, nil
 }
 
-func AggregateOrganizationApplications(organizationID *primitive.ObjectID, status string, database *database.Database) (*[]models.OrganizationApplication, error) {
+func AggregateOrganizationApplications(organizationID *bson.ObjectID, status string, database *database.Database) (*[]models.OrganizationApplication, error) {
 
 	ctx := context.Background()
 

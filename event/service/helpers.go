@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // Helper function to generate the document containing the changes for an event dao
@@ -26,10 +25,10 @@ func buildUpdateChanges(req *models.EventDao) bson.M {
 	}
 
 	// Media details
-	if req.MediaURL != "" {
+	if req.MediaURL != nil && *req.MediaURL != "" {
 		changes["media_url"] = req.MediaURL
 	}
-	if req.MediaType != "" {
+	if req.MediaType != nil && *req.MediaType != "" {
 		changes["media_type"] = req.MediaType
 	}
 
@@ -95,7 +94,7 @@ func buildUpdateChanges(req *models.EventDao) bson.M {
 }
 
 // Helper function to generate updates for recurring events
-func buildRecurringUpdateFilter(id primitive.ObjectID, event *models.EventDao, currentTime primitive.DateTime) bson.M {
+func buildRecurringUpdateFilter(id bson.ObjectID, event *models.EventDao, currentTime bson.DateTime) bson.M {
 	if event.RecurrenceConfig.ParentEventID != nil {
 		// This is a child event, update all future siblings
 		return bson.M{
@@ -128,7 +127,7 @@ func buildRecurringUpdateFilter(id primitive.ObjectID, event *models.EventDao, c
 }
 
 // Helper function to generate recurring event instances
-func GenerateEventInstancesBatched(parentID primitive.ObjectID, baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []models.EventDao {
+func GenerateEventInstancesBatched(parentID bson.ObjectID, baseEvent *models.EventDao, recurrence *models.RecurrenceOptions) []models.EventDao {
 	var instances []models.EventDao
 
 	// Get start time as Go time.Time
@@ -166,14 +165,15 @@ func GenerateEventInstancesBatched(parentID primitive.ObjectID, baseEvent *model
 		instance := *baseEvent // Copy all fields from parent
 
 		// Set new times for this instance
-		instanceStartTime := primitive.NewDateTimeFromTime(nextTime)
-		instanceStopTime := primitive.NewDateTimeFromTime(nextTime.Add(eventDuration))
+		instanceStartTime := bson.NewDateTimeFromTime(nextTime)
+		instanceStopTime := bson.NewDateTimeFromTime(nextTime.Add(eventDuration))
 		instance.StartTime = &instanceStartTime
 		instance.StopTime = &instanceStopTime
 
 		// Set up recurrence config pointing to parent event
+		pattern := string(recurrence.Pattern)
 		instance.RecurrenceConfig = &models.EventRecurrenceConfig{
-			RecurrenceRule: &recurrence.Pattern,
+			RecurrenceRule: &pattern,
 			ParentEventID:  &parentID,
 		}
 
@@ -196,7 +196,7 @@ func GenerateEventInstancesBatched(parentID primitive.ObjectID, baseEvent *model
 }
 
 // Find nearby venues based on location, sports, and radius
-func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []primitive.ObjectID, error) {
+func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []bson.ObjectID, error) {
 	// Convert radius from miles to meters (1 mile = 1609.34 meters)
 	radiusInMeters := radius * 1609.34
 
@@ -215,7 +215,7 @@ func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON,
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			// Return empty results rather than error
-			return &[]models.Venue{}, []primitive.ObjectID{}, nil
+			return &[]models.Venue{}, []bson.ObjectID{}, nil
 		}
 		return nil, nil, err
 	}
@@ -223,7 +223,7 @@ func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON,
 
 	// Process results
 	venues := []models.Venue{}
-	venueIDs := []primitive.ObjectID{}
+	venueIDs := []bson.ObjectID{}
 
 	for cursor.Next(ctx) {
 		var venue models.Venue

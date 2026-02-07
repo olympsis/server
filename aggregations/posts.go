@@ -5,13 +5,12 @@ import (
 	"olympsis-server/database"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // AggregatePost gets a single post by ID with all related data
-func AggregatePost(id primitive.ObjectID, database *database.Database) (*models.Post, error) {
+func AggregatePost(id bson.ObjectID, database *database.Database) (*models.Post, error) {
 	ctx := context.Background()
 
 	// Create ID filter pipeline stage

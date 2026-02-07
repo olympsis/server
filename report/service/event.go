@@ -9,9 +9,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func (s *Service) CreateEventReport() http.HandlerFunc {
@@ -28,24 +27,24 @@ func (s *Service) CreateEventReport() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "group IDs not found in body" }`, http.StatusBadRequest)
 			return
 		}
-		if req.EventID == nil || req.EventID == &primitive.NilObjectID {
+		if req.EventID == nil || req.EventID == &bson.NilObjectID {
 			http.Error(rw, `{ "msg": "field ID not found in body" }`, http.StatusBadRequest)
 			return
 		}
 
 		// set necessary data
-		id := primitive.NewObjectID()
+		id := bson.NewObjectID()
 		uuid := r.Header.Get("UUID")
 		status := "pending"
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		options := options.InsertOneOptions{}
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		opts := options.InsertOne()
 		req.ID = &id
 		req.User = &uuid
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
 		// insert model into database
-		err = s.EventReport.Insert(context.Background(), &req, &options)
+		err = s.EventReport.Insert(context.Background(), &req, opts)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to create report" }`, http.StatusInternalServerError)
 			s.Logger.Error(fmt.Sprintf(`failed to insert report: %s`, err.Error()))
@@ -64,10 +63,10 @@ func (s *Service) ReadEventReports() http.HandlerFunc {
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}
-		options := options.AggregateOptions{}
+		opts := options.Aggregate()
 
 		if groupID != "" {
-			oid, _ := primitive.ObjectIDFromHex(groupID)
+			oid, _ := bson.ObjectIDFromHex(groupID)
 			filter["groups"] = bson.M{
 				"$in": bson.A{oid},
 			}
@@ -76,7 +75,7 @@ func (s *Service) ReadEventReports() http.HandlerFunc {
 			filter["status"] = status
 		}
 
-		reports, err := s.EventReport.Find(context.Background(), bson.M{"$match": filter}, &options)
+		reports, err := s.EventReport.Find(context.Background(), bson.M{"$match": filter}, opts)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf("failed to find reports: %s", err.Error()))
 			http.Error(rw, `{ "msg": "failed to find reports" }`, http.StatusInternalServerError)
@@ -113,7 +112,7 @@ func (s *Service) UpdateEventReport() http.HandlerFunc {
 		}
 
 		// handle updates
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}
@@ -151,7 +150,7 @@ func (s *Service) DeleteEventReport() http.HandlerFunc {
 		}
 
 		// convert id -> object id
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}

@@ -4,16 +4,16 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Insert a new organization application into the database
-func (s *Service) InsertApplication(ctx context.Context, event *models.OrganizationApplicationDao) (*primitive.ObjectID, error) {
+func (s *Service) InsertApplication(ctx context.Context, event *models.OrganizationApplicationDao) (*bson.ObjectID, error) {
 	res, err := s.Database.OrgApplicationCollection.InsertOne(ctx, event)
 	if err != nil {
 		return nil, err
 	}
-	id := res.InsertedID.(primitive.ObjectID)
+	id := res.InsertedID.(bson.ObjectID)
 	return &id, nil
 }
 

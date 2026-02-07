@@ -16,9 +16,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 /*
@@ -76,7 +75,7 @@ func (f *Service) InsertAField() http.HandlerFunc {
 		}
 
 		field := models.Venue{
-			ID:          primitive.NewObjectID(),
+			ID:          bson.NewObjectID(),
 			Owner:       req.Owner,
 			Name:        req.Name,
 			Description: req.Description,
@@ -196,8 +195,8 @@ func (f *Service) GetAField() http.HandlerFunc {
 
 		// find field data in database
 		var field models.Venue
-		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
+		oid, _ := bson.ObjectIDFromHex(id)
+		filter := bson.D{bson.E{Key: "_id", Value: oid}}
 		err := f.FindField(context.Background(), filter, &field)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -243,8 +242,8 @@ func (f *Service) UpdateAField() http.HandlerFunc {
 		}
 
 		id := vars["id"]
-		oid, _ := primitive.ObjectIDFromHex(id)
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
+		oid, _ := bson.ObjectIDFromHex(id)
+		filter := bson.D{bson.E{Key: "_id", Value: oid}}
 		changes := bson.M{}
 		updates := bson.M{"$set": changes}
 
@@ -309,9 +308,9 @@ func (f *Service) DeleteAField() http.HandlerFunc {
 		}
 
 		id := vars["id"]
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
-		filter := bson.D{primitive.E{Key: "_id", Value: oid}}
+		filter := bson.D{bson.E{Key: "_id", Value: oid}}
 		err := f.DeleteField(context.Background(), filter)
 		if err != nil {
 			f.Log.Debug(err.Error())

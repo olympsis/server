@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func GetTokenFromHeader(r *http.Request) (string, error) {
@@ -35,7 +35,7 @@ func GetClubTokenFromHeader(r *http.Request) (string, error) {
 }
 
 func ValidateClubID(s string) bool {
-	_, err := primitive.ObjectIDFromHex(s)
+	_, err := bson.ObjectIDFromHex(s)
 	return err == nil
 }
 

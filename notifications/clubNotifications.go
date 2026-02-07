@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func (n *Service) NewApplication(id *primitive.ObjectID, application *models.ClubApplicationDao) error {
+func (n *Service) NewApplication(id *bson.ObjectID, application *models.ClubApplicationDao) error {
 	// Load club info
 	club, err := n.findClub(*id)
 	if err != nil {
@@ -21,9 +21,9 @@ func (n *Service) NewApplication(id *primitive.ObjectID, application *models.Clu
 
 	clubID := id.Hex()
 	name := *club.Name
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "New Club Application!",
 		Body:     name,
 		Type:     "push",
@@ -46,7 +46,7 @@ func (n *Service) NewApplication(id *primitive.ObjectID, application *models.Clu
 	return n.carousel.AddJob(1, request)
 }
 
-func (n *Service) ApplicationUpdate(id primitive.ObjectID, app *models.ClubApplicationDao) error {
+func (n *Service) ApplicationUpdate(id bson.ObjectID, app *models.ClubApplicationDao) error {
 	// Load club info
 	club, err := n.findClub(id)
 	if err != nil {
@@ -56,9 +56,9 @@ func (n *Service) ApplicationUpdate(id primitive.ObjectID, app *models.ClubAppli
 	clubID := id.Hex()
 	name := *club.Name
 	users := []string{*app.Applicant}
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "Your application was approved!",
 		Body:     name,
 		Type:     "push",
@@ -79,7 +79,7 @@ func (n *Service) ApplicationUpdate(id primitive.ObjectID, app *models.ClubAppli
 	return n.carousel.AddJob(1, request)
 }
 
-func (n *Service) ChangedRole(id primitive.ObjectID, userID string, previous models.MemberRole, new models.MemberRole) error {
+func (n *Service) ChangedRole(id bson.ObjectID, userID string, previous models.MemberRole, new models.MemberRole) error {
 	// Load club info
 	club, err := n.findClub(id)
 	if err != nil {
@@ -89,9 +89,9 @@ func (n *Service) ChangedRole(id primitive.ObjectID, userID string, previous mod
 	clubID := id.Hex()
 	name := *club.Name
 	users := []string{userID}
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "Your Rank has changed!",
 		Body:     name,
 		Type:     "push",
@@ -112,11 +112,11 @@ func (n *Service) ChangedRole(id primitive.ObjectID, userID string, previous mod
 	return n.carousel.AddJob(1, request)
 }
 
-func (n *Service) Suspended(id *primitive.ObjectID, member *models.MemberDao) error {
+func (n *Service) Suspended(id *bson.ObjectID, member *models.MemberDao) error {
 	return n.carousel.AddJob(1, models.NotificationPushRequest{})
 }
 
-func (n *Service) Kicked(id *primitive.ObjectID, member *models.MemberDao) error {
+func (n *Service) Kicked(id *bson.ObjectID, member *models.MemberDao) error {
 	// Load club info
 	club, err := n.findClub(*id)
 	if err != nil {
@@ -126,9 +126,9 @@ func (n *Service) Kicked(id *primitive.ObjectID, member *models.MemberDao) error
 	clubID := id.Hex()
 	name := *club.Name
 	users := []string{member.UserID}
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
-		ID:       primitive.NewObjectID(),
+		ID:       bson.NewObjectID(),
 		Title:    "You've been kicked from the club!",
 		Body:     name,
 		Type:     "push",

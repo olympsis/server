@@ -16,8 +16,7 @@ import (
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
 	"github.com/stripe/stripe-go/v82"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Service struct {
@@ -173,7 +172,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		}
 
 		// Additional data
-		timeStamp := primitive.NewDateTimeFromTime(time.Now())
+		timeStamp := bson.NewDateTimeFromTime(time.Now())
 		verification := false
 		req.IsVerified = &verification
 		req.CreatedAt = &timeStamp
@@ -188,7 +187,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 
 		// Insert owner into members collection
 		member := models.MemberDao{
-			ID:       primitive.NewObjectID(),
+			ID:       bson.NewObjectID(),
 			UserID:   uuid,
 			Role:     string(models.OwnerMember),
 			ClubID:   id,
@@ -746,7 +745,7 @@ func (s *Service) CreateFinancialAccount() http.HandlerFunc {
 		status := "active"
 		tempBalance := float64(0.00)
 		currencyString := "usd"
-		timestamp := primitive.DateTime(time.Now().Unix())
+		timestamp := bson.DateTime(time.Now().Unix())
 		account := models.ClubFinancialAccount{
 			ClubID:          &oid,
 			StripeAccountID: &customer.ID,
@@ -877,14 +876,14 @@ func (s *Service) GetFinancialOverview() http.HandlerFunc {
 				Type:           string(t.Type),
 				Status:         string(t.Status),
 				Currency:       string(t.Currency),
-				CreatedAt:      primitive.DateTime(t.Created),
+				CreatedAt:      bson.DateTime(t.Created),
 			}
 
 			// Handle event id
 			if t.Source != nil {
 				eventID := t.Source.Payout.Metadata["event_id"]
 				if eventID != "" {
-					eid, _ := primitive.ObjectIDFromHex(eventID)
+					eid, _ := bson.ObjectIDFromHex(eventID)
 					transaction.EventID = &eid
 				}
 			}

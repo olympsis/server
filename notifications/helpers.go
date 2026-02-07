@@ -4,8 +4,7 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func (n *Service) findUsers(arr []string) ([]models.User, error) {
@@ -46,7 +45,7 @@ func (n *Service) findUser(userID string) (*models.User, error) {
 	return &user, nil
 }
 
-func (n *Service) findEvent(id primitive.ObjectID) (*models.EventDao, error) {
+func (n *Service) findEvent(id bson.ObjectID) (*models.EventDao, error) {
 	filter := bson.M{
 		"_id": id,
 	}
@@ -60,7 +59,7 @@ func (n *Service) findEvent(id primitive.ObjectID) (*models.EventDao, error) {
 	return &event, nil
 }
 
-func (n *Service) findClub(id primitive.ObjectID) (*models.ClubDao, error) {
+func (n *Service) findClub(id bson.ObjectID) (*models.ClubDao, error) {
 	filter := bson.M{
 		"_id": id,
 	}

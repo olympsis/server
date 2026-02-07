@@ -15,9 +15,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 /*
@@ -71,7 +70,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 			return
 		}
 
-		timeStamp := primitive.NewDateTimeFromTime(time.Now())
+		timeStamp := bson.NewDateTimeFromTime(time.Now())
 		verification := false
 
 		// new organization model
@@ -99,7 +98,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 
 		// Creator of the organization
 		member := models.MemberDao{
-			ID:             primitive.NewObjectID(),
+			ID:             bson.NewObjectID(),
 			UserID:         uuid,
 			OrganizationID: id,
 			Role:           "owner",
@@ -150,7 +149,7 @@ func (e *Service) GetOrganization() http.HandlerFunc {
 		}
 
 		// find organization data in database
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		org, err := aggregations.AggregateOrganization(oid, e.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -244,7 +243,7 @@ func (e *Service) UpdateOrganization() http.HandlerFunc {
 		}
 
 		// handle changes here
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{"_id": oid}
 		changes := bson.M{}
 		updates := bson.M{"$set": changes}
@@ -308,7 +307,7 @@ func (e *Service) DeleteOrganization() http.HandlerFunc {
 			return
 		}
 		id := vars["id"]
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		// Delete organization members
 		err := e.DeleteMembers(ctx, bson.M{"organization_id": oid})
@@ -374,7 +373,7 @@ func (e *Service) CreateApplication() http.HandlerFunc {
 
 		// insert application into database
 		status := "pending"
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
@@ -420,7 +419,7 @@ func (e *Service) GetApplication() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "bad application id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(vars["id"])
+		oid, _ := bson.ObjectIDFromHex(vars["id"])
 
 		application, err := aggregations.AggregateOrganizationApplication(&oid, e.Database)
 		if err != nil || application.Status == "" {
@@ -447,7 +446,7 @@ func (e *Service) GetApplications() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "No/Bad id found in request" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		// status of applications
 		status := r.URL.Query().Get("status")
@@ -490,7 +489,7 @@ func (e *Service) UpdateApplication() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "bad application id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		var req models.OrganizationApplicationDao
 		json.NewDecoder(r.Body).Decode(&req)
@@ -534,7 +533,7 @@ func (e *Service) DeleteApplication() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "bad application id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(vars["id"])
+		oid, _ := bson.ObjectIDFromHex(vars["id"])
 
 		err := e.DeleteAnApplication(context.Background(), bson.M{"_id": oid})
 		if err != nil {
@@ -584,8 +583,8 @@ func (e *Service) CreateInvitation() http.HandlerFunc {
 		}
 
 		// insert application into database
-		req.ID = primitive.NewObjectID()
-		req.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
+		req.ID = bson.NewObjectID()
+		req.CreatedAt = bson.NewDateTimeFromTime(time.Now())
 		err = e.InsertAnInvitation(context.TODO(), &req)
 		if err != nil {
 			e.Logger.Error(err.Error())
@@ -621,7 +620,7 @@ func (e *Service) GetInvitation() http.HandlerFunc {
 			http.Error(w, `{ "msg": "bad invitation id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		// find invitation document
 		var invitation models.Invitation
@@ -649,7 +648,7 @@ func (e *Service) GetInvitations() http.HandlerFunc {
 			http.Error(w, `{ "msg": "bad organization id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		var invitations []models.Invitation
 		err := e.FindInvitations(context.TODO(), bson.M{"subject_id": oid}, &invitations)
@@ -701,7 +700,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 			http.Error(w, `{ "msg": "bad invitation id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		var req models.Invitation
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -712,10 +711,10 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 
 		if req.Status == "accepted" {
 			member := models.MemberDao{
-				ID:       primitive.NewObjectID(),
+				ID:       bson.NewObjectID(),
 				UserID:   req.Recipient,
 				Role:     "manager",
-				JoinedAt: primitive.NewDateTimeFromTime(time.Now()),
+				JoinedAt: bson.NewDateTimeFromTime(time.Now()),
 			}
 			changes := bson.M{
 				"$push": bson.M{"members": member},
@@ -802,7 +801,7 @@ func (e *Service) DeleteInvitation() http.HandlerFunc {
 			http.Error(w, `{ "msg": "bad invitation id" }`, http.StatusBadRequest)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		err := e.DeleteAnInvitation(context.Background(), bson.M{"_id": oid})
 		if err != nil {

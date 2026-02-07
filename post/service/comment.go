@@ -4,18 +4,17 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func (s *Service) InsertComment(ctx context.Context, comment *models.PostCommentDao, opts *options.InsertOneOptions) (*primitive.ObjectID, error) {
+func (s *Service) InsertComment(ctx context.Context, comment *models.PostCommentDao, opts *options.InsertOneOptionsBuilder) (*bson.ObjectID, error) {
 	id, err := s.Database.PostCommentsCollection.InsertOne(ctx, comment, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return id.InsertedID.(*primitive.ObjectID), nil
+	return id.InsertedID.(*bson.ObjectID), nil
 }
 
 func (s *Service) UpdateComment(ctx context.Context, filter bson.M, update bson.M) error {

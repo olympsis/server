@@ -85,7 +85,7 @@ func parsePostQueryParams(r *http.Request) (*PostQueryParams, error) {
 // 	}
 // }
 
-// func findOrganizationMembers(ctx *context.Context, id *primitive.ObjectID, db *database.Database) (*[]models.MemberDao, error) {
+// func findOrganizationMembers(ctx *context.Context, id *bson.ObjectID, db *database.Database) (*[]models.MemberDao, error) {
 // 	var members []models.MemberDao
 // 	cur, err := db.ClubMembersCollection.Find(*ctx, bson.M{"org_id": id})
 // 	if err != nil {

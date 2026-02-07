@@ -5,7 +5,7 @@ import (
 	"olympsis-server/aggregations"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Insert auth user into database

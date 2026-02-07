@@ -11,10 +11,9 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 /*
@@ -68,7 +67,7 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 
 		// find user data in database
 		var user models.User
-		filter := bson.D{primitive.E{Key: "username", Value: userName}}
+		filter := bson.D{bson.E{Key: "username", Value: userName}}
 		err := u.Database.UserCollection.FindOne(context.TODO(), filter).Decode(&user)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -112,7 +111,7 @@ func (s *Service) CreateUserData() http.HandlerFunc {
 		}
 
 		user := models.User{
-			ID:           primitive.NewObjectID(),
+			ID:           bson.NewObjectID(),
 			UUID:         uuid,
 			UserName:     req.UserName,
 			Sports:       req.Sports,
@@ -181,7 +180,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			// Create map of incoming devices by ID for quick lookup
 			incomingDevices := make(map[string]models.NotificationDevice)
 			for _, device := range *req.NotificationDevices {
-				timestamp := primitive.NewDateTimeFromTime(time.Now())
+				timestamp := bson.NewDateTimeFromTime(time.Now())
 				device.UpdatedAt = &timestamp
 				incomingDevices[device.DeviceID] = device
 			}
@@ -253,7 +252,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			changes["notification_preference"] = req.NotificationPreference
 		}
 
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		changes["updated_at"] = timestamp
 
 		update := bson.M{"$set": changes}
@@ -399,7 +398,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 
 		// fetch users that might be related data
 		var users []models.UserData
-		regex := primitive.Regex{Pattern: userName, Options: "i"}
+		regex := bson.Regex{Pattern: userName, Options: "i"}
 		filter := bson.M{"username": regex}
 		cur, err := u.Database.UserCollection.Find(context.TODO(), filter)
 		if err != nil {
@@ -470,7 +469,7 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 		// context/filter
 		ctx := context.Background()
 		filter := bson.M{"uuid": uuid}
-		opts := options.FindOneOptions{}
+		opts := options.FindOne()
 
 		// find and decode auth user data
 		var auth models.AuthUser
@@ -481,7 +480,7 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 		// find and decode user metadata
 		var user models.User
-		err = u.Database.UserCollection.FindOne(ctx, filter, &opts).Decode(&user)
+		err = u.Database.UserCollection.FindOne(ctx, filter, opts).Decode(&user)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 		}

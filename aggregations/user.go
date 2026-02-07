@@ -5,8 +5,8 @@ import (
 	"olympsis-server/database"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func AggregateUser(uuid *string, database *database.Database) (*models.UserData, error) {

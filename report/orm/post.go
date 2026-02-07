@@ -7,8 +7,8 @@ import (
 
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type PostReportORM struct {
@@ -16,12 +16,12 @@ type PostReportORM struct {
 	Logger   *logrus.Logger
 }
 
-func (orm *PostReportORM) Insert(ctx context.Context, report *models.PostReportDao, opts *options.InsertOneOptions) error {
+func (orm *PostReportORM) Insert(ctx context.Context, report *models.PostReportDao, opts *options.InsertOneOptionsBuilder) error {
 	_, err := orm.Database.PostReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
-func (orm *PostReportORM) Find(ctx context.Context, filter interface{}, opts *options.AggregateOptions) (*[]models.PostReport, error) {
+func (orm *PostReportORM) Find(ctx context.Context, filter interface{}, opts *options.AggregateOptionsBuilder) (*[]models.PostReport, error) {
 
 	pipeline1 := bson.M{
 		"$lookup": bson.M{

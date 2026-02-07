@@ -13,8 +13,7 @@ import (
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/payload"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Carousel struct {
@@ -45,7 +44,7 @@ func New(c *apns2.Client, l *logrus.Logger, db *database.Database) *Service {
 
 func (n *Service) CreateTopic(name string, users []string) error {
 	isActive := true
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 	return n.createNotificationTopic(&models.NotificationTopicDao{
 		Name:      &name,
 		Users:     &users,
@@ -77,13 +76,13 @@ func (n *Service) AddNoteToCarousel(priority int, request *models.NotificationPu
 func (n *Service) processPushRequest(request *models.NotificationPushRequest) error {
 	// Create a new PushNotification record
 	pushNotif := &models.PushNotification{
-		ID:        primitive.NewObjectID(),
+		ID:        bson.NewObjectID(),
 		Title:     request.Notification.Title,
 		Body:      request.Notification.Body,
 		Type:      request.Notification.Type,
 		Category:  request.Notification.Category,
 		Data:      request.Notification.Data,
-		CreatedAt: primitive.NewDateTimeFromTime(time.Now()),
+		CreatedAt: bson.NewDateTimeFromTime(time.Now()),
 	}
 	if err := n.createPushNotification(pushNotif); err != nil {
 		return err
@@ -110,11 +109,11 @@ func (n *Service) processPushRequest(request *models.NotificationPushRequest) er
 	for _, user := range userDetails {
 		// Create UserNotification for each user
 		userNotif := &models.UserNotification{
-			ID:             primitive.NewObjectID(),
+			ID:             bson.NewObjectID(),
 			UUID:           user.UUID,
 			NotificationID: pushNotif.ID,
 			IsRead:         false,
-			CreatedAt:      primitive.NewDateTimeFromTime(time.Now()),
+			CreatedAt:      bson.NewDateTimeFromTime(time.Now()),
 		}
 
 		if err := n.createUserNotification(userNotif); err != nil {
@@ -128,14 +127,14 @@ func (n *Service) processPushRequest(request *models.NotificationPushRequest) er
 
 				// Object log the notification attempt
 				log := &models.NotificationLog{
-					ID:             primitive.NewObjectID(),
+					ID:             bson.NewObjectID(),
 					NotificationID: pushNotif.ID,
-					Platform:       device.Platform,
+					Platform:       device.DeviceInfo.Platform,
 					Status:         "sent",
-					CreatedAt:      primitive.NewDateTimeFromTime(time.Now()),
+					CreatedAt:      bson.NewDateTimeFromTime(time.Now()),
 				}
 
-				switch device.Platform {
+				switch device.DeviceInfo.Platform {
 				case "ios":
 					if user.NotificationPreference.Types["push"] {
 						err := n.pushAppleNote(&request.Notification, device.Token)

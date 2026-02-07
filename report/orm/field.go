@@ -7,8 +7,8 @@ import (
 
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type FieldReportORM struct {
@@ -16,12 +16,12 @@ type FieldReportORM struct {
 	Logger   *logrus.Logger
 }
 
-func (orm *FieldReportORM) Insert(ctx context.Context, report *models.VenueReportDao, opts *options.InsertOneOptions) error {
+func (orm *FieldReportORM) Insert(ctx context.Context, report *models.VenueReportDao, opts *options.InsertOneOptionsBuilder) error {
 	_, err := orm.Database.VenueReportCollection.InsertOne(ctx, report, opts)
 	return err
 }
 
-func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *options.AggregateOptions) (*[]models.VenueReport, error) {
+func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *options.AggregateOptionsBuilder) (*[]models.VenueReport, error) {
 
 	pipeline0 := bson.M{
 		"$lookup": bson.M{

@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 /*
@@ -24,7 +24,7 @@ type Service struct {
 type EventQueryParams struct {
 	Location *models.GeoJSON
 	Sports   []string
-	VenueIDs []primitive.ObjectID
+	VenueIDs []bson.ObjectID
 	Radius   float64
 	Skip     int
 	Limit    int

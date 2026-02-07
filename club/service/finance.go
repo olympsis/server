@@ -4,8 +4,7 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 /*
@@ -26,15 +25,15 @@ func (s *Service) FindFinancialAccount(ctx context.Context, filter bson.M) (*mod
 }
 
 // InsertFinancialAccount creates a new financial account record
-func (s *Service) InsertFinancialAccount(ctx context.Context, account *models.ClubFinancialAccount) (primitive.ObjectID, error) {
+func (s *Service) InsertFinancialAccount(ctx context.Context, account *models.ClubFinancialAccount) (bson.ObjectID, error) {
 	collection := s.Database.ClubFinancialAccountsCollection
 
 	result, err := collection.InsertOne(ctx, account)
 	if err != nil {
-		return primitive.NilObjectID, err
+		return bson.NilObjectID, err
 	}
 
-	return result.InsertedID.(primitive.ObjectID), nil
+	return result.InsertedID.(bson.ObjectID), nil
 }
 
 // UpdateFinancialAccount updates a financial account record
@@ -78,15 +77,15 @@ func (s *Service) FindTransactions(ctx context.Context, filter bson.M, limit, sk
 }
 
 // InsertTransaction creates a new transaction record
-func (s *Service) InsertTransaction(ctx context.Context, transaction *models.ClubTransaction) (primitive.ObjectID, error) {
+func (s *Service) InsertTransaction(ctx context.Context, transaction *models.ClubTransaction) (bson.ObjectID, error) {
 	collection := s.Database.ClubTransactionsCollection
 
 	result, err := collection.InsertOne(ctx, transaction)
 	if err != nil {
-		return primitive.NilObjectID, err
+		return bson.NilObjectID, err
 	}
 
-	return result.InsertedID.(primitive.ObjectID), nil
+	return result.InsertedID.(bson.ObjectID), nil
 }
 
 // UpdateTransaction updates a transaction record

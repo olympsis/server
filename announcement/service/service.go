@@ -14,10 +14,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type Service struct {
@@ -60,7 +59,7 @@ func (s *Service) CreateAnnouncement() http.HandlerFunc {
 		}
 
 		// Set default values for announcement
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 
 		// Default to title emphasis if not specified
 		textEmphasis := models.EmphasisTitle
@@ -130,7 +129,7 @@ func (s *Service) CreateAnnouncement() http.HandlerFunc {
 		}
 		if req.ExpiryDate == nil {
 			// Default to 30 days
-			expiry := primitive.NewDateTimeFromTime(time.Now().Add((24 * time.Hour) * 30))
+			expiry := bson.NewDateTimeFromTime(time.Now().Add((24 * time.Hour) * 30))
 			req.ExpiryDate = &expiry
 		}
 
@@ -172,7 +171,7 @@ func (s *Service) GetAnnouncement() http.HandlerFunc {
 		}
 
 		// Convert string ID to ObjectID
-		objID, err := primitive.ObjectIDFromHex(id)
+		objID, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			http.Error(rw, `{"msg": "invalid announcement id format"}`, http.StatusBadRequest)
 			return
@@ -222,7 +221,7 @@ func (s *Service) GetAnnouncements() http.HandlerFunc {
 		// }
 
 		// Get announcements with location filter applied
-		announcements, err := aggregations.AggregateAnnouncements(ctx, bson.M{}, &options.AggregateOptions{}, s.Database)
+		announcements, err := aggregations.AggregateAnnouncements(ctx, bson.M{}, options.Aggregate(), s.Database)
 		if err != nil {
 			s.Logger.Error("Failed to fetch announcements: ", err.Error())
 			http.Error(rw, `{"msg": "failed to fetch announcements"}`, http.StatusInternalServerError)
@@ -274,7 +273,7 @@ func (s *Service) UpdateAnnouncement() http.HandlerFunc {
 		}
 
 		// Convert string ID to ObjectID
-		objID, err := primitive.ObjectIDFromHex(id)
+		objID, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			http.Error(rw, `{"msg": "invalid announcement id format"}`, http.StatusBadRequest)
 			return
@@ -395,7 +394,7 @@ func (s *Service) DeleteAnnouncement() http.HandlerFunc {
 		}
 
 		// Convert string ID to ObjectID
-		objID, err := primitive.ObjectIDFromHex(id)
+		objID, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			http.Error(rw, `{"msg": "invalid announcement id format"}`, http.StatusBadRequest)
 			return

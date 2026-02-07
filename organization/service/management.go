@@ -3,8 +3,7 @@ package service
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // POST MANAGEMENT
@@ -12,14 +11,14 @@ import (
 func (s *Service) PinPost(orgID *string, postID *string) bool {
 
 	// convert club hex id string to object id
-	cid, err := primitive.ObjectIDFromHex(*orgID)
+	cid, err := bson.ObjectIDFromHex(*orgID)
 	if err != nil {
 		s.Logger.Error("Failed to create org object id: " + err.Error())
 		return false
 	}
 
 	// convert post hex id string to object id
-	pid, err := primitive.ObjectIDFromHex(*postID)
+	pid, err := bson.ObjectIDFromHex(*postID)
 	if err != nil {
 		s.Logger.Error("Failed to create post object id: " + err.Error())
 		return false
@@ -40,7 +39,7 @@ func (s *Service) PinPost(orgID *string, postID *string) bool {
 func (s *Service) UnpinPost(orgID *string) bool {
 
 	// convert club hex id string to object id
-	cid, err := primitive.ObjectIDFromHex(*orgID)
+	cid, err := bson.ObjectIDFromHex(*orgID)
 	if err != nil {
 		s.Logger.Error("Failed to create club object id: " + err.Error())
 		return false

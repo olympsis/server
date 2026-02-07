@@ -4,34 +4,33 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Comment Functions
 
 // Insert new comment into database
-func (s *Service) InsertComment(ctx context.Context, comment *models.EventCommentDao) (primitive.ObjectID, error) {
+func (s *Service) InsertComment(ctx context.Context, comment *models.EventCommentDao) (bson.ObjectID, error) {
 	resp, err := s.Database.EventCommentsCollection.InsertOne(ctx, comment)
 	if err != nil {
-		return primitive.NilObjectID, err
+		return bson.NilObjectID, err
 	}
-	id := resp.InsertedID.(primitive.ObjectID)
+	id := resp.InsertedID.(bson.ObjectID)
 	return id, nil
 }
 
 // Insert multiple comments into database
-func (s *Service) InsertComments(ctx context.Context, comments []any) ([]primitive.ObjectID, error) {
+func (s *Service) InsertComments(ctx context.Context, comments []any) ([]bson.ObjectID, error) {
 	resp, err := s.Database.EventCommentsCollection.InsertMany(ctx, comments)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert inserted IDs to ObjectIDs
-	ids := make([]primitive.ObjectID, len(resp.InsertedIDs))
+	ids := make([]bson.ObjectID, len(resp.InsertedIDs))
 	for i, id := range resp.InsertedIDs {
-		ids[i] = id.(primitive.ObjectID)
+		ids[i] = id.(bson.ObjectID)
 	}
 
 	return ids, nil

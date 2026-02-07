@@ -12,10 +12,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 /*
@@ -47,7 +46,7 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 
 		uuid := r.Header.Get("UUID")
 		isRecurring := req.Recurrence != nil
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 
 		// Create base event
 		event := req.Event
@@ -91,8 +90,9 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 		}
 
 		// Handle recurring event creation
+		pattern := string(req.Recurrence.Pattern)
 		recurrenceConfig := models.EventRecurrenceConfig{
-			RecurrenceRule: &req.Recurrence.Pattern,
+			RecurrenceRule: &pattern,
 			RecurrenceEnd:  &req.Recurrence.EndTime,
 		}
 		event.RecurrenceConfig = &recurrenceConfig
@@ -141,7 +141,7 @@ func (e *Service) GetEvent() http.HandlerFunc {
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		event, err := aggregations.AggregateEvent(oid, e.Database)
 		if err != nil {
@@ -168,11 +168,11 @@ func (s *Service) GetEvents() http.HandlerFunc {
 		// Parse user info (if authenticated)
 		userID := r.Header.Get("UUID")
 		var user *models.UserData
-		var clubs, orgs []primitive.ObjectID
+		var clubs, orgs []bson.ObjectID
 		var sportsList []string
 
 		// Initialize empty slices to avoid nil references
-		venues := []primitive.ObjectID{}
+		venues := []bson.ObjectID{}
 
 		// If location is provided, get nearby venues
 		if queryParams.Location != nil {
@@ -180,7 +180,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 			if err != nil {
 				s.Logger.Error("Failed to find venues: ", err.Error())
 				// Continue with empty venues list instead of failing
-				venues = []primitive.ObjectID{}
+				venues = []bson.ObjectID{}
 			} else {
 				venues = venueIDs
 			}
@@ -220,8 +220,8 @@ func (s *Service) GetEvents() http.HandlerFunc {
 			}
 
 			// Use empty slices for clubs and orgs to avoid nil references
-			clubs = []primitive.ObjectID{}
-			orgs = []primitive.ObjectID{}
+			clubs = []bson.ObjectID{}
+			orgs = []bson.ObjectID{}
 		}
 
 		// Retrieve events
@@ -258,7 +258,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 
 		// Success response
 		resp := models.EventsResponse{
-			TotalEvents: int16(len(*events)),
+			TotalEvents: int32(len(*events)),
 			Events:      *events,
 		}
 		w.WriteHeader(http.StatusOK)
@@ -274,7 +274,7 @@ func (s *Service) GetGroupPastEvents() http.HandlerFunc {
 			return
 		}
 
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			http.Error(w, `{ "msg": "failed to encode id" }`, http.StatusInternalServerError)
 			return
@@ -352,7 +352,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		currentEvent, err := e.FindEvent(context.Background(), bson.M{"_id": oid})
 		if err != nil {
 			e.Logger.Error("failed to find event", err.Error())
@@ -361,7 +361,7 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 		}
 
 		changes := buildUpdateChanges(&req)
-		currentTime := primitive.NewDateTimeFromTime(time.Now())
+		currentTime := bson.NewDateTimeFromTime(time.Now())
 
 		if updateAll && currentEvent.RecurrenceConfig != nil {
 			// Update all future instances
@@ -395,7 +395,7 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 		}
 
 		deleteAll := r.URL.Query().Get("deleteAll") == "true"
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 
 		// First, log what we're trying to delete
 		e.Logger.Infof("Attempting to delete event %s, deleteAll=%v", id, deleteAll)
@@ -528,7 +528,7 @@ func (s *Service) Cancel() http.HandlerFunc {
 		filter := bson.M{
 			"_id": oid,
 		}
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		update := bson.M{
 			"$set": bson.M{
 				"canceled_at": timestamp,
@@ -570,8 +570,8 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 
 		// Decode request
 		var req models.ParticipantDao
-		oid, _ := primitive.ObjectIDFromHex(id)
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		oid, _ := bson.ObjectIDFromHex(id)
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(rw, `{"msg":"failed to decode request"}`, http.StatusBadRequest)
@@ -680,7 +680,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		// grab ids from path
 		vars := mux.Vars(r)
 		eventID := vars["id"]
-		oid, err := primitive.ObjectIDFromHex(eventID)
+		oid, err := bson.ObjectIDFromHex(eventID)
 		if err != nil {
 			e.Logger.Error("Failed to encode event ID to Object ID", err.Error())
 			http.Error(rw, `{"msg": "invalid event id"}`, http.StatusBadRequest)
@@ -697,7 +697,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 
 		// If we have a participant ID this means that they are being removed
 		if participantID, exists := vars["participantID"]; exists && participantID != "" {
-			participantOID, _ := primitive.ObjectIDFromHex(participantID)
+			participantOID, _ := bson.ObjectIDFromHex(participantID)
 			participant, err := e.FindParticipant(ctx, bson.M{"_id": participantOID})
 			if err != nil {
 				http.Error(rw, `{"msg": "failed to find participant"}`, http.StatusNotFound)
@@ -737,8 +737,8 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 
 		// Check waitlist and see if we need to promote another participant
-		opts := options.FindOptions{Sort: bson.M{"created_at": 1}}
-		waitlist, err := e.FindParticipants(ctx, bson.M{"event_id": oid, "status": models.RSVPWaitlist}, &opts)
+		opts := options.Find().SetSort(bson.M{"created_at": 1})
+		waitlist, err := e.FindParticipants(ctx, bson.M{"event_id": oid, "status": models.RSVPWaitlist}, opts)
 		if err != nil {
 			e.Logger.Error("Failed to check waitlist. Error: ", err.Error())
 		}
@@ -810,7 +810,7 @@ func (s *Service) AddComment() http.HandlerFunc {
 			http.Error(w, `{"msg": "bad event id"}`, http.StatusBadRequest)
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			s.Logger.Error("Failed to convert id to ObjectID. Error: ", err.Error())
 			http.Error(w, `{"msg": "failed to encode id"}`, http.StatusBadRequest)
@@ -827,9 +827,9 @@ func (s *Service) AddComment() http.HandlerFunc {
 		}
 
 		// Add comment to the database
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
+		timestamp := bson.NewDateTimeFromTime(time.Now())
 		req.UserID = &uuid
-		req.EventID = oid
+		req.EventID = &oid
 		req.CreatedAt = &timestamp
 		cid, err := s.InsertComment(ctx, &req)
 		if err != nil {
@@ -859,7 +859,7 @@ func (s *Service) RemoveComment() http.HandlerFunc {
 			http.Error(w, `{"msg": "bad comment id"}`, http.StatusBadRequest)
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			s.Logger.Error("Failed to convert id to ObjectID. Error: ", err.Error())
 			http.Error(w, `{"msg": "failed to encode id"}`, http.StatusBadRequest)
@@ -906,7 +906,7 @@ func (s *Service) Location() http.HandlerFunc {
 		// Get user data if authenticated
 		userID := r.Header.Get("UUID")
 		var userData *models.UserData
-		var clubs, orgs []primitive.ObjectID
+		var clubs, orgs []bson.ObjectID
 
 		if userID != "" {
 			userData, err = aggregations.AggregateUser(&userID, s.Database)

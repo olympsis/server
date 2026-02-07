@@ -9,9 +9,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func (s *Service) CreatePostReport() http.HandlerFunc {
@@ -24,26 +23,26 @@ func (s *Service) CreatePostReport() http.HandlerFunc {
 			http.Error(rw, `{ "msg": "failed to decode request" }`, http.StatusBadRequest)
 			return
 		}
-		if req.GroupID == nil || req.GroupID == &primitive.NilObjectID {
+		if req.GroupID == nil || req.GroupID == &bson.NilObjectID {
 			http.Error(rw, `{ "msg": "group ID not found in body" }`, http.StatusBadRequest)
 			return
 		}
-		if req.PostID == nil || req.PostID == &primitive.NilObjectID {
+		if req.PostID == nil || req.PostID == &bson.NilObjectID {
 			http.Error(rw, `{ "msg": "post ID not found in body" }`, http.StatusBadRequest)
 			return
 		}
 
 		// set necessary data
-		id := primitive.NewObjectID()
+		id := bson.NewObjectID()
 		status := "pending"
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		options := options.InsertOneOptions{}
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		opts := options.InsertOne()
 		req.ID = &id
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
 		// insert model into database
-		err = s.PostReport.Insert(context.Background(), &req, &options)
+		err = s.PostReport.Insert(context.Background(), &req, opts)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to create report" }`, http.StatusInternalServerError)
 			s.Logger.Error(fmt.Sprintf(`failed to insert report: %s`, err.Error()))
@@ -66,14 +65,14 @@ func (s *Service) ReadPostReports() http.HandlerFunc {
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}
-		options := options.AggregateOptions{}
-		oid, _ := primitive.ObjectIDFromHex(id)
+		opts := options.Aggregate()
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter["group_id"] = oid
 		if status != "" {
 			filter["status"] = status
 		}
 
-		reports, err := s.PostReport.Find(context.Background(), bson.M{"$match": filter}, &options)
+		reports, err := s.PostReport.Find(context.Background(), bson.M{"$match": filter}, opts)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf("failed to find reports: %s", err.Error()))
 			http.Error(rw, `{ "msg": "failed to find reports" }`, http.StatusInternalServerError)
@@ -110,7 +109,7 @@ func (s *Service) UpdatePostReport() http.HandlerFunc {
 		}
 
 		// handle updates
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}
@@ -148,7 +147,7 @@ func (s *Service) DeletePostReport() http.HandlerFunc {
 		}
 
 		// convert id -> object id
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}

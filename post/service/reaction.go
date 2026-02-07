@@ -4,18 +4,17 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func (s *Service) InsertReaction(ctx context.Context, reaction *models.ReactionDao, opts *options.InsertOneOptions) (*primitive.ObjectID, error) {
+func (s *Service) InsertReaction(ctx context.Context, reaction *models.ReactionDao, opts *options.InsertOneOptionsBuilder) (*bson.ObjectID, error) {
 	id, err := s.Database.PostReactionsCollection.InsertOne(ctx, reaction, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return id.InsertedID.(*primitive.ObjectID), nil
+	return id.InsertedID.(*bson.ObjectID), nil
 }
 
 func (s *Service) UpdateReaction(ctx context.Context, filter bson.M, update bson.M) error {

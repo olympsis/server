@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"olympsis-server/utils"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Sets up all of the events collections
@@ -406,13 +406,14 @@ func (d *Database) SetUpVenueCollections(db *mongo.Database, config *utils.Colle
 			// Filter out indexes that already exist
 			var newIndexes []mongo.IndexModel
 			for _, idx := range indexes {
-				if idx.Options == nil || idx.Options.Name == nil {
+				name := getIndexName(idx.Options)
+				if name == nil {
 					// No name specified, keep the index
 					newIndexes = append(newIndexes, idx)
 					continue
 				}
 
-				indexName := *idx.Options.Name
+				indexName := *name
 				if existingIndexes[indexName] {
 					// Skip this index as it already exists
 					continue
@@ -483,13 +484,14 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		// Filter out indexes that already exist
 		var newIndexes []mongo.IndexModel
 		for _, idx := range indexes {
-			if idx.Options == nil || idx.Options.Name == nil {
+			name := getIndexName(idx.Options)
+			if name == nil {
 				// No name specified, keep the index
 				newIndexes = append(newIndexes, idx)
 				continue
 			}
 
-			indexName := *idx.Options.Name
+			indexName := *name
 			if existingIndexes[indexName] {
 				// Skip this index as it already exists
 				continue
@@ -793,13 +795,14 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		// Filter out indexes that already exist
 		var newIndexes []mongo.IndexModel
 		for _, idx := range indexes {
-			if idx.Options == nil || idx.Options.Name == nil {
+			name := getIndexName(idx.Options)
+			if name == nil {
 				// No name specified, keep the index
 				newIndexes = append(newIndexes, idx)
 				continue
 			}
 
-			indexName := *idx.Options.Name
+			indexName := *name
 			if existingIndexes[indexName] {
 				// Skip this index as it already exists
 				continue
@@ -1018,13 +1021,14 @@ func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.Collec
 		// Filter out indexes that already exist
 		var newIndexes []mongo.IndexModel
 		for _, idx := range indexes {
-			if idx.Options == nil || idx.Options.Name == nil {
+			name := getIndexName(idx.Options)
+			if name == nil {
 				// No name specified, keep the index
 				newIndexes = append(newIndexes, idx)
 				continue
 			}
 
-			indexName := *idx.Options.Name
+			indexName := *name
 			if existingIndexes[indexName] {
 				// Skip this index as it already exists
 				continue

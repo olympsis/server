@@ -11,9 +11,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // Get club applications
@@ -104,7 +103,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 
 		// If we have no existing events create a new one
 		if err == mongo.ErrNoDocuments {
-			timeStamp := primitive.NewDateTimeFromTime(time.Now())
+			timeStamp := bson.NewDateTimeFromTime(time.Now())
 			status := "pending"
 			app := models.ClubApplicationDao{
 				Applicant: &uuid,
@@ -126,7 +125,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 			}
 
 			rw.WriteHeader(http.StatusCreated)
-			rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, resp.InsertedID.(primitive.ObjectID).Hex()))
+			rw.Write(fmt.Appendf(nil, `{ "id" : "%s" }`, resp.InsertedID.(bson.ObjectID).Hex()))
 			return
 		} else {
 			c.Logger.Error(fmt.Sprintf("Failed to check for application. ID: %s - Error: %s", id, err.Error()))
@@ -179,7 +178,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 		}
 
 		// Handle accepting application
-		if req.Status == models.AcceptedApplicationStatus {
+		if models.ApplicationStatus(req.Status) == models.AcceptedApplicationStatus {
 
 			// Check for existing application
 			var app models.ClubApplicationDao
@@ -191,7 +190,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			}
 
 			// Only process pending application
-			if *app.Status != models.PendingApplicationStatus {
+			if models.ApplicationStatus(*app.Status) != models.PendingApplicationStatus {
 				rw.WriteHeader(http.StatusOK)
 				rw.Write([]byte(`{"msg":"OK"}`))
 				return
@@ -209,11 +208,11 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 
 			// Add member to database
 			member := models.MemberDao{
-				ID:       primitive.NewObjectID(),                   // doc id
+				ID:       bson.NewObjectID(),                   // doc id
 				UserID:   *app.Applicant,                            // user uuid
 				ClubID:   &oid,                                      // club id
 				Role:     string(models.MemberMember),               // user role
-				JoinedAt: primitive.NewDateTimeFromTime(time.Now()), // joined date
+				JoinedAt: bson.NewDateTimeFromTime(time.Now()), // joined date
 			}
 			_, err = c.InsertMember(ctx, &member)
 			if err != nil {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Checks if the collection exists
@@ -42,6 +42,22 @@ func (d *Database) createTimeSeriesCollection(db *mongo.Database, name string, t
 	return nil
 }
 
+// getIndexName extracts the index name from an IndexOptionsBuilder.
+// In v2, IndexModel.Options is a builder with setter functions, so we
+// resolve them into an IndexOptions struct to read the Name field.
+func getIndexName(builder *options.IndexOptionsBuilder) *string {
+	if builder == nil {
+		return nil
+	}
+	resolved := &options.IndexOptions{}
+	for _, fn := range builder.Opts {
+		if err := fn(resolved); err != nil {
+			return nil
+		}
+	}
+	return resolved.Name
+}
+
 // Safely creates the indexes for a collection
 func createIndexes(collection *mongo.Collection, indexes []mongo.IndexModel, collectionName string) error {
 	// First, list existing indexes
@@ -70,14 +86,14 @@ func createIndexes(collection *mongo.Collection, indexes []mongo.IndexModel, col
 	// Filter out indexes that already exist
 	var newIndexes []mongo.IndexModel
 	for _, idx := range indexes {
-		if idx.Options == nil || idx.Options.Name == nil {
+		name := getIndexName(idx.Options)
+		if name == nil {
 			// No name specified, keep the index
 			newIndexes = append(newIndexes, idx)
 			continue
 		}
 
-		indexName := *idx.Options.Name
-		if existingIndexes[indexName] {
+		if existingIndexes[*name] {
 			// Skip this index as it already exists
 			continue
 		}

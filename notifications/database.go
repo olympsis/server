@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func (n *Service) createNotificationLog(log *models.NotificationLog) error {
@@ -86,7 +85,7 @@ func (n *Service) updateNotificationTopic(filter bson.M, users []string, add boo
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	timestamp := primitive.NewDateTimeFromTime(time.Now())
+	timestamp := bson.NewDateTimeFromTime(time.Now())
 
 	var updates bson.M
 	if add { // Handle add users operation

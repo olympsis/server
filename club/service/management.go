@@ -3,8 +3,7 @@ package service
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // MEMBER MANAGEMENT
@@ -27,7 +26,7 @@ func (s *Service) KickAMember(clubID *string, memberID *string) bool {
 
 // POST MANAGEMENT
 
-func (s *Service) PinPost(clubID *primitive.ObjectID, postID *primitive.ObjectID) bool {
+func (s *Service) PinPost(clubID *bson.ObjectID, postID *bson.ObjectID) bool {
 
 	// update club's pinned post
 	filter := bson.M{"_id": clubID}
@@ -41,7 +40,7 @@ func (s *Service) PinPost(clubID *primitive.ObjectID, postID *primitive.ObjectID
 	return true
 }
 
-func (s *Service) UnpinPost(clubID *primitive.ObjectID) bool {
+func (s *Service) UnpinPost(clubID *bson.ObjectID) bool {
 
 	// remove club's pinned post
 	filter := bson.M{"_id": clubID}

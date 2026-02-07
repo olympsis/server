@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type EventPollingService struct {
@@ -23,7 +22,7 @@ type EventPollingService struct {
 // Stripped down event object to reduce memory footprint
 type StrippedEvent struct {
 	ID       string             `bson:"_id"`
-	StopTime primitive.DateTime `bson:"stop_time"`
+	StopTime bson.DateTime `bson:"stop_time"`
 }
 
 func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.Service) *EventPollingService {
@@ -54,8 +53,8 @@ func (p *EventPollingService) getEvents(start time.Time, end time.Time) []Stripp
 	options := options.Find().SetProjection(projection)
 	filter := bson.M{
 		"start_time": bson.M{
-			"$gte": primitive.NewDateTimeFromTime(start),
-			"$lte": primitive.NewDateTimeFromTime(end),
+			"$gte": bson.NewDateTimeFromTime(start),
+			"$lte": bson.NewDateTimeFromTime(end),
 		},
 	}
 	cursor, err := p.db.EventsCollection.Find(context.Background(), filter, options)

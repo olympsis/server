@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Parse and validate events query parameters
@@ -49,14 +49,14 @@ func parseEventsQueryParams(r *http.Request) (*EventQueryParams, error) {
 	// Parse venues if provided
 	if venuesStr != "" {
 		venueStrings := strings.Split(venuesStr, ",")
-		params.VenueIDs = make([]primitive.ObjectID, 0, len(venueStrings))
+		params.VenueIDs = make([]bson.ObjectID, 0, len(venueStrings))
 
 		for _, id := range venueStrings {
 			if id == "" {
 				continue
 			}
 
-			oid, err := primitive.ObjectIDFromHex(id)
+			oid, err := bson.ObjectIDFromHex(id)
 			if err != nil {
 				return nil, fmt.Errorf("invalid venue ID: %s", id)
 			}

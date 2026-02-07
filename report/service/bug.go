@@ -9,9 +9,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func (s *Service) CreateBugReport() http.HandlerFunc {
@@ -27,17 +26,17 @@ func (s *Service) CreateBugReport() http.HandlerFunc {
 
 		// set necessary data
 		uuid := r.Header.Get("UUID")
-		id := primitive.NewObjectID()
+		id := bson.NewObjectID()
 		status := "pending"
-		timestamp := primitive.NewDateTimeFromTime(time.Now())
-		options := options.InsertOneOptions{}
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		opts := options.InsertOne()
 		req.ID = &id
 		req.User = &uuid
 		req.Status = &status
 		req.CreatedAt = &timestamp
 
 		// insert model into database
-		err = s.BugReport.Insert(context.Background(), &req, &options)
+		err = s.BugReport.Insert(context.Background(), &req, opts)
 		if err != nil {
 			http.Error(rw, `{ "msg": "failed to create bug report" }`, http.StatusInternalServerError)
 			s.Logger.Error(fmt.Sprintf(`failed to insert bug report: %s`, err.Error()))
@@ -56,7 +55,7 @@ func (s *Service) ReadBugReports() http.HandlerFunc {
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}
-		options := options.AggregateOptions{}
+		opts := options.Aggregate()
 
 		if uuid != "" {
 			filter["user"] = uuid
@@ -65,7 +64,7 @@ func (s *Service) ReadBugReports() http.HandlerFunc {
 			filter["status"] = status
 		}
 
-		reports, err := s.BugReport.Find(context.Background(), bson.M{"$match": filter}, &options)
+		reports, err := s.BugReport.Find(context.Background(), bson.M{"$match": filter}, opts)
 		if err != nil {
 			s.Logger.Error(fmt.Sprintf("failed to find reports: %s", err.Error()))
 			http.Error(rw, `{ "msg": "failed to find reports" }`, http.StatusInternalServerError)
@@ -102,7 +101,7 @@ func (s *Service) UpdateBugReport() http.HandlerFunc {
 		}
 
 		// handle updates
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}
@@ -149,7 +148,7 @@ func (s *Service) DeleteBugReport() http.HandlerFunc {
 		}
 
 		// convert id -> object id
-		oid, _ := primitive.ObjectIDFromHex(id)
+		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.M{
 			"_id": oid,
 		}

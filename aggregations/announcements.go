@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/olympsis/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Aggregate a single announcement with creator details
-func AggregateAnnouncement(ctx context.Context, id primitive.ObjectID, db *database.Database) (*models.Announcement, error) {
+func AggregateAnnouncement(ctx context.Context, id bson.ObjectID, db *database.Database) (*models.Announcement, error) {
 	pipeline := []bson.M{
 		{
 			"$match": bson.M{
@@ -86,7 +85,7 @@ func AggregateAnnouncement(ctx context.Context, id primitive.ObjectID, db *datab
 }
 
 // Aggregate multiple announcements with creator details
-func AggregateAnnouncements(ctx context.Context, filter bson.M, opts *options.AggregateOptions, db *database.Database) ([]models.Announcement, error) {
+func AggregateAnnouncements(ctx context.Context, filter bson.M, opts *options.AggregateOptionsBuilder, db *database.Database) ([]models.Announcement, error) {
 	pipeline := []bson.M{
 		{
 			"$match": filter,
@@ -206,8 +205,8 @@ func GetActiveAnnouncements(ctx context.Context, location *models.Location, limi
 		"$and": []bson.M{baseFilter, filter},
 	}
 
-	// Set up options for limiting results
-	opts := options.Aggregate().SetMaxTime(30 * time.Second)
+	// Set up aggregation options (SetMaxTime removed in v2; use context deadlines instead)
+	opts := options.Aggregate()
 
 	// Use the aggregation pipeline to get full announcements with creator info
 	announcements, err := AggregateAnnouncements(ctx, combinedFilter, opts, db)
