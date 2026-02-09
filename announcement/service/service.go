@@ -42,7 +42,7 @@ Create Announcement (POST)
 func (s *Service) CreateAnnouncement() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Get user UUID from header
+		// Get user UserID from header
 		uuid := r.Header.Get("userID")
 		if uuid == "" {
 			s.Logger.Error("Failed to get uuid from authorization token")
@@ -257,7 +257,7 @@ Update Announcement (PUT)
 */
 func (s *Service) UpdateAnnouncement() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// Get user UUID from header
+		// Get user UserID from header
 		uuid := r.Header.Get("userID")
 		if uuid == "" {
 			http.Error(rw, `{"msg": "unauthorized"}`, http.StatusUnauthorized)
@@ -378,7 +378,7 @@ Delete Announcement (DELETE)
 */
 func (s *Service) DeleteAnnouncement() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// Get user UUID from header
+		// Get user UserID from header
 		uuid := r.Header.Get("userID")
 		if uuid == "" {
 			http.Error(rw, `{"msg": "unauthorized"}`, http.StatusUnauthorized)

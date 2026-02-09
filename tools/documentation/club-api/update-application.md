@@ -7,7 +7,7 @@ Accept or deny a membership application (admin only).
 
 ## Headers
 - `Authorization: Bearer {firebase_token}`
-- `UUID: {user_uuid}`
+- `UserID: {user_uuid}`
 
 ## Request Body
 ```json

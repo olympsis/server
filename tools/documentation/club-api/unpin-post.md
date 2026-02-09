@@ -7,7 +7,7 @@ Removes the currently pinned post from the club.
 
 ## Headers
 - `Authorization: Bearer {firebase_token}`
-- `UUID: {user_uuid}`
+- `UserID: {user_uuid}`
 
 ## Response
 **200 OK**

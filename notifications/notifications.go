@@ -110,7 +110,7 @@ func (n *Service) processPushRequest(request *models.NotificationPushRequest) er
 		// Create UserNotification for each user
 		userNotif := &models.UserNotification{
 			ID:             bson.NewObjectID(),
-			UUID:           user.UUID,
+			UserID:         user.UserID,
 			NotificationID: pushNotif.ID,
 			IsRead:         false,
 			CreatedAt:      bson.NewDateTimeFromTime(time.Now()),

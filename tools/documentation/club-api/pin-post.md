@@ -7,7 +7,7 @@ Pins a specific post to the top of the club's feed.
 
 ## Headers
 - `Authorization: Bearer {firebase_token}`
-- `UUID: {user_uuid}`
+- `UserID: {user_uuid}`
 
 ## Response
 **200 OK**

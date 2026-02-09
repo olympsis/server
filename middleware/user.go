@@ -12,7 +12,7 @@ import (
 /*
 User Middleware
   - used for routes that require the user to be logged in and have an auth token
-  - after decoding auth token, add a request header of UUID with user id
+  - after decoding auth token, add a request header of UserID with user id
 */
 func UserMiddleware(auth *auth.Client) Middleware {
 	return func(f http.HandlerFunc) http.HandlerFunc {

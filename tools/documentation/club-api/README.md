@@ -7,7 +7,7 @@ All club endpoints follow the pattern: `/v1/clubs/{id}` where `{id}` is the club
 
 ## Authentication
 - Most endpoints require Firebase authentication token in the `Authorization` header
-- User UUID is passed in the `UUID` header
+- User UserID is passed in the `UserID` header
 - Admin/Owner permissions are validated internally based on club membership roles
 
 ---

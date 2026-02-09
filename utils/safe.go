@@ -64,7 +64,7 @@ func NewSafeUsers() *SafeUsers {
 }
 func (m *SafeUsers) AddUser(usr *models.UserData) {
 	m.mu.Lock()
-	m.members[usr.UUID] = usr
+	m.members[usr.UserID] = usr
 	m.mu.Unlock()
 }
 func (m *SafeUsers) FindUser(uuid string) *models.UserData {

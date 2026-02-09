@@ -51,7 +51,7 @@ func (a *Service) Register() http.HandlerFunc {
 		if err == nil {
 			if existing != nil {
 				response := models.AuthResponse{
-					UUID:      existing.UUID,
+					UserID:    existing.UserID,
 					FirstName: existing.FirstName,
 					LastName:  existing.LastName,
 					Email:     existing.Email,
@@ -72,7 +72,7 @@ func (a *Service) Register() http.HandlerFunc {
 		// New AuthUser
 		timestamp := bson.NewDateTimeFromTime(time.Now())
 		user := &models.AuthUserDao{
-			UUID:      &token.UID,
+			UserID:    &token.UID,
 			FirstName: request.FirstName,
 			LastName:  request.LastName,
 			Email:     request.Email,
@@ -90,15 +90,13 @@ func (a *Service) Register() http.HandlerFunc {
 		// User Metadata
 		tempUsername := "olympsis-user-" + uuid.NewString()
 		hasOnboarded := false
-		acceptedEULA := true
 		visibility := "public"
 		meta := models.User{
 			ID:           bson.NewObjectID(),
-			UUID:         token.UID,
+			UserID:       token.UID,
 			UserName:     tempUsername,
 			Visibility:   visibility,
 			HasOnboarded: hasOnboarded,
-			AcceptedEULA: acceptedEULA,
 		}
 
 		// Insert metadata into database
@@ -110,7 +108,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		response := models.AuthResponse{
-			UUID:      *user.UUID,
+			UserID:    *user.UserID,
 			FirstName: *user.FirstName,
 			LastName:  *user.LastName,
 			Email:     *user.Email,

@@ -7,7 +7,7 @@ Allows a member to voluntarily leave the club.
 
 ## Headers
 - `Authorization: Bearer {firebase_token}`
-- `UUID: {user_uuid}`
+- `UserID: {user_uuid}`
 
 ## Response
 **200 OK**
@@ -20,7 +20,7 @@ Allows a member to voluntarily leave the club.
 ## Implementation Details
 - Removes member record for the user
 - Unsubscribes from all club notification topics (general and admin)
-- Uses user UUID from header to identify member to remove
+- Uses user UserID from header to identify member to remove
 - Self-service endpoint - members can leave without admin approval
 
 ## Error Responses

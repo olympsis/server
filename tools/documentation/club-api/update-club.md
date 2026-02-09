@@ -7,7 +7,7 @@ Updates club information. Requires club admin/owner permissions.
 
 ## Headers
 - `Authorization: Bearer {firebase_token}`
-- `UUID: {user_uuid}`
+- `UserID: {user_uuid}`
 
 ## Request Body
 All fields are optional:

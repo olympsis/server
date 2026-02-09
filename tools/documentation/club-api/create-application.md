@@ -7,7 +7,7 @@ Submit an application to join the club.
 
 ## Headers
 - `Authorization: Bearer {firebase_token}`
-- `UUID: {user_uuid}`
+- `UserID: {user_uuid}`
 
 ## Response
 **201 Created**

@@ -112,7 +112,7 @@ func (s *Service) CreateUserData() http.HandlerFunc {
 
 		user := models.User{
 			ID:           bson.NewObjectID(),
-			UUID:         uuid,
+			UserID:       uuid,
 			UserName:     req.UserName,
 			Sports:       req.Sports,
 			Visibility:   "public",
@@ -229,9 +229,6 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		}
 		if req.Visibility != nil {
 			changes["visibility"] = req.Visibility
-		}
-		if req.AcceptedEULA != nil {
-			changes["accepted_eula"] = req.AcceptedEULA
 		}
 		if req.HasOnboarded != nil {
 			changes["has_onboarded"] = req.HasOnboarded
@@ -415,7 +412,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			}
 
 			data.Bio = meta.Bio
-			data.UUID = meta.UUID
+			data.UserID = meta.UserID
 			data.Username = meta.UserName
 			if meta.ImageURL != nil {
 				data.ImageURL = *meta.ImageURL
@@ -435,7 +432,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 		// fetch first and last name
 		for i := range users {
 			var auth models.AuthUser
-			err := u.Database.AuthCollection.FindOne(context.TODO(), bson.M{"uuid": users[i].UUID}).Decode(&auth)
+			err := u.Database.AuthCollection.FindOne(context.TODO(), bson.M{"uuid": users[i].UserID}).Decode(&auth)
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
@@ -492,7 +489,7 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 		// create user data object
 		userData := models.UserData{
-			UUID:                   user.UUID,
+			UserID:                 user.UserID,
 			Bio:                    user.Bio,
 			Username:               user.UserName,
 			FirstName:              auth.FirstName,

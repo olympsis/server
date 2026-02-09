@@ -7,7 +7,7 @@ Retrieves a list of clubs based on location and filter criteria.
 
 ## Headers
 - `Authorization: Bearer {firebase_token}` (required)
-- `UUID: {user_uuid}` (required)
+- `UserID: {user_uuid}` (required)
 
 ## Query Parameters
 - `location` (string): Comma-separated longitude,latitude (e.g., "-122.4194,37.7749")

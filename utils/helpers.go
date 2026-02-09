@@ -142,7 +142,7 @@ func RemovePostsByPosterUUIDs(posts *[]models.Post, uuids []string) *[]models.Po
 			found := false
 			for _, uuid := range uuids {
 				if post.Poster != nil {
-					if post.Poster.UUID == uuid {
+					if post.Poster.UserID == uuid {
 						found = true
 						break
 					}
