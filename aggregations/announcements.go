@@ -24,7 +24,7 @@ func AggregateAnnouncement(ctx context.Context, id bson.ObjectID, db *database.D
 			"$lookup": bson.M{
 				"from":         "users",
 				"localField":   "creator",
-				"foreignField": "uuid",
+				"foreignField": "user_id",
 				"as":           "creator_user",
 			},
 		},
@@ -54,7 +54,7 @@ func AggregateAnnouncement(ctx context.Context, id bson.ObjectID, db *database.D
 				"created_at":     1,
 				"updated_at":     1,
 				"creator": bson.M{
-					"uuid":      "$creator",
+					"user_id":   "$creator",
 					"username":  "$creator_user.username",
 					"image_url": "$creator_user.image_url",
 				},
@@ -94,7 +94,7 @@ func AggregateAnnouncements(ctx context.Context, filter bson.M, opts *options.Ag
 			"$lookup": bson.M{
 				"from":         "users",
 				"localField":   "creator",
-				"foreignField": "uuid",
+				"foreignField": "user_id",
 				"as":           "creator_user",
 			},
 		},
@@ -124,7 +124,7 @@ func AggregateAnnouncements(ctx context.Context, filter bson.M, opts *options.Ag
 				"created_at":     1,
 				"updated_at":     1,
 				"creator": bson.M{
-					"uuid":      "$creator",
+					"user_id":   "$creator",
 					"username":  "$creator_user.username",
 					"image_url": "$creator_user.image_url",
 				},

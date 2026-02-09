@@ -61,7 +61,7 @@ func (orm *MemberReportORM) Find(ctx context.Context, filter interface{}, opts *
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "user.uuid",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "user",
 		},
 	}

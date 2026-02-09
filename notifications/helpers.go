@@ -9,7 +9,7 @@ import (
 
 func (n *Service) findUsers(arr []string) ([]models.User, error) {
 	filter := bson.M{
-		"uuid": bson.M{
+		"user_id": bson.M{
 			"$in": arr,
 		},
 	}
@@ -33,7 +33,7 @@ func (n *Service) findUsers(arr []string) ([]models.User, error) {
 
 func (n *Service) findUser(userID string) (*models.User, error) {
 	filter := bson.M{
-		"uuid": userID,
+		"user_id": userID,
 	}
 
 	var user models.User

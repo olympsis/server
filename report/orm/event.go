@@ -27,7 +27,7 @@ func (orm *EventReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "user",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_auth",
 		},
 	}
@@ -36,7 +36,7 @@ func (orm *EventReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "user",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_users",
 		},
 	}
@@ -87,7 +87,7 @@ func (orm *EventReportORM) Find(ctx context.Context, filter interface{}, opts *o
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "event.poster",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_poster",
 		},
 	}

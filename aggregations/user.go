@@ -16,7 +16,7 @@ func AggregateUser(uuid *string, database *database.Database) (*models.UserData,
 	// find user auth object
 	match := bson.M{
 		"$match": bson.M{
-			"uuid": *uuid,
+			"user_id": *uuid,
 		},
 	}
 
@@ -24,8 +24,8 @@ func AggregateUser(uuid *string, database *database.Database) (*models.UserData,
 	lookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "uuid",
-			"foreignField": "uuid",
+			"localField":   "user_id",
+			"foreignField": "user_id",
 			"as":           "metadata",
 		},
 	}
@@ -55,6 +55,7 @@ func AggregateUser(uuid *string, database *database.Database) (*models.UserData,
 			"accepted_eula":           "$metadata.accepted_eula",
 			"has_onboarded":           "$metadata.has_onboarded",
 			"blocked_users":           "$metadata.blocked_users",
+			"gender":                  "$metadata.gender",
 			"hometown":                "$metadata.hometown",
 			"last_location":           "$metadata.last_location",
 			"notification_devices":    "$metadata.notification_devices",

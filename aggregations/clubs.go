@@ -132,8 +132,8 @@ func AggregateClubApplication(id *bson.ObjectID, database *database.Database) (*
 	metaLookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "users",
-			"localField":   "uuid",
-			"foreignField": "uuid",
+			"localField":   "user_id",
+			"foreignField": "user_id",
 			"as":           "meta",
 		},
 	}
@@ -141,8 +141,8 @@ func AggregateClubApplication(id *bson.ObjectID, database *database.Database) (*
 	authLookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "auth",
-			"localField":   "uuid",
-			"foreignField": "uuid",
+			"localField":   "user_id",
+			"foreignField": "user_id",
 			"as":           "auth",
 		},
 	}
@@ -184,7 +184,7 @@ func AggregateClubApplication(id *bson.ObjectID, database *database.Database) (*
 		"$project": bson.M{
 			"meta":    0,
 			"auth":    0,
-			"uuid":    0,
+			"user_id": 0,
 			"club_id": 0,
 			"user": bson.M{
 				"_id":          0,
@@ -239,7 +239,7 @@ func AggregateClubApplications(clubId *bson.ObjectID, status string, database *d
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "applicant",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "meta",
 		},
 	}
@@ -248,7 +248,7 @@ func AggregateClubApplications(clubId *bson.ObjectID, status string, database *d
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "applicant",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "auth",
 		},
 	}
@@ -290,7 +290,7 @@ func AggregateClubApplications(clubId *bson.ObjectID, status string, database *d
 		"$project": bson.M{
 			"meta":            0,
 			"auth":            0,
-			"uuid":            0,
+			"user_id":         0,
 			"club_id":         0,
 			"applicant._id":   0,
 			"applicant.email": 0,
@@ -427,7 +427,7 @@ func BuildClubCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "_club_members.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_member_users",
 		},
 	}
@@ -437,7 +437,7 @@ func BuildClubCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "_club_members.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_member_auth",
 		},
 	}
@@ -524,7 +524,7 @@ func BuildClubCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "_parent_members.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_parent_member_users",
 		},
 	}
@@ -534,7 +534,7 @@ func BuildClubCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "_parent_members.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_parent_member_auth",
 		},
 	}

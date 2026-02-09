@@ -47,7 +47,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		// Check for duplicates
-		existing, err := a.FindUser(ctx, bson.M{"uuid": token.UID})
+		existing, err := a.FindUser(ctx, bson.M{"user_id": token.UID})
 		if err == nil {
 			if existing != nil {
 				response := models.AuthResponse{
@@ -209,7 +209,7 @@ func (a *Service) Delete() http.HandlerFunc {
 
 		// DELETE USER FROM DATABASE
 		uuid := r.Header.Get("userID")
-		err := a.DeleteUser(context.Background(), bson.M{"uuid": uuid})
+		err := a.DeleteUser(context.Background(), bson.M{"user_id": uuid})
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))

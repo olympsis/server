@@ -168,7 +168,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		// Special handling for notification devices
 		if req.NotificationDevices != nil && len(*req.NotificationDevices) > 0 {
 			// First get the current user to access existing devices
-			filter := bson.M{"uuid": uuid}
+			filter := bson.M{"user_id": uuid}
 			var currentUser models.User
 			err = s.Database.UserCollection.FindOne(context.Background(), filter).Decode(&currentUser)
 			if err != nil {
@@ -210,7 +210,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			req.NotificationDevices = &updatedDevices
 		}
 
-		filter := bson.M{"uuid": uuid}
+		filter := bson.M{"user_id": uuid}
 		changes := bson.M{}
 		if req.UserName != nil {
 			changes["username"] = req.UserName
@@ -288,9 +288,9 @@ Returns:
 func (s *Service) GetUserData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("userID")
+		user_id := r.Header.Get("userID")
 
-		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		user, err := aggregations.AggregateUser(&user_id, s.Database)
 		if err != nil || user.Username == "" {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusNotFound)
@@ -319,7 +319,7 @@ func (u *Service) DeleteUserData() http.HandlerFunc {
 		uuid := r.Header.Get("userID")
 
 		// delete user data from database
-		filter := bson.M{"uuid": uuid}
+		filter := bson.M{"user_id": uuid}
 		err := u.DeleteUser(context.Background(), filter)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -432,7 +432,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 		// fetch first and last name
 		for i := range users {
 			var auth models.AuthUser
-			err := u.Database.AuthCollection.FindOne(context.TODO(), bson.M{"uuid": users[i].UserID}).Decode(&auth)
+			err := u.Database.AuthCollection.FindOne(context.TODO(), bson.M{"user_id": users[i].UserID}).Decode(&auth)
 			if err != nil {
 				u.Log.Error("Failed to decode user auth data: " + err.Error())
 			} else {
@@ -455,7 +455,7 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// grab username from query
-		keys, ok := r.URL.Query()["uuid"]
+		keys, ok := r.URL.Query()["user_id"]
 		if !ok || len(keys[0]) < 1 {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(`{ "msg": "no uuid found in request" }`))
@@ -465,7 +465,7 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 		// context/filter
 		ctx := context.Background()
-		filter := bson.M{"uuid": uuid}
+		filter := bson.M{"user_id": uuid}
 		opts := options.FindOne()
 
 		// find and decode auth user data

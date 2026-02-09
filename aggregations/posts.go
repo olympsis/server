@@ -111,7 +111,7 @@ func BuildPostCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "poster",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_poster_user",
 		},
 	}
@@ -121,7 +121,7 @@ func BuildPostCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "poster",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_poster_auth",
 		},
 	}
@@ -135,7 +135,7 @@ func BuildPostCorePipeline() bson.A {
 					bson.M{
 						"$mergeObjects": bson.A{
 							bson.M{
-								"uuid":      bson.M{"$arrayElemAt": bson.A{"$_poster_user.uuid", 0}},
+								"user_id":   bson.M{"$arrayElemAt": bson.A{"$_poster_user.uuid", 0}},
 								"username":  bson.M{"$arrayElemAt": bson.A{"$_poster_user.username", 0}},
 								"image_url": bson.M{"$arrayElemAt": bson.A{"$_poster_user.image_url", 0}},
 							},
@@ -189,7 +189,7 @@ func BuildPostCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "_comments.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_comment_users",
 		},
 	}
@@ -199,7 +199,7 @@ func BuildPostCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "_comments.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_comment_auth",
 		},
 	}
@@ -254,7 +254,7 @@ func BuildPostCorePipeline() bson.A {
 									},
 								},
 								"in": bson.M{
-									"uuid":       "$$userData.uuid",
+									"user_id":    "$$userData.uuid",
 									"username":   "$$userData.username",
 									"image_url":  "$$userData.image_url",
 									"first_name": "$$authData.first_name",
@@ -283,7 +283,7 @@ func BuildPostCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "_reactions.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_reaction_users",
 		},
 	}
@@ -293,7 +293,7 @@ func BuildPostCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "_reactions.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_reaction_auth",
 		},
 	}
@@ -347,7 +347,7 @@ func BuildPostCorePipeline() bson.A {
 									},
 								},
 								"in": bson.M{
-									"uuid":       "$$userData.uuid",
+									"user_id":    "$$userData.uuid",
 									"username":   "$$userData.username",
 									"image_url":  "$$userData.image_url",
 									"first_name": "$$authData.first_name",

@@ -15,15 +15,15 @@ func CheckInUser(uuid string, database *database.Database) (*models.CheckIn, err
 
 	filter := bson.M{
 		"$match": bson.M{
-			"uuid": uuid,
+			"user_id": uuid,
 		},
 	}
 
 	authLookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "auth",
-			"localField":   "uuid",
-			"foreignField": "uuid",
+			"localField":   "user_id",
+			"foreignField": "user_id",
 			"as":           "_auth",
 		},
 	}
@@ -50,7 +50,7 @@ func CheckInUser(uuid string, database *database.Database) (*models.CheckIn, err
 		"$lookup": bson.M{
 			"from":         "user",
 			"localField":   "_clubs.members.uuid",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_clubs_members",
 		},
 	}
@@ -59,7 +59,7 @@ func CheckInUser(uuid string, database *database.Database) (*models.CheckIn, err
 		"$lookup": bson.M{
 			"from":         "user",
 			"localField":   "_orgs.members.uuid",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_orgs_members",
 		},
 	}
@@ -174,7 +174,7 @@ func CheckInUser(uuid string, database *database.Database) (*models.CheckIn, err
 	reformDocument := bson.M{
 		"$project": bson.M{
 			"user_data": bson.M{
-				"uuid":       "$uuid",
+				"user_id":    "$uuid",
 				"username":   "$username",
 				"visibility": "$visibility",
 				"sports":     "$sports",
@@ -255,15 +255,15 @@ func FindUser(uuid string, database *database.Database) (*models.UserData, error
 
 	filter := bson.M{
 		"$match": bson.M{
-			"uuid": uuid,
+			"user_id": uuid,
 		},
 	}
 
 	authLookup := bson.M{
 		"$lookup": bson.M{
 			"from":         "auth",
-			"localField":   "uuid",
-			"foreignField": "uuid",
+			"localField":   "user_id",
+			"foreignField": "user_id",
 			"as":           "_auth",
 		},
 	}

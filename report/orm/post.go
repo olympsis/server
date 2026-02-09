@@ -36,7 +36,7 @@ func (orm *PostReportORM) Find(ctx context.Context, filter interface{}, opts *op
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "_post.poster",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_poster",
 		},
 	}

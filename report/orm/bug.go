@@ -27,7 +27,7 @@ func (orm *BugReportORM) Find(ctx context.Context, filter interface{}, opts *opt
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "user",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_auth",
 		},
 	}
@@ -36,7 +36,7 @@ func (orm *BugReportORM) Find(ctx context.Context, filter interface{}, opts *opt
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "user",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_users",
 		},
 	}

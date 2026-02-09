@@ -51,7 +51,7 @@ func (s *Service) CreateBugReport() http.HandlerFunc {
 func (s *Service) ReadBugReports() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		uuid := r.URL.Query().Get("uuid")
+		uuid := r.URL.Query().Get("user_id")
 		status := r.URL.Query().Get("status")
 
 		filter := bson.M{}

@@ -746,7 +746,7 @@ func (e *Service) UpdateInvitation() http.HandlerFunc {
 
 		// Update user data to have the organization
 		filter = bson.M{
-			"uuid": req.Recipient,
+			"user_id": req.Recipient,
 		}
 		updates = bson.M{
 			"$push": bson.M{

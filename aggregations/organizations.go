@@ -303,7 +303,7 @@ func BuildOrganizationCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "_organization_members.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_member_users",
 		},
 	}
@@ -313,7 +313,7 @@ func BuildOrganizationCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "_organization_members.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_member_auth",
 		},
 	}

@@ -94,7 +94,7 @@ func BuildEventCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "poster_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_poster_user",
 		},
 	}
@@ -104,7 +104,7 @@ func BuildEventCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "poster_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_poster_auth",
 		},
 	}
@@ -122,7 +122,7 @@ func BuildEventCorePipeline() bson.A {
 								"auth_data": bson.M{"$arrayElemAt": bson.A{"$_poster_auth", 0}},
 							},
 							"in": bson.M{
-								"uuid":       "$$user_data.uuid",
+								"user_id":    "$$user_data.uuid",
 								"username":   "$$user_data.username",
 								"image_url":  "$$user_data.image_url",
 								"first_name": "$$auth_data.first_name",
@@ -173,7 +173,7 @@ func BuildEventCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "participants.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_participant_users",
 		},
 	}
@@ -183,7 +183,7 @@ func BuildEventCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "participants.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_participant_auth",
 		},
 	}
@@ -301,7 +301,7 @@ func BuildEventCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "comments.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_comment_users",
 		},
 	}
@@ -311,7 +311,7 @@ func BuildEventCorePipeline() bson.A {
 		"$lookup": bson.M{
 			"from":         "auth",
 			"localField":   "comments.user_id",
-			"foreignField": "uuid",
+			"foreignField": "user_id",
 			"as":           "_comment_auth",
 		},
 	}
