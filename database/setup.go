@@ -10,6 +10,68 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+// Sets up the auth collection with indexes for user_id lookups
+func (d *Database) SetUpAuthCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
+	// Create auth collection if it doesn't exist
+	if !d.collectionExists(db, config.AuthCollection) {
+		if err := d.createCollection(db, config.AuthCollection); err != nil {
+			return err
+		}
+	}
+
+	d.AuthCollection = db.Collection(config.AuthCollection)
+
+	// user_id is the primary lookup key for every auth operation
+	authIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "user_id", Value: 1}},
+			Options: options.Index().SetName("user_id_index").SetUnique(true),
+		},
+	}
+
+	if err := createIndexes(d.AuthCollection, authIndexes, "auth"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Sets up the user collection with indexes for user_id and username lookups
+func (d *Database) SetUpUserCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
+	// Create user collection if it doesn't exist
+	if !d.collectionExists(db, config.UserCollection) {
+		if err := d.createCollection(db, config.UserCollection); err != nil {
+			return err
+		}
+	}
+
+	d.UserCollection = db.Collection(config.UserCollection)
+
+	userIndexes := []mongo.IndexModel{
+		{
+			// Primary lookup for get/update/delete user data
+			Keys:    bson.D{{Key: "user_id", Value: 1}},
+			Options: options.Index().SetName("user_id_index").SetUnique(true),
+		},
+		{
+			// Used for CheckUsername availability and SearchUsersByUserName
+			Keys:    bson.D{{Key: "username", Value: 1}},
+			Options: options.Index().SetName("username_index").SetUnique(true),
+		},
+		{
+			// Enables text search for user discovery
+			Keys:    bson.D{{Key: "username", Value: "text"}},
+			Options: options.Index().SetName("username_text_index"),
+		},
+	}
+
+	if err := createIndexes(d.UserCollection, userIndexes, "users"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Sets up all of the events collections
 func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
 
@@ -322,13 +384,6 @@ func (d *Database) SetUpAnnouncementCollection(db *mongo.Database, config *utils
 	if err != nil {
 		return fmt.Errorf("could not create time index for announcements: %v", err)
 	}
-	return nil
-}
-
-// Sets up the collections associated with user data
-func (d *Database) SetUpUserCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
-	d.AuthCollection = db.Collection(config.AuthCollection)
-	d.UserCollection = db.Collection(config.UserCollection)
 	return nil
 }
 

@@ -124,8 +124,14 @@ func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.S
 func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConfig *utils.CollectionsConfig) error {
 	database := d.Client.Database(config.Name)
 
+	// Initialize Auth Collections
+	err := d.SetUpAuthCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
 	// Initialize User Collections
-	err := d.SetUpUserCollections(database, collectionConfig)
+	err = d.SetUpUserCollections(database, collectionConfig)
 	if err != nil {
 		return err
 	}
