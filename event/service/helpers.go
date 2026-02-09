@@ -93,6 +93,100 @@ func buildUpdateChanges(req *models.EventDao) bson.M {
 	return bson.M{"$set": changes}
 }
 
+// extractAuditChanges takes the output of buildUpdateChanges and the current event state,
+// and returns the fields changed, old values, and new values for use in an EventAuditLog.
+// The changes param is the bson.M{"$set": bson.M{...}} returned by buildUpdateChanges.
+func extractAuditChanges(changes bson.M, currentEvent *models.EventDao) ([]string, map[string]any, map[string]any) {
+	setMap, ok := changes["$set"].(bson.M)
+	if !ok {
+		return nil, nil, nil
+	}
+
+	fieldsChanged := make([]string, 0, len(setMap))
+	oldValues := make(map[string]any, len(setMap))
+	newValues := make(map[string]any, len(setMap))
+
+	// Build a lookup of bson field names to current values on the existing event
+	currentFields := eventFieldValues(currentEvent)
+
+	for field, newVal := range setMap {
+		fieldsChanged = append(fieldsChanged, field)
+		newValues[field] = newVal
+		if oldVal, exists := currentFields[field]; exists {
+			oldValues[field] = oldVal
+		}
+	}
+
+	return fieldsChanged, oldValues, newValues
+}
+
+// eventFieldValues maps an EventDao's bson field names to their current values.
+// Only non-nil fields are included so callers can distinguish "unset" from "set".
+func eventFieldValues(e *models.EventDao) map[string]any {
+	m := make(map[string]any)
+	if e == nil {
+		return m
+	}
+	if e.PosterID != nil {
+		m["poster_id"] = *e.PosterID
+	}
+	if e.Organizers != nil {
+		m["organizers"] = *e.Organizers
+	}
+	if e.Venues != nil {
+		m["venues"] = *e.Venues
+	}
+	if e.MediaURL != nil {
+		m["media_url"] = *e.MediaURL
+	}
+	if e.MediaType != nil {
+		m["media_type"] = *e.MediaType
+	}
+	if e.Title != nil {
+		m["title"] = *e.Title
+	}
+	if e.Body != nil {
+		m["body"] = *e.Body
+	}
+	if e.Sports != nil {
+		m["sports"] = *e.Sports
+	}
+	if e.FormatConfig != nil {
+		m["format_config"] = e.FormatConfig
+	}
+	if e.StartTime != nil {
+		m["start_time"] = e.StartTime
+	}
+	if e.StopTime != nil {
+		m["stop_time"] = e.StopTime
+	}
+	if e.ParticipantsConfig != nil {
+		m["participants_config"] = e.ParticipantsConfig
+	}
+	if e.TeamsConfig != nil {
+		m["teams_config"] = e.TeamsConfig
+	}
+	if e.Visibility != nil {
+		m["visibility"] = *e.Visibility
+	}
+	if e.ExternalLinks != nil {
+		m["external_links"] = *e.ExternalLinks
+	}
+	if e.IsSensitive != nil {
+		m["is_sensitive"] = *e.IsSensitive
+	}
+	if e.UpdatedAt != nil {
+		m["updated_at"] = e.UpdatedAt
+	}
+	if e.CancelledAt != nil {
+		m["cancelled_at"] = e.CancelledAt
+	}
+	if e.RecurrenceConfig != nil {
+		m["recurrence_config"] = e.RecurrenceConfig
+	}
+	return m
+}
+
 // Helper function to generate updates for recurring events
 func buildRecurringUpdateFilter(id bson.ObjectID, event *models.EventDao, currentTime bson.DateTime) bson.M {
 	if event.RecurrenceConfig.ParentEventID != nil {

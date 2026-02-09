@@ -135,6 +135,18 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			}
 		}
 
+		// Create log
+		log := models.EventAuditLog{
+			EventID:   *parentID,
+			UserID:    userID,
+			Action:    "create_many",
+			Timestamp: timestamp,
+		}
+		err = s.createEventLog(&log)
+		if err != nil {
+			s.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusCreated)
 		rw.Header().Set("Content-Type", "application/json")
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, parentID.Hex()))
@@ -383,6 +395,25 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			err = e.UpdateEvent(context.Background(), filter, changes)
 		}
 
+
+		// Extract audit-friendly change data from the update
+		fieldsChanged, oldValues, newValues := extractAuditChanges(changes, currentEvent)
+
+		// Create log
+		log := models.EventAuditLog{
+			EventID:       oid,
+			UserID:        r.Header.Get("userID"),
+			Action:        "update",
+			FieldsChanged: fieldsChanged,
+			OldValues:     oldValues,
+			NewValues:     newValues,
+			Timestamp:     bson.NewDateTimeFromTime(time.Now()),
+		}
+		err = e.createEventLog(&log)
+		if err != nil {
+			e.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
+		}
+
 		if err != nil {
 			e.Logger.Error("failed to update event(s)", err.Error())
 			http.Error(rw, `{ "msg": "failed to update event(s)" }`, http.StatusInternalServerError)
@@ -516,6 +547,18 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 			e.Logger.Errorf("Failed to delete notification topic. Error: %s", err.Error())
 		}
 
+		// Create log
+		log := models.EventAuditLog{
+			EventID:   oid,
+			UserID:    r.Header.Get("userID"),
+			Action:    "delete",
+			Timestamp: bson.NewDateTimeFromTime(time.Now()),
+		}
+		err = e.createEventLog(&log)
+		if err != nil {
+			e.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
+		}
+
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
@@ -530,7 +573,7 @@ func (s *Service) Cancel() http.HandlerFunc {
 			http.Error(w, `{"msg": "bad id"}`, http.StatusBadRequest)
 		}
 
-		uuid := r.Header.Get("userID")
+		userID := r.Header.Get("userID")
 
 		filter := bson.M{
 			"_id": oid,
@@ -548,13 +591,25 @@ func (s *Service) Cancel() http.HandlerFunc {
 		}
 
 		// Notify participants
-		if err = s.Notification.CancelEvent(&oid, uuid); err != nil {
+		if err = s.Notification.CancelEvent(&oid, userID); err != nil {
 			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
 		}
 
 		// Disable notification topic
 		if err = s.Notification.DisableTopic(id); err != nil {
 			s.Logger.Errorf("Failed to disable notification topic. Topic ID: %s - Error: %s", id, err.Error())
+		}
+
+		// Create log
+		log := models.EventAuditLog{
+			EventID:   oid,
+			UserID:    userID,
+			Action:    "cancel",
+			Timestamp: timestamp,
+		}
+		err = s.createEventLog(&log)
+		if err != nil {
+			s.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
 		}
 
 		w.WriteHeader(http.StatusOK)
