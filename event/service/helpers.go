@@ -13,6 +13,11 @@ import (
 func buildUpdateChanges(req *models.EventDao) bson.M {
 	changes := bson.M{}
 
+	// Event type
+	if req.Type != nil {
+		changes["type"] = req.Type
+	}
+
 	// Basic event details
 	if req.PosterID != nil {
 		changes["poster_id"] = req.PosterID
@@ -126,6 +131,9 @@ func eventFieldValues(e *models.EventDao) map[string]any {
 	m := make(map[string]any)
 	if e == nil {
 		return m
+	}
+	if e.Type != nil {
+		m["type"] = *e.Type
 	}
 	if e.PosterID != nil {
 		m["poster_id"] = *e.PosterID

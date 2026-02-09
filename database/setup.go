@@ -117,6 +117,10 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 	// Create indexes for EventsCollection
 	eventIndexes := []mongo.IndexModel{
 		{
+			Keys:    bson.D{{Key: "type", Value: 1}},
+			Options: options.Index().SetName("type_index"),
+		},
+		{
 			Keys:    bson.D{{Key: "start_time", Value: 1}},
 			Options: options.Index().SetName("start_time_index"),
 		},
