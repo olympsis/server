@@ -59,7 +59,7 @@ func (e *Service) CreateOrganization() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// decode request
 		var req models.OrganizationDao
@@ -557,7 +557,7 @@ Creates an invitation object
 func (e *Service) CreateInvitation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// decode request
 		var req models.Invitation

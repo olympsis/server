@@ -99,7 +99,7 @@ Returns:
 func (s *Service) CreateUserData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// decode request
 		var req models.User
@@ -154,7 +154,7 @@ Returns:
 func (s *Service) UpdateUserData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// decode request
 		var req models.UserDao
@@ -291,7 +291,7 @@ Returns:
 func (s *Service) GetUserData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		user, err := aggregations.AggregateUser(&uuid, s.Database)
 		if err != nil || user.Username == "" {
@@ -319,7 +319,7 @@ Returns:
 func (u *Service) DeleteUserData() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// delete user data from database
 		filter := bson.M{"uuid": uuid}
@@ -339,7 +339,7 @@ func (u *Service) DeleteUserData() http.HandlerFunc {
 func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		filter := bson.M{
 			"recipient": uuid,
@@ -520,7 +520,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		response := models.CheckIn{}
 
 		var wgError error

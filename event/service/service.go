@@ -13,8 +13,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 /*
@@ -44,13 +42,13 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			return
 		}
 
-		uuid := r.Header.Get("UUID")
+		userID := r.Header.Get("userID")
 		isRecurring := req.Recurrence != nil
 		timestamp := bson.NewDateTimeFromTime(time.Now())
 
 		// Create base event
 		event := req.Event
-		event.PosterID = &uuid
+		event.PosterID = &userID
 		event.CreatedAt = &timestamp
 
 		// Single event creation & returns early
@@ -63,7 +61,7 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			}
 
 			// Create notification topic
-			err = s.Notification.CreateTopic(id.Hex(), []string{uuid})
+			err = s.Notification.CreateTopic(id.Hex(), []string{userID})
 			if err != nil {
 				s.Logger.Errorf("Failed to create new event topic. Event ID: %s - Error: %s", id, err.Error())
 			}
@@ -72,7 +70,7 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			if req.IncludeHost != nil && *req.IncludeHost {
 				rsvp := models.RSVPYes
 				participant := models.ParticipantDao{
-					UserID:    &uuid,
+					UserID:    &userID,
 					Status:    &rsvp,
 					EventID:   id,
 					CreatedAt: &timestamp,
@@ -81,6 +79,18 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 				if err != nil {
 					s.Logger.Error("Failed to add host as participant. Error: ", err.Error())
 				}
+			}
+
+			// Create log
+			log := models.EventAuditLog{
+				EventID:   *id,
+				UserID:    userID,
+				Action:    "create",
+				Timestamp: timestamp,
+			}
+			err = s.createEventLog(&log)
+			if err != nil {
+				s.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
 			}
 
 			rw.WriteHeader(http.StatusCreated)
@@ -166,7 +176,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 		}
 
 		// Parse user info (if authenticated)
-		userID := r.Header.Get("UUID")
+		userID := r.Header.Get("userID")
 		var user *models.UserData
 		var clubs, orgs []bson.ObjectID
 		var sportsList []string
@@ -442,44 +452,41 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 				e.Logger.Infof("Expected to delete %d events with parent %s", count, id)
 			}
 
-			// Execute deletion
-			result, err := e.Database.EventsCollection.DeleteMany(ctx, filter)
+			// Execute archival
+			update := bson.M{
+				"$set": bson.M{
+					"archived_at": bson.NewDateTimeFromTime(time.Now()),
+				},
+			}
+			result, err := e.Database.EventsCollection.UpdateMany(ctx, filter, update)
 			if err != nil {
-				e.Logger.Error("failed to delete events", err.Error())
+				e.Logger.Errorf("Failed to delete events. Error: %s", err.Error())
 				http.Error(rw, `{ "msg": "failed to delete events" }`, http.StatusInternalServerError)
 				return
 			}
 
-			// Delete parent event's participants
-			err = e.DeleteParticipants(ctx, bson.M{"event_id": oid})
-			if err != nil {
-				e.Logger.Error("Failed to remove event's participants. Error: ", err.Error())
-			}
-
 			// Log deletion result
-			e.Logger.Infof("Actually deleted %d documents", result.DeletedCount)
+			e.Logger.Infof("Actually deleted %d documents", result.ModifiedCount)
 
-			if result.DeletedCount == 0 {
-				e.Logger.Warn("No documents were deleted with filter:", filter)
+			if result.ModifiedCount == 0 {
+				e.Logger.Warnf("No documents were deleted with filter: %s", filter)
 			}
 
 		} else {
 			// Delete single instance
 			filter := bson.M{"_id": oid}
-			result, err := e.Database.EventsCollection.DeleteOne(ctx, filter)
+			result, err := e.Database.EventsCollection.UpdateOne(ctx, filter, bson.M{
+				"$set": bson.M{
+					"archival_at": bson.NewDateTimeFromTime(time.Now()),
+				},
+			})
 			if err != nil {
 				e.Logger.Error("failed to delete event", err.Error())
 				http.Error(rw, `{ "msg": "failed to delete event" }`, http.StatusInternalServerError)
 				return
 			}
 
-			e.Logger.Infof("Deleted %d document", result.DeletedCount)
-
-			// Delete event participants
-			err = e.DeleteParticipants(ctx, bson.M{"event_id": oid})
-			if err != nil {
-				e.Logger.Error("Failed to remove event's participants. Error: ", err.Error())
-			}
+			e.Logger.Infof("Deleted %d document", result.ModifiedCount)
 
 			// Track deletion in parent if this is part of a series
 			if event.RecurrenceConfig != nil && event.RecurrenceConfig.ParentEventID != nil {
@@ -523,7 +530,7 @@ func (s *Service) Cancel() http.HandlerFunc {
 			http.Error(w, `{"msg": "bad id"}`, http.StatusBadRequest)
 		}
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		filter := bson.M{
 			"_id": oid,
@@ -548,330 +555,6 @@ func (s *Service) Cancel() http.HandlerFunc {
 		// Disable notification topic
 		if err = s.Notification.DisableTopic(id); err != nil {
 			s.Logger.Errorf("Failed to disable notification topic. Topic ID: %s - Error: %s", id, err.Error())
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"msg": "OK"}`))
-	}
-}
-
-func (e *Service) AddParticipant() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		uuid := r.Header.Get("UUID")
-
-		// Grab event id from path
-		vars := mux.Vars(r)
-		id := vars["id"]
-		if len(id) < 24 {
-			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
-			return
-		}
-
-		// Decode request
-		var req models.ParticipantDao
-		oid, _ := bson.ObjectIDFromHex(id)
-		timestamp := bson.NewDateTimeFromTime(time.Now())
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			http.Error(rw, `{"msg":"failed to decode request"}`, http.StatusBadRequest)
-			return
-		}
-
-		// Validations
-		if req.EventID == nil {
-			req.EventID = &oid
-		}
-		if req.Status == nil {
-			defaultRSVP := models.RSVPYes
-			req.Status = &defaultRSVP
-		}
-
-		// Find event in database
-		filter := bson.M{"_id": oid}
-		event, err := e.FindEvent(context.Background(), filter)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(rw, `{ "msg": "event not found" }`, http.StatusNotFound)
-				return
-			}
-			e.Logger.Error("failed to find event", err.Error())
-			http.Error(rw, `{ "msg": "failed to find event" }`, http.StatusInternalServerError)
-			return
-		}
-
-		// Check if participant already exists
-		participants, err := e.FindParticipants(context.TODO(), bson.M{"event_id": oid}, nil)
-		if err != nil {
-			http.Error(rw, `{"msg":"failed to find event's participants"}`, http.StatusInternalServerError)
-			return
-		}
-		for i := range participants {
-			if *participants[i].UserID == uuid {
-				rw.WriteHeader(http.StatusOK)
-				rw.Write(fmt.Appendf(nil, `{ "id": "%s" }`, participants[i].ID))
-				return
-			}
-		}
-
-		// New participant object
-		participant := &models.ParticipantDao{
-			UserID:      &uuid,
-			EventID:     req.EventID,
-			Status:      req.Status,
-			IsAnonymous: req.IsAnonymous,
-			CreatedAt:   &timestamp,
-		}
-
-		// If event is full add the user to the wait-list
-		if event.ParticipantsConfig != nil && event.ParticipantsConfig.MaxParticipants != nil {
-			if *event.ParticipantsConfig.MaxParticipants != 0 {
-				if len(participants) >= int(*event.ParticipantsConfig.MaxParticipants) {
-
-					// Add Participant to the participants database
-					waitStatus := models.RSVPWaitlist
-					participant.Status = &waitStatus
-					pid, err := e.InsertParticipant(context.TODO(), participant)
-					if err != nil {
-						e.Logger.Error("Failed to add participant to waitlist", err.Error())
-						http.Error(rw, `{ "msg": "failed to add participant to waitlist" }`, http.StatusInternalServerError)
-						return
-					}
-
-					// Add participant to notifications
-					err = e.Notification.AddUsersToTopic(id, []string{uuid})
-					if err != nil {
-						e.Logger.Errorf("Failed to add user to event notifications topic. Event ID: %s - Error: %s", id, err.Error())
-					}
-
-					rw.WriteHeader(http.StatusOK)
-					rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
-					return
-				}
-			}
-		}
-
-		// Insert participant to event participants database
-		pid, err := e.InsertParticipant(context.TODO(), participant)
-		if err != nil {
-			e.Logger.Error("Failed to add participant to event", err.Error())
-			http.Error(rw, `{ "msg": "failed to add participant to event" }`, http.StatusInternalServerError)
-			return
-		}
-
-		// Add participant to notifications
-		if err = e.Notification.AddUsersToTopic(id, []string{uuid}); err != nil {
-			e.Logger.Errorf("Failed to add user to notifications topic. EventID: %s - Error: %s", id, err.Error())
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
-	}
-}
-
-func (e *Service) RemoveParticipant() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
-		defer cancel()
-
-		uuid := r.Header.Get("UUID")
-
-		// grab ids from path
-		vars := mux.Vars(r)
-		eventID := vars["id"]
-		oid, err := bson.ObjectIDFromHex(eventID)
-		if err != nil {
-			e.Logger.Error("Failed to encode event ID to Object ID", err.Error())
-			http.Error(rw, `{"msg": "invalid event id"}`, http.StatusBadRequest)
-			return
-		}
-
-		// First, fetch the event
-		event, err := e.FindEvent(ctx, bson.M{"_id": oid})
-		if err != nil {
-			e.Logger.Error("failed to fetch event: ", err.Error())
-			http.Error(rw, `{ "msg": "failed to fetch event" }`, http.StatusInternalServerError)
-			return
-		}
-
-		// If we have a participant ID this means that they are being removed
-		if participantID, exists := vars["participantID"]; exists && participantID != "" {
-			participantOID, _ := bson.ObjectIDFromHex(participantID)
-			participant, err := e.FindParticipant(ctx, bson.M{"_id": participantOID})
-			if err != nil {
-				http.Error(rw, `{"msg": "failed to find participant"}`, http.StatusNotFound)
-				return
-			}
-
-			// Remove the participant from the database
-			err = e.DeleteParticipant(ctx, bson.M{"_id": participantOID, "event_id": oid})
-			if err != nil {
-				e.Logger.Errorf("Failed to delete event participant. Error: %s", err.Error())
-				http.Error(rw, `{"msg": "failed to remove participant"}`, http.StatusInternalServerError)
-				return
-			}
-
-			// Remove user from the topic
-			if err = e.Notification.RemoveUsersFromTopic(eventID, []string{*participant.UserID}); err != nil {
-				e.Logger.Errorf("Failed to remove user from notification topic. Event: %s - Error: %s", eventID, err.Error())
-			}
-
-			// Notify the user that they have been removed
-			if err = e.Notification.ParticipantKick(event, participant); err != nil {
-				e.Logger.Errorf("Failed to notify user. Event ID: %s - Error: %s", eventID, err.Error())
-			}
-		} else { // User removing themselves from the list
-
-			// Remove participant
-			err = e.DeleteParticipant(ctx, bson.M{"user_id": uuid, "event_id": oid})
-			if err != nil {
-				e.Logger.Errorf("Failed to delete event participant. Error: %s", err.Error())
-				http.Error(rw, `{"msg": "failed to remove participant"}`, http.StatusInternalServerError)
-			}
-
-			// Remove user from the topic
-			if err = e.Notification.RemoveUsersFromTopic(eventID, []string{uuid}); err != nil {
-				e.Logger.Errorf("Failed to remove user from notification topic. Event: %s - Error: %s", eventID, err.Error())
-			}
-		}
-
-		// Check waitlist and see if we need to promote another participant
-		opts := options.Find().SetSort(bson.M{"created_at": 1})
-		waitlist, err := e.FindParticipants(ctx, bson.M{"event_id": oid, "status": models.RSVPWaitlist}, opts)
-		if err != nil {
-			e.Logger.Error("Failed to check waitlist. Error: ", err.Error())
-		}
-		if len(waitlist) > 0 {
-			participant := waitlist[0]
-			err := e.UpdateParticipant(ctx, bson.M{"_id": participant.ID}, bson.M{"status": models.RSVPYes})
-			if err != nil {
-				e.Logger.Error("Failed to promote participant from waitlist. Error: ", err.Error())
-			} else {
-				// Notify the user that they have been promoted
-				if err = e.Notification.WaitlistPromotion(event, &participant); err != nil {
-					e.Logger.Errorf("Failed to notify user. Event: %s - Error: %s", eventID, err.Error())
-				}
-			}
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"msg": "OK"}`))
-	}
-}
-
-func (e *Service) NotifyParticipants() http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-
-		// grab id from path
-		vars := mux.Vars(r)
-		id := vars["id"]
-		if len(id) < 24 {
-			http.Error(rw, `{ "msg": "bad event id" }`, http.StatusBadRequest)
-			return
-		}
-
-		// decode request
-		var req models.PushNotification
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			e.Logger.Error("failed to decode notification", err.Error())
-			http.Error(rw, `{ "msg": "failed to decode notification" }`, http.StatusInternalServerError)
-			return
-		}
-
-		request := models.NotificationPushRequest{
-			Topic:        &id,
-			Notification: req,
-		}
-		if err = e.Notification.AddNoteToCarousel(2, &request); err != nil {
-			e.Logger.Errorf("Failed to send notification. Event ID: %s - Error: %s", id, err.Error())
-			http.Error(rw, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
-			return
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{ "msg": "OK" }`))
-	}
-}
-
-func (s *Service) AddComment() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-
-		uuid := r.Header.Get("UUID")
-
-		// Grab event id from path
-		vars := mux.Vars(r)
-		id := vars["id"]
-		if len(id) < 24 {
-			http.Error(w, `{"msg": "bad event id"}`, http.StatusBadRequest)
-			return
-		}
-		oid, err := bson.ObjectIDFromHex(id)
-		if err != nil {
-			s.Logger.Error("Failed to convert id to ObjectID. Error: ", err.Error())
-			http.Error(w, `{"msg": "failed to encode id"}`, http.StatusBadRequest)
-			return
-		}
-
-		// Decode request
-		var req models.EventCommentDao
-		err = json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			s.Logger.Error("Failed to decode request. Error: ", err.Error())
-			http.Error(w, `{"msg":"failed to decode request"}`, http.StatusBadRequest)
-			return
-		}
-
-		// Add comment to the database
-		timestamp := bson.NewDateTimeFromTime(time.Now())
-		req.UserID = &uuid
-		req.EventID = &oid
-		req.CreatedAt = &timestamp
-		cid, err := s.InsertComment(ctx, &req)
-		if err != nil {
-			s.Logger.Error("Failed to insert comment into the database. Error: ", err.Error())
-			http.Error(w, `{"msg": "failed to create comment"}`, http.StatusInternalServerError)
-		}
-
-		// Notify participants
-		if err = s.Notification.NewEventComment(oid, *req.Text); err != nil {
-			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
-		}
-
-		w.WriteHeader(http.StatusCreated)
-		w.Write(fmt.Appendf(nil, `{"id": "%s"}`, cid.Hex()))
-	}
-}
-
-func (s *Service) RemoveComment() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-
-		// Grab comment id from path
-		vars := mux.Vars(r)
-		id := vars["commentID"]
-		if len(id) < 24 {
-			http.Error(w, `{"msg": "bad comment id"}`, http.StatusBadRequest)
-			return
-		}
-		oid, err := bson.ObjectIDFromHex(id)
-		if err != nil {
-			s.Logger.Error("Failed to convert id to ObjectID. Error: ", err.Error())
-			http.Error(w, `{"msg": "failed to encode id"}`, http.StatusBadRequest)
-			return
-		}
-
-		// Delete comment from db
-		err = s.DeleteComment(ctx, bson.M{"_id": oid})
-		if err != nil {
-			s.Logger.Error("Failed to delete comment. Error: ", err.Error())
-			http.Error(w, `{"msg": "failed to remove comment"}`, http.StatusInternalServerError)
-			return
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -904,7 +587,7 @@ func (s *Service) Location() http.HandlerFunc {
 		}
 
 		// Get user data if authenticated
-		userID := r.Header.Get("UUID")
+		userID := r.Header.Get("userID")
 		var userData *models.UserData
 		var clubs, orgs []bson.ObjectID
 

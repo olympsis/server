@@ -13,7 +13,7 @@ func ClubAdminMiddleware() Middleware {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 
-			uuid := r.Header.Get("UUID")
+			uuid := r.Header.Get("userID")
 
 			// get club token from header
 			var token string

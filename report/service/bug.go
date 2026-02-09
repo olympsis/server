@@ -25,7 +25,7 @@ func (s *Service) CreateBugReport() http.HandlerFunc {
 		}
 
 		// set necessary data
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		id := bson.NewObjectID()
 		status := "pending"
 		timestamp := bson.NewDateTimeFromTime(time.Now())

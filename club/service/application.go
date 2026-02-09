@@ -79,7 +79,7 @@ func (c *Service) CreateApplication() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// Validate club ID
 		id := mux.Vars(r)["id"]
@@ -209,9 +209,9 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			// Add member to database
 			member := models.MemberDao{
 				ID:       bson.NewObjectID(),                   // doc id
-				UserID:   *app.Applicant,                            // user uuid
-				ClubID:   &oid,                                      // club id
-				Role:     string(models.MemberMember),               // user role
+				UserID:   *app.Applicant,                       // user uuid
+				ClubID:   &oid,                                 // club id
+				Role:     string(models.MemberMember),          // user role
 				JoinedAt: bson.NewDateTimeFromTime(time.Now()), // joined date
 			}
 			_, err = c.InsertMember(ctx, &member)
@@ -258,7 +258,7 @@ func (c *Service) DeleteApplication() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// Validate club ID
 		id := mux.Vars(r)["id"]

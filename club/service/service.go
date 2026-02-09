@@ -160,7 +160,7 @@ func (c *Service) CreateClub() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// Decode request
 		var req models.ClubDao
@@ -240,7 +240,7 @@ func (c *Service) ModifyClub() http.HandlerFunc {
 		}
 
 		// Validate user role - admin/owners can modify a club
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			c.Logger.Error("Failed to find member. Error: ", err.Error())
@@ -347,7 +347,7 @@ func (c *Service) DeleteClub() http.HandlerFunc {
 		}
 
 		// Validate user role - only owners can delete a club
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			c.Logger.Error("Failed to find member. Error: ", err.Error())
@@ -423,7 +423,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 		}
 
 		// Validate user role - admin/owners can modify a club
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		admin, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			c.Logger.Error("Failed to find member. Error: ", err.Error())
@@ -508,7 +508,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 		}
 
 		// Validate user role - admin/owners can modify a club
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		admin, err := c.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			c.Logger.Error("Failed to find member. Error: ", err.Error())
@@ -568,7 +568,7 @@ func (c *Service) LeaveClub() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// Validate club ID
 		id := mux.Vars(r)["id"]
@@ -697,7 +697,7 @@ func (s *Service) CreateFinancialAccount() http.HandlerFunc {
 		}
 
 		// Validate user permissions - only owners/admins can create financial accounts
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)
@@ -790,7 +790,7 @@ func (s *Service) GetFinancialAccount() http.HandlerFunc {
 		}
 
 		// Validate user permissions
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)
@@ -838,7 +838,7 @@ func (s *Service) GetFinancialOverview() http.HandlerFunc {
 		}
 
 		// Validate user permissions
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)
@@ -923,7 +923,7 @@ func (s *Service) GetTransactionHistory() http.HandlerFunc {
 		}
 
 		// Validate user permissions
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)
@@ -976,7 +976,7 @@ func (s *Service) InitiatePayout() http.HandlerFunc {
 		}
 
 		// Validate user permissions - only owners can initiate payouts
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)
@@ -1050,7 +1050,7 @@ func (s *Service) GetPayoutHistory() http.HandlerFunc {
 		}
 
 		// Validate user permissions
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)
@@ -1103,7 +1103,7 @@ func (s *Service) GetCustomerSheetConfig() http.HandlerFunc {
 		}
 
 		// Validate user permissions - only club members can access this
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		member, err := s.FindMember(ctx, bson.M{"user_id": uuid, "club_id": oid})
 		if err != nil {
 			utils.HandleFindError(rw, err)

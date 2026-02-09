@@ -34,7 +34,7 @@ func (s *Service) CreateEventReport() http.HandlerFunc {
 
 		// set necessary data
 		id := bson.NewObjectID()
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		status := "pending"
 		timestamp := bson.NewDateTimeFromTime(time.Now())
 		opts := options.InsertOne()

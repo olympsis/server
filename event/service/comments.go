@@ -2,13 +2,104 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// Comment Functions
+func (s *Service) AddComment() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		uuid := r.Header.Get("userID")
+
+		// Grab event id from path
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if len(id) < 24 {
+			http.Error(w, `{"msg": "bad event id"}`, http.StatusBadRequest)
+			return
+		}
+		oid, err := bson.ObjectIDFromHex(id)
+		if err != nil {
+			s.Logger.Error("Failed to convert id to ObjectID. Error: ", err.Error())
+			http.Error(w, `{"msg": "failed to encode id"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Decode request
+		var req models.EventCommentDao
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			s.Logger.Error("Failed to decode request. Error: ", err.Error())
+			http.Error(w, `{"msg":"failed to decode request"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Add comment to the database
+		timestamp := bson.NewDateTimeFromTime(time.Now())
+		req.UserID = &uuid
+		req.EventID = &oid
+		req.CreatedAt = &timestamp
+		cid, err := s.InsertComment(ctx, &req)
+		if err != nil {
+			s.Logger.Error("Failed to insert comment into the database. Error: ", err.Error())
+			http.Error(w, `{"msg": "failed to create comment"}`, http.StatusInternalServerError)
+		}
+
+		// Notify participants
+		if err = s.Notification.NewEventComment(oid, *req.Text); err != nil {
+			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Write(fmt.Appendf(nil, `{"id": "%s"}`, cid.Hex()))
+	}
+}
+
+func (s *Service) RemoveComment() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		// Grab comment id from path
+		vars := mux.Vars(r)
+		id := vars["commentID"]
+		if len(id) < 24 {
+			http.Error(w, `{"msg": "bad comment id"}`, http.StatusBadRequest)
+			return
+		}
+		oid, err := bson.ObjectIDFromHex(id)
+		if err != nil {
+			s.Logger.Error("Failed to convert id to ObjectID. Error: ", err.Error())
+			http.Error(w, `{"msg": "failed to encode id"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Delete comment from db
+		err = s.DeleteComment(ctx, bson.M{"_id": oid})
+		if err != nil {
+			s.Logger.Error("Failed to delete comment. Error: ", err.Error())
+			http.Error(w, `{"msg": "failed to remove comment"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"msg": "OK"}`))
+	}
+}
+
+/*****************
+DATABASE FUNCTIONS
+******************/
 
 // Insert new comment into database
 func (s *Service) InsertComment(ctx context.Context, comment *models.EventCommentDao) (bson.ObjectID, error) {

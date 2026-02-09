@@ -70,8 +70,8 @@ func buildUpdateChanges(req *models.EventDao) bson.M {
 	if req.Visibility != nil {
 		changes["visibility"] = req.Visibility
 	}
-	if req.ExternalLink != nil {
-		changes["external_link"] = req.ExternalLink
+	if req.ExternalLinks != nil {
+		changes["external_links"] = req.ExternalLinks
 	}
 	if req.IsSensitive != nil {
 		changes["is_sensitive"] = req.IsSensitive

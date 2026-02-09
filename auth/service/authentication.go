@@ -160,7 +160,7 @@ func (s *Service) Modify() http.HandlerFunc {
 		defer cancel()
 
 		var request models.AuthUserDao
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
@@ -210,7 +210,7 @@ func (a *Service) Delete() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// DELETE USER FROM DATABASE
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 		err := a.DeleteUser(context.Background(), bson.M{"uuid": uuid})
 		if err != nil {
 			if err == mongo.ErrNoDocuments {

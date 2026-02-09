@@ -150,7 +150,7 @@ func (p *Service) CreatePost() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// grab uuid of the user who made this request
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// decode request
 		var req models.PostDao
@@ -347,7 +347,7 @@ func (p *Service) AddLike() http.HandlerFunc {
 		defer cancel()
 
 		// grab uuid of the user who made this request
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// grab id from path
 		vars := mux.Vars(r)
@@ -450,7 +450,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 		defer cancel()
 
 		// grab uuid of the user who made this request
-		uuid := r.Header.Get("UUID")
+		uuid := r.Header.Get("userID")
 
 		// grab id from path
 		vars := mux.Vars(r)

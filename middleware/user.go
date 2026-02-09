@@ -36,7 +36,7 @@ func UserMiddleware(auth *auth.Client) Middleware {
 				http.Error(w, `{ "msg": "failed to verify token" }`, http.StatusUnauthorized)
 				return
 			}
-			r.Header.Add("UUID", token.UID)
+			r.Header.Add("userID", token.UID)
 			f(w, r) // call next middleware/handler in chain
 		}
 	}
