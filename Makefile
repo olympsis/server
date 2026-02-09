@@ -77,7 +77,7 @@ unsecure-server: #Un-secure server with http
 		-p 80:80 $(SERVICE_NAME)-unsecure:latest
 
 dev-up: #Runs the docker-compose stack to set up local environment
-	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-server" | xargs -I {} docker rmi {}
+	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-dev-server" | xargs -I {} docker rmi {}
 	docker-compose -f compose.dev.yaml up -d
 
 dev-down: #Takes down the docker-compose stack

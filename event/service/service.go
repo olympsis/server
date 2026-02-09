@@ -395,7 +395,6 @@ func (e *Service) UpdateAnEvent() http.HandlerFunc {
 			err = e.UpdateEvent(context.Background(), filter, changes)
 		}
 
-
 		// Extract audit-friendly change data from the update
 		fieldsChanged, oldValues, newValues := extractAuditChanges(changes, currentEvent)
 
@@ -508,7 +507,7 @@ func (e *Service) DeleteAnEvent() http.HandlerFunc {
 			filter := bson.M{"_id": oid}
 			result, err := e.Database.EventsCollection.UpdateOne(ctx, filter, bson.M{
 				"$set": bson.M{
-					"archival_at": bson.NewDateTimeFromTime(time.Now()),
+					"archived_at": bson.NewDateTimeFromTime(time.Now()),
 				},
 			})
 			if err != nil {

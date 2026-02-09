@@ -3,6 +3,7 @@ name: olympsis-dev
 
 volumes:
     db-data:
+    redis-data:
 
 secrets:
     key-file:
@@ -30,21 +31,21 @@ services:
         ports:
             - 80:80
         volumes:
-            - db-data:/server
-            - ../files/firebase-credentials.json:/app/firebase-credentials.json:ro
-            - ../files/localhost.key:/app/localhost.key:ro
-            - ../files/localhost.crt:/app/localhost.crt:ro
+            - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
+            - ./files/localhost.key:/app/localhost.key:ro
+            - ./files/localhost.crt:/app/localhost.crt:ro
+            - ./files/AuthKey_5MP3VW78BZ.p8:/app/AuthKey_5MP3VW78BZ.p8:ro
         environment:
             PORT: 80
             HTTP: UNSECURE
             MODE: DEVELOPMENT
-            KEY_FILE_PATH: ./localhost.key
-            CERT_FILE_PATH: ./localhost.crt
+            KEY_FILE_PATH: ./files/localhost.key
+            CERT_FILE_PATH: ./files/localhost.crt
             MONGO_ADDRESS: mongo
             MONGO_USERNAME: admin
             MONGO_PASSWORD: olympsis
             REDIS_ADDRESS: redis:6379
-            APNS_FILE_PATH: ./AuthKey_5MP3VW78BZ.p8"
+            APNS_FILE_PATH: ./AuthKey_5MP3VW78BZ.p8
             STORAGE_URL: http://storage:8081
             FIREBASE_FILE_PATH: ./firebase-credentials.json
             STRIPE_TOKEN: sk_test_51P33HvRxf68pt9NZisRo9RRtCn4OJwspd4juCFnJEip0e7oSx0WPm7Cb2M7WJ7VRs7i5LZDSs9fuyV6QahQgPuaI00oYr8nc89
@@ -81,8 +82,8 @@ services:
         ports:
             - 27017:27017
         volumes:
-            - db-data:/mongo
-            - ./master-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+            - db-data:/data/db
+            # - ./master-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
 
     redis:
         container_name: redis
@@ -91,4 +92,4 @@ services:
         ports:
             - 6379:6379
         volumes:
-            - db-data:/redis
+            - redis-data:/data
