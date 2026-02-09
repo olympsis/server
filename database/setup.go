@@ -1250,10 +1250,59 @@ func (d *Database) SetUpLocaleCollections(db *mongo.Database, config *utils.Coll
 	return nil
 }
 
-// Sets up the application configuration collections
+// Sets up the application configuration collections (tags and sports)
 func (d *Database) SetUpAppConfigCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
+
+	// Set up Tags Collection
+	if !d.collectionExists(db, config.TagsCollections) {
+		if err := d.createCollection(db, config.TagsCollections); err != nil {
+			return err
+		}
+	}
+
 	d.TagsCollection = db.Collection(config.TagsCollections)
+
+	// Index on name for lookups, and on is_enabled to filter active tags
+	tagsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "name", Value: 1}},
+			Options: options.Index().SetName("name_index").SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "is_enabled", Value: 1}},
+			Options: options.Index().SetName("is_enabled_index"),
+		},
+	}
+
+	if err := createIndexes(d.TagsCollection, tagsIndexes, "tags"); err != nil {
+		return err
+	}
+
+	// Set up Sports Collection
+	if !d.collectionExists(db, config.SportsCollection) {
+		if err := d.createCollection(db, config.SportsCollection); err != nil {
+			return err
+		}
+	}
+
 	d.SportsCollection = db.Collection(config.SportsCollection)
+
+	// Index on name for lookups, and on is_enabled to filter active sports
+	sportsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "name", Value: 1}},
+			Options: options.Index().SetName("name_index").SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "is_enabled", Value: 1}},
+			Options: options.Index().SetName("is_enabled_index"),
+		},
+	}
+
+	if err := createIndexes(d.SportsCollection, sportsIndexes, "sports"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
