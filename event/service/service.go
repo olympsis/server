@@ -147,8 +147,8 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			s.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
 		}
 
-		rw.WriteHeader(http.StatusCreated)
 		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusCreated)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, parentID.Hex()))
 	}
 }
@@ -172,8 +172,8 @@ func (e *Service) GetEvent() http.HandlerFunc {
 			return
 		}
 
-		rw.WriteHeader(http.StatusOK)
 		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(event)
 	}
 }
@@ -283,6 +283,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 			TotalEvents: int32(len(*events)),
 			Events:      *events,
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(resp)
 	}
