@@ -1,8 +1,16 @@
-FROM golang:1.25-alpine
+# --- Build stage ---
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
-COPY ./ ./
-RUN go build -o /docker
+COPY go.mod go.sum ./
 RUN go mod download
+COPY . .
+RUN go build -o /server
+
+# --- Runtime stage ---
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /app
+COPY --from=builder /server /app/server
 
 ARG STORAGE_URL
 
@@ -73,4 +81,4 @@ ENV SPORTS_COLLECTION=sports
 
 EXPOSE 80
 
-CMD ["/docker"]
+CMD ["/app/server"]

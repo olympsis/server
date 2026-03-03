@@ -2,7 +2,7 @@ version: "3.0"
 name: olympsis-dev
 
 volumes:
-    db-data:
+    mongo-data:
     redis-data:
 
 secrets:
@@ -24,6 +24,15 @@ secrets:
         environment: STRIPE_TOKEN
 
 services:
+    gateway:
+        container_name: gateway
+        image: apache/apisix
+        restart: always
+        volumes:
+            - ./files/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
+            - ./files/apisix-routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+        ports:
+            - 9080:9080
     server:
         build: .
         container_name: server
@@ -36,23 +45,23 @@ services:
             - ./files/localhost.crt:/app/localhost.crt:ro
             - ./files/AuthKey_5PR7XV2XXL.p8:/app/AuthKey_5PR7XV2XXL.p8:ro
         env_file: .env.dev
-        environment:
-            # Docker-network overrides (these reference compose service names)
-            MONGO_ADDRESS: mongo
-            MONGO_USERNAME: admin
-            MONGO_PASSWORD: olympsis
-            REDIS_ADDRESS: redis:6379
         depends_on:
+            - gateway
             - mongo
             - redis
 
-    # storage:
-    #     container_name: storage
-    #     restart: always
-    #     ports:
-    #         - 8081:80
-    #     depends_on:
-    #         - master
+    storage:
+        image: us-central1-docker.pkg.dev/olympsis-485522/storage/dev:v0.3.0
+        container_name: storage
+        restart: always
+        ports:
+            - 8081:80
+        volumes:
+            - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
+            - ./files/storage-credentials.json:/app/storage-credentials.json:ro
+        env_file: .env.dev
+        depends_on:
+            - gateway
 
     # chat:
     #     container_name: chat
@@ -72,8 +81,7 @@ services:
         ports:
             - 27017:27017
         volumes:
-            - db-data:/data/db
-            # - ./master-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+            - mongo-data:/data/db
 
     redis:
         container_name: redis

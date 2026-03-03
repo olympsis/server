@@ -1,2 +1,5 @@
-README.md
-files/*
+.git
+.env*
+files/
+tools/
+*.md
