@@ -84,36 +84,49 @@ func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.S
 	dbConfig := utils.GetDatabaseConfig(manager)
 	collectionConfig := utils.GetCollectionsConfig()
 
-	switch config.Mode {
-	case "PRODUCTION":
-		opts := options.Client().ApplyURI(`mongodb+srv://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
-		client, err := mongo.Connect(opts)
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
+	// switch config.Mode {
+	// case "PRODUCTION":
+	// 	opts := options.Client().ApplyURI(`mongodb+srv://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
+	// 	client, err := mongo.Connect(opts)
+	// 	if err != nil {
+	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	// 	}
 
-		err = client.Ping(context.Background(), readpref.Primary())
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
+	// 	err = client.Ping(context.Background(), readpref.Primary())
+	// 	if err != nil {
+	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	// 	}
 
-		d.Client = client
-	default:
-		opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
-		client, err := mongo.Connect(opts)
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
+	// 	d.Client = client
+	// default:
+	// 	opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
+	// 	client, err := mongo.Connect(opts)
+	// 	if err != nil {
+	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	// 	}
 
-		err = client.Ping(context.Background(), readpref.Primary())
-		if err != nil {
-			d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-		}
+	// 	err = client.Ping(context.Background(), readpref.Primary())
+	// 	if err != nil {
+	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	// 	}
 
-		d.Client = client
+	// 	d.Client = client
+	// }
+
+	opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
+	client, err := mongo.Connect(opts)
+	if err != nil {
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
 	}
 
-	err := d.SetUpCollections(&dbConfig, &collectionConfig)
+	err = client.Ping(context.Background(), readpref.Primary())
+	if err != nil {
+		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+	}
+
+	d.Client = client
+
+	err = d.SetUpCollections(&dbConfig, &collectionConfig)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to set up database collections. Error: %s", err.Error()))
 	}
