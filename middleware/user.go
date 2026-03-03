@@ -20,7 +20,7 @@ func UserMiddleware(auth *auth.Client) Middleware {
 
 			// Server mode
 			if os.Getenv("MODE") == "DEVELOPMENT" {
-				if r.Header.Get("userID") == "" {
+				if r.Header.Get("UserID") == "" {
 					http.Error(w, `{ "msg": "failed to get token from header" }`, http.StatusUnauthorized)
 					return
 				}

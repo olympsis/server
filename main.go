@@ -42,6 +42,9 @@ func main() {
 	// Set up Mux router
 	r := mux.NewRouter()
 
+	// Set default Content-Type to application/json for all routes
+	r.Use(middleware.JSONGlobal)
+
 	manager := secrets.New()
 
 	// Set up server configuration

@@ -11,7 +11,7 @@ secrets:
     cert-file:
         file: ./files/localhost.crt
     apns-key:
-        file: ./files/AuthKey_5MP3VW78BZ.p8
+        file: ./files/AuthKey_5PR7XV2XXL.p8
     firebase-token:
         file: ./files/firebase-credentials.json
     apple_key_id:
@@ -34,24 +34,14 @@ services:
             - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
             - ./files/localhost.key:/app/localhost.key:ro
             - ./files/localhost.crt:/app/localhost.crt:ro
-            - ./files/AuthKey_5MP3VW78BZ.p8:/app/AuthKey_5MP3VW78BZ.p8:ro
+            - ./files/AuthKey_5PR7XV2XXL.p8:/app/AuthKey_5PR7XV2XXL.p8:ro
+        env_file: .env.dev
         environment:
-            PORT: 80
-            HTTP: UNSECURE
-            MODE: DEVELOPMENT
-            KEY_FILE_PATH: ./files/localhost.key
-            CERT_FILE_PATH: ./files/localhost.crt
+            # Docker-network overrides (these reference compose service names)
             MONGO_ADDRESS: mongo
             MONGO_USERNAME: admin
             MONGO_PASSWORD: olympsis
             REDIS_ADDRESS: redis:6379
-            APNS_FILE_PATH: ./AuthKey_5MP3VW78BZ.p8
-            STORAGE_URL: http://storage:8081
-            FIREBASE_FILE_PATH: ./firebase-credentials.json
-            STRIPE_TOKEN: sk_test_51P33HvRxf68pt9NZisRo9RRtCn4OJwspd4juCFnJEip0e7oSx0WPm7Cb2M7WJ7VRs7i5LZDSs9fuyV6QahQgPuaI00oYr8nc89
-            MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
-            APPLE_KEY_ID: 5MP3VW78BZ
-            APPLE_TEAM_ID: 5A6H49Q85D
         depends_on:
             - mongo
             - redis

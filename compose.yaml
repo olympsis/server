@@ -22,7 +22,7 @@ services:
             
     server:
         container_name: server
-        image: us-central1-docker.pkg.dev/olympsis-408521/main/server:v0.8.1
+        image: us-central1-docker.pkg.dev/olympsis-485522/server/release:v0.8.1
         restart: always
         pull_policy: always
         ports:
@@ -33,19 +33,7 @@ services:
             - db-data:/server
             - /etc/olympsis/AuthKey_FDZ85P3KX3.p8:/app/AuthKey_FDZ85P3KX3.p8:ro
             - /etc/olympsis/firebase-credentials.json:/app/firebase-credentials.json:ro
-        environment:
-            MODE: PRODUCTION
-            APPLE_KEY_ID: 5MP3VW78BZ
-            APPLE_TEAM_ID: 5A6H49Q85D
-            MONGO_ADDRESS: production.md0v8.mongodb.net
-            MONGO_USERNAME: server
-            MONGO_PASSWORD: RvmeTaUvkGs7Vc8e
-            REDIS_ADDRESS: 10.128.0.7:6379
-            STORAGE_URL: http://storage:8081
-            APNS_FILE_PATH: ./AuthKey_FDZ85P3KX3.p8
-            FIREBASE_FILE_PATH: ./firebase-credentials.json
-            STRIPE_TOKEN: sk_test_51P33HvRxf68pt9NZisRo9RRtCn4OJwspd4juCFnJEip0e7oSx0WPm7Cb2M7WJ7VRs7i5LZDSs9fuyV6QahQgPuaI00oYr8nc89
-            MAPKIT_TOKEN: eyJraWQiOiI3NjZXUjMyNVM4IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI1QTZINDlRODVEIiwiaWF0IjoxNzQwMjg0NjQ1LCJleHAiOjE3NDA5MDIzOTl9.LPQlwicCot1AmWF8utQclYB2XCoN5C4oeOQyDmo-SlAGP_zWVpExAbcQGyEl6NvnWtLIM1cVLpGLcln9DxrZNw
+        env_file: .env.prod
 
     storage:
         container_name: storage

@@ -1,2 +1,6 @@
 /files/*
 /tools/olympsis-server.conf
+
+# Environment files (contain secrets)
+.env*
+!.env.example
