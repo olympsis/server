@@ -47,6 +47,16 @@ services:
             - ./storage-credentials.json:/app/storage-credentials.json:ro
         env_file: .env.prod
 
+    client-web:
+        container_name: client-web
+        image: us-central1-docker.pkg.dev/olympsis-485522/client-web/release:v0.1.0
+        restart: always
+        pull_policy: always
+        ports:
+            - 3000:80
+        networks:
+            - olympsis
+
     # chat:
     #     container_name: chat
     #     image: us-central1-docker.pkg.dev/olympsis-408521/main/chat:v1.0.0

@@ -63,6 +63,15 @@ services:
         depends_on:
             - gateway
 
+    client-web:
+        container_name: client-web
+        image: us-central1-docker.pkg.dev/olympsis-485522/client-web/dev:v0.1.0
+        restart: always
+        ports:
+            - 3000:80
+        depends_on:
+            - gateway
+
     # chat:
     #     container_name: chat
     #     restart: always
