@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -30,21 +31,22 @@ func NewStorageInterface(u string, token string, logger *logrus.Logger) *Storage
 	}
 }
 
-func (s *StorageInterface) GetMapSnapshot(token string, name string) ([]byte, error) {
+func (s *StorageInterface) GetMapSnapshot(name string) ([]byte, error) {
 	var image []byte
 
 	// Check storage for image
 	image, err := s.GetSnapshotFromStorage(CreateImageHash(name))
 	if err != nil {
 		// We assume we don't have it. Fetch image from mapkit
-		return s.GetMapKitSnapshot(token, name)
+		return s.GetMapKitSnapshot(name)
 	}
 
 	return image, nil
 }
 
-func (s *StorageInterface) GetMapKitSnapshot(token string, name string) ([]byte, error) {
+func (s *StorageInterface) GetMapKitSnapshot(name string) ([]byte, error) {
 	// Craft http request
+	token := os.Getenv("MAPKIT_TOKEN")
 	encodedLocation := url.QueryEscape(name)
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s", encodedLocation, s.MapKitToken), nil)
 	if err != nil {
@@ -128,7 +130,7 @@ func (s *StorageInterface) GetSnapshotFromStorage(name string) ([]byte, error) {
 
 func (s *StorageInterface) UploadMapKitSnapshotToStorage(token string, name string, data []byte) error {
 	// Create the request to the storage service
-	req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/v1/storage/olympsis-mapkit-snapshots", s.ServiceURL), bytes.NewReader(data))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/v1/storage/olympsis-mapkit-snapshots", s.ServiceURL), bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

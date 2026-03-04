@@ -44,13 +44,8 @@ func (s *Service) GetMapSnapShot() http.HandlerFunc {
 			http.Error(w, `{ "msg": "center query is required" }`, http.StatusBadRequest)
 			return
 		}
-		token, err := utils.GetTokenFromHeader(r)
-		if err != nil {
-			http.Error(w, `{ "msg": "failed to find token" }`, http.StatusUnauthorized)
-			return
-		}
 
-		data, err := s.StorageInterface.GetMapSnapshot(token, center)
+		data, err := s.StorageInterface.GetMapSnapshot(center)
 		if err != nil {
 			s.Logger.Errorf("Failed to get map snapshot. Error: %s", err.Error())
 			http.Error(w, `{ "msg": "failed to get map snapshot"} `, http.StatusInternalServerError)
