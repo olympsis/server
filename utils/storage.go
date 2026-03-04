@@ -130,7 +130,7 @@ func (s *StorageInterface) GetSnapshotFromStorage(name string) ([]byte, error) {
 
 func (s *StorageInterface) UploadMapKitSnapshotToStorage(token string, name string, data []byte) error {
 	// Create the request to the storage service
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/v1/storage/olympsis-mapkit-snapshots", s.ServiceURL), bytes.NewReader(data))
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/v1/storage/olympsis-mapkit-snapshots", s.ServiceURL), bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
