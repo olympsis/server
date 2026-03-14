@@ -48,7 +48,8 @@ func (s *StorageInterface) GetMapKitSnapshot(name string) ([]byte, error) {
 	// Craft http request
 	token := os.Getenv("MAPKIT_TOKEN")
 	encodedLocation := url.QueryEscape(name)
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s", encodedLocation, s.MapKitToken), nil)
+	zoom := 18
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s&z=%d", encodedLocation, s.MapKitToken, zoom), nil)
 	if err != nil {
 		return nil, err
 	}
