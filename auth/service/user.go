@@ -10,8 +10,8 @@ import (
 
 // Insert auth user into database
 func (a *Service) InsertUser(ctx context.Context, user *models.AuthUserDao) error {
-	a.Database.AuthCollection.InsertOne(ctx, user)
-	return nil
+	_, err := a.Database.AuthCollection.InsertOne(ctx, user)
+	return err
 }
 
 // Get auth user from database
