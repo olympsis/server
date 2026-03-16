@@ -1,6 +1,9 @@
 /files/*
 /tools/olympsis-server.conf
 
-# Environment files (contain secrets)
+# Environment files
 .env*
 !.env.example
+
+# PM2 config
+ecosystem.config.js

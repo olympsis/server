@@ -39,6 +39,10 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		// Verify user token
+		if request.Token == nil {
+			http.Error(w, `{ "msg": "missing token in request" }`, http.StatusBadRequest)
+			return
+		}
 		token, err := a.Client.VerifyIDToken(ctx, *request.Token)
 		if err != nil {
 			a.Log.Error(fmt.Sprintf("Failed to verify ID Token: %s\n", err.Error()))
@@ -107,11 +111,19 @@ func (a *Service) Register() http.HandlerFunc {
 			return
 		}
 
+		// Safely dereference pointer fields — these may be nil if the client
+		// omitted them (e.g. Apple Sign In without a last name).
 		response := models.AuthResponse{
-			UserID:    *user.UserID,
-			FirstName: *user.FirstName,
-			LastName:  *user.LastName,
-			Email:     *user.Email,
+			UserID: *user.UserID,
+		}
+		if user.FirstName != nil {
+			response.FirstName = *user.FirstName
+		}
+		if user.LastName != nil {
+			response.LastName = *user.LastName
+		}
+		if user.Email != nil {
+			response.Email = *user.Email
 		}
 
 		w.WriteHeader(http.StatusOK)
