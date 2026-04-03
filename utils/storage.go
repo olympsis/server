@@ -31,102 +31,87 @@ func NewStorageInterface(u string, token string, logger *logrus.Logger) *Storage
 	}
 }
 
-func (s *StorageInterface) GetMapSnapshot(name string) ([]byte, error) {
-	var image []byte
+// GetMapSnapshot checks if the snapshot exists in storage, and if not, fetches it
+// from MapKit and uploads it. Returns a URL path: /mapkit-snapshot/{hash}.png
+func (s *StorageInterface) GetMapSnapshot(name string) (string, error) {
+	imageHash := CreateImageHash(name)
 
-	// Check storage for image
-	image, err := s.GetSnapshotFromStorage(CreateImageHash(name))
-	if err != nil {
-		// We assume we don't have it. Fetch image from mapkit
-		return s.GetMapKitSnapshot(name)
+	// Check if the image already exists in storage
+	exists, err := s.SnapshotExistsInStorage(imageHash)
+	if err == nil && exists {
+		return fmt.Sprintf("mapkit-snapshots/%s", imageHash), nil
 	}
 
-	return image, nil
+	// Image doesn't exist in storage, fetch from MapKit and upload
+	return s.GetMapKitSnapshot(name)
 }
 
-func (s *StorageInterface) GetMapKitSnapshot(name string) ([]byte, error) {
-	// Craft http request
+// GetMapKitSnapshot fetches the snapshot from Apple MapKit, uploads it to storage
+// in the background, and returns a URL path: /mapkit-snapshot/{hash}.png
+func (s *StorageInterface) GetMapKitSnapshot(name string) (string, error) {
 	token := os.Getenv("MAPKIT_TOKEN")
+	imageHash := CreateImageHash(name)
 	encodedLocation := url.QueryEscape(name)
-	zoom := 18
+	zoom := 15
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s&z=%d", encodedLocation, s.MapKitToken, zoom), nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	// Add Accept header to explicitly request image data
 	req.Header.Set("Accept", "image/png")
 	req.Header.Set("Origin", "https://api.olympsis.com")
 	req.Header.Set("Referer", "https://api.olympsis.com")
 
-	// Make http request
 	resp, err := s.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	// Check content type to ensure we're getting an image
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "image/") {
-		// Read the body for error information
 		body, _ := io.ReadAll(resp.Body)
 		s.Logger.Errorf("URL Request: %s", req.URL)
-		return nil, fmt.Errorf("unexpected content type: %s, body: %s", contentType, string(body))
+		return "", fmt.Errorf("unexpected content type: %s, body: %s", contentType, string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		s.Logger.Errorf("URL Request: %s", req.URL)
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Read the image data from the response
 	imageData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		s.Logger.Errorf("URL Request: %s", req.URL)
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Start a goroutine to upload the image to storage
+	// Upload to storage in the background
 	go func() {
-		if err := s.UploadMapKitSnapshotToStorage(token, CreateImageHash(name), imageData); err != nil {
+		if err := s.UploadMapKitSnapshotToStorage(token, imageHash, imageData); err != nil {
 			s.Logger.Errorf("Failed to upload image to storage: %v", err)
 		}
 	}()
 
-	return imageData, nil
+	return fmt.Sprintf("/mapkit-snapshot/%s", imageHash), nil
 }
 
-func (s *StorageInterface) GetSnapshotFromStorage(name string) ([]byte, error) {
-	// Construct the URL
+// SnapshotExistsInStorage checks if a snapshot exists in GCS using a HEAD request
+func (s *StorageInterface) SnapshotExistsInStorage(name string) (bool, error) {
 	url := fmt.Sprintf("https://storage.googleapis.com/olympsis-mapkit-snapshots/%s", name)
 
-	// Create new request
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return false, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "image/png")
 
-	// Make the request
 	resp, err := s.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return false, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Check status code
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("storage returned non-200 status code: %d", resp.StatusCode)
-	}
-
-	// Read the image data
-	imageData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	return imageData, nil
+	return resp.StatusCode == http.StatusOK, nil
 }
 
 func (s *StorageInterface) UploadMapKitSnapshotToStorage(token string, name string, data []byte) error {

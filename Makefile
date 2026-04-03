@@ -68,20 +68,8 @@ prod-up:
 prod-down:
 	docker-compose -f compose.yaml down
 
-update-service: #Updates the linux service
-	make build && \
-	if [ $$? -ne 0 ]; then \
-		echo "Error: Failed to build new server binary." && \
-		exit 1; \
-	fi && \
-	rm /sbin/olympsis-server && \
-	mv olympsis-server /sbin && \
-	if [ $$? -ne 0 ]; then \
-		echo "Error: Failed to move binary." && \
-		exit 1; \
-	fi && \
-	systemctl restart olympsis-server.service && \
-	echo "Update Successful"
+mac-mini:
+	scp olympsis-server joel@joels-mac-mini:/Users/joel/Documents
 
 clean: ## Remove previous build
 	rm -f $(SERVICE_NAME)

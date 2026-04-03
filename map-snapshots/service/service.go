@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/server"
@@ -45,15 +46,15 @@ func (s *Service) GetMapSnapShot() http.HandlerFunc {
 			return
 		}
 
-		data, err := s.StorageInterface.GetMapSnapshot(center)
+		url, err := s.StorageInterface.GetMapSnapshot(center)
 		if err != nil {
 			s.Logger.Errorf("Failed to get map snapshot. Error: %s", err.Error())
 			http.Error(w, `{ "msg": "failed to get map snapshot"} `, http.StatusInternalServerError)
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "image/png")
-		w.Write(data)
+		fmt.Fprintf(w, `{"url":"%s"}`, url)
 	}
 }

@@ -1,0 +1,691 @@
+{
+  "version": 3,
+  "name": "olympsis-gateway-prod",
+  "port": 80,
+  "timeout": "30s",
+  "extra_config": {
+    "router": {
+      "auto_options": true
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/v1/health",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "backend": [
+        {
+          "url_pattern": "/v1/health",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/health/wsg",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "backend": [
+        {
+          "url_pattern": "/v1/health/wsg",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/system/config",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "backend": [
+        {
+          "url_pattern": "/v1/system/config",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/auth/register",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/auth/register",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 100,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/auth/login",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/auth/login",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/auth/modify",
+      "method": "PUT",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/auth/modify",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 100,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/auth/delete",
+      "method": "DELETE",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/auth/delete",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 50,
+          "client_max_rate": 3,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/check-in",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/check-in",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/username",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/username",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/user",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/user",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/user",
+      "method": "PUT",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/user",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/invitations/organizations",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/invitations/organizations",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/search/username",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/search/username",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/users/search/uuid",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/users/search/uuid",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/map-snapshot",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "input_query_strings": ["center"],
+      "backend": [
+        {
+          "url_pattern": "/v1/map-snapshot",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/location",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/location",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/past/user/{uuid}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/past/user/{uuid}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/past/group/{id}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/past/group/{id}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "input_query_strings": ["location", "venues", "sports", "radius", "skip", "limit"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}",
+      "method": "PUT",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}",
+      "method": "DELETE",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 100,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/cancel",
+      "method": "PUT",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/cancel",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 100,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/participants",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/participants",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/participants",
+      "method": "DELETE",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/participants",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/participants/{participantID}",
+      "method": "DELETE",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/participants/{participantID}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/comments",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/comments",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 300,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/comments/{commentID}",
+      "method": "DELETE",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/comments/{commentID}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/events/{id}/notify/participants",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/events/{id}/notify/participants",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 100,
+          "client_max_rate": 3,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/organizations/{id}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/organizations/{id}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/clubs/{id}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/clubs/{id}",
+          "host": ["http://127.0.0.1:8080"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 500,
+          "client_max_rate": 10,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/storage/{fileBucket}",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/storage/{fileBucket}",
+          "host": ["http://127.0.0.1:8081"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    },
+    {
+      "endpoint": "/v1/storage/{fileBucket}",
+      "method": "DELETE",
+      "output_encoding": "no-op",
+      "input_headers": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/v1/storage/{fileBucket}",
+          "host": ["http://127.0.0.1:8081"],
+          "encoding": "no-op"
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 200,
+          "client_max_rate": 5,
+          "strategy": "ip"
+        }
+      }
+    }
+  ]
+}
