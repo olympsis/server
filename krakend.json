@@ -150,6 +150,7 @@
       "method": "GET",
       "output_encoding": "no-op",
       "input_headers": ["*"],
+      "input_query_strings": ["username"],
       "backend": [
         {
           "url_pattern": "/v1/users/username",

@@ -181,7 +181,7 @@ func (s *Service) Modify() http.HandlerFunc {
 		defer cancel()
 
 		var request models.AuthUserDao
-		uuid := r.Header.Get("userID")
+		userID := r.Header.Get("userID")
 
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
@@ -203,12 +203,23 @@ func (s *Service) Modify() http.HandlerFunc {
 			changes["email"] = request.Email
 		}
 
-		user, err := s.UpdateUser(ctx, uuid, changes)
+		user, err := s.UpdateUser(ctx, userID, changes)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				http.Error(w, `{"msg": "user not found."}`, http.StatusNotFound)
-				s.Log.Error("[Auth] failed to update user. Document not found: ", err.Error())
-				return
+				// Insert AuthUser into database
+				timestamp := bson.NewDateTimeFromTime(time.Now())
+				request.UserID = &userID
+				request.CreatedAt = &timestamp
+
+				err = s.InsertUser(ctx, &request)
+				if err != nil {
+					s.Log.Error(fmt.Sprintf("[Auth] Failed to insert user into the database: %s\n", err.Error()))
+					http.Error(w, `{ "msg": "failed to create auth user" }`, http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(request)
 			}
 
 			http.Error(w, `{"msg": "failed to update user."}`, http.StatusInternalServerError)
