@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"olympsis-server/aggregations"
 	"olympsis-server/server"
+	"regexp"
 	"sync"
 	"time"
 
@@ -52,29 +53,41 @@ Returns:
 */
 func (u *Service) CheckUsername() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
 
 		// grab username from query
 		keys, ok := r.URL.Query()["username"]
-		if !ok || len(keys[0]) < 1 {
+		if !ok || len(keys) < 1 || len(keys[0]) < 1 {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`{ "msg": "no userName found in request" }`))
 			return
 		}
 		userName := keys[0]
 
-		_, c := context.WithTimeout(context.Background(), 30*time.Second)
-		defer c()
+		// validate username: alphanumeric, underscores, periods, max 30 chars
+		if len(userName) > 30 {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`{ "msg": "username exceeds maximum length" }`))
+			return
+		}
 
-		// find user data in database
-		var user models.User
-		filter := bson.D{bson.E{Key: "username", Value: userName}}
-		err := u.Database.UserCollection.FindOne(context.TODO(), filter).Decode(&user)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		// case-insensitive lookup
+		filter := bson.D{bson.E{Key: "username", Value: bson.Regex{Pattern: "^" + regexp.QuoteMeta(userName) + "$", Options: "i"}}}
+		err := u.Database.UserCollection.FindOne(ctx, filter).Err()
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				rw.WriteHeader(http.StatusOK)
 				rw.Write([]byte(`{ "is_available": true }`))
 				return
 			}
+			// actual database error
+			u.Log.Error(fmt.Sprintf("[User] Failed to check username availability: %s", err.Error()))
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte(`{ "msg": "internal server error" }`))
+			return
 		}
 
 		rw.WriteHeader(http.StatusOK)
