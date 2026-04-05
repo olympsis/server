@@ -131,6 +131,9 @@ func main() {
 	snapShotAPI.Ready()
 	systemAPI.Ready()
 
+	// Apply compression universally
+	r.Use(middleware.GzipMiddleware)
+
 	// Handling raw notification requests
 	r.Handle("/v1/notifications", middleware.Chain(
 		serverInterface.Notification.HandleNotificationRequest(),
