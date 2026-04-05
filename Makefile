@@ -69,7 +69,9 @@ prod-down:
 	docker-compose -f compose.yaml down
 
 mac-mini:
-	scp olympsis-server joel@joels-mac-mini:/Users/joel/Documents
+	go build -v olympsis-server
+	scp olympsis-server joel@joels-mac-mini:/Users/joel/Documents/olympsis-platform/builds
+	rm olympsis-server
 
 clean: ## Remove previous build
 	rm -f $(SERVICE_NAME)
