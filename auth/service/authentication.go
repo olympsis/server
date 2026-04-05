@@ -33,7 +33,7 @@ func (a *Service) Register() http.HandlerFunc {
 		var request models.AuthRequest
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to decode AuthRequest object: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to decode AuthRequest object: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "bad body in request" }`, http.StatusBadRequest)
 			return
 		}
@@ -45,7 +45,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 		token, err := a.Client.VerifyIDToken(ctx, *request.Token)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to verify ID Token: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to verify ID Token: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to register new user" }`, http.StatusInternalServerError)
 			return
 		}
@@ -68,7 +68,7 @@ func (a *Service) Register() http.HandlerFunc {
 		}
 
 		if err != mongo.ErrNoDocuments {
-			a.Log.Error("Failed to check user data. Error: ", err.Error())
+			a.Log.Error("[Auth] Failed to check user data. Error: ", err.Error())
 			http.Error(w, `{"msg": "something went wrong."}`, http.StatusInternalServerError)
 			return
 		}
@@ -86,7 +86,7 @@ func (a *Service) Register() http.HandlerFunc {
 		// Insert AuthUser into database
 		err = a.InsertUser(ctx, user)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to insert user into the database: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to insert user into the database: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to create auth user" }`, http.StatusInternalServerError)
 			return
 		}
@@ -106,7 +106,7 @@ func (a *Service) Register() http.HandlerFunc {
 		// Insert metadata into database
 		_, err = a.Database.UserCollection.InsertOne(ctx, meta)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to insert user into the database: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to insert user into the database: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to create user" }`, http.StatusInternalServerError)
 			return
 		}
@@ -137,22 +137,33 @@ func (a *Service) Login() http.HandlerFunc {
 		var request models.AuthRequest
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to decode AuthRequest: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to decode AuthRequest: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "bad body in request"} `, http.StatusBadRequest)
 			return
 		}
 
+		// Validate token
+		if request.Token == nil {
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to decode AuthRequest: %s\n", err.Error()))
+			http.Error(w, `{ "msg": "no token found in request"} `, http.StatusBadRequest)
+		}
+
+		// Verify auth token with firebase
 		token, err := a.Client.VerifyIDToken(context.TODO(), *request.Token)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to verify ID Token: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to verify ID Token: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to register new user" }`, http.StatusInternalServerError)
 			return
 		}
 
-		uuid := token.UID
-		user, err := aggregations.AggregateUser(&uuid, a.Database)
+		user, err := aggregations.AggregateUser(&token.UID, a.Database)
 		if err != nil {
-			a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+			if err == mongo.ErrNoDocuments {
+				a.Log.Error(fmt.Sprintf("[Auth] User data not found for uid: %s\n", token.UID))
+				http.Error(w, `{ "msg": "user data not found" }`, http.StatusNotFound)
+				return
+			}
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
 			return
 		}
@@ -175,7 +186,7 @@ func (s *Service) Modify() http.HandlerFunc {
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
 			http.Error(w, `{"msg": "failed to decode request"}`, http.StatusBadRequest)
-			s.Log.Error("Failed to decode request. Error: ", err.Error())
+			s.Log.Error("[Auth] Failed to decode request. Error: ", err.Error())
 			return
 		}
 
@@ -196,18 +207,18 @@ func (s *Service) Modify() http.HandlerFunc {
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(w, `{"msg": "user not found."}`, http.StatusNotFound)
-				s.Log.Error("failed to update user. Document not found: ", err.Error())
+				s.Log.Error("[Auth] failed to update user. Document not found: ", err.Error())
 				return
 			}
 
 			http.Error(w, `{"msg": "failed to update user."}`, http.StatusInternalServerError)
-			s.Log.Error("failed to update user. Error: ", err.Error())
+			s.Log.Error("[Auth] failed to update user. Error: ", err.Error())
 			return
 		}
 
 		if user == nil {
 			http.Error(w, `{"msg": "something went wrong."}`, http.StatusInternalServerError)
-			s.Log.Error("Failed to get user data after update.")
+			s.Log.Error("[Auth] Failed to get user data after update.")
 			return
 		}
 
@@ -224,11 +235,11 @@ func (a *Service) Delete() http.HandlerFunc {
 		err := a.DeleteUser(context.Background(), bson.M{"user_id": uuid})
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				a.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+				a.Log.Error(fmt.Sprintf("[Auth] Failed to find user data: %s\n", err.Error()))
 				http.Error(rw, `{ "msg": "user data not found" }`, http.StatusNotFound)
 				return
 			}
-			a.Log.Error(fmt.Sprintf("Failed to delete user data: %s\n", err.Error()))
+			a.Log.Error(fmt.Sprintf("[Auth] Failed to delete user data: %s\n", err.Error()))
 			http.Error(rw, `{ "msg": "failed to delete user data" }`, http.StatusInternalServerError)
 			return
 		}
