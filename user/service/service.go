@@ -269,6 +269,36 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 
 		err = s.UpdateUser(context.Background(), filter, update, &req)
 		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				user := models.User{
+					ID:           bson.NewObjectID(),
+					UserID:       uuid,
+					UserName:     *req.UserName,
+					Sports:       *req.Sports,
+					Visibility:   "public",
+					HasOnboarded: true,
+				}
+
+				// insert auth user in database
+				err = s.InsertUser(context.Background(), &user)
+				if err != nil {
+					s.Log.Error(fmt.Sprintf("Failed to insert user into database: %s\n", err.Error()))
+					http.Error(w, `{ "msg": "failed to insert user"}`, http.StatusInternalServerError)
+					return
+				}
+
+				// Aggregate user data response
+				usr, err := aggregations.AggregateUser(&uuid, s.Database)
+				if err != nil {
+					s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
+					http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(usr)
+				return
+			}
+
 			s.Log.Error(fmt.Sprintf("Failed to update user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to update user data" }`, http.StatusInternalServerError)
 			return

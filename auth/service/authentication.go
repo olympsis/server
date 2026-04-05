@@ -220,6 +220,7 @@ func (s *Service) Modify() http.HandlerFunc {
 
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(request)
+				return
 			}
 
 			http.Error(w, `{"msg": "failed to update user."}`, http.StatusInternalServerError)
