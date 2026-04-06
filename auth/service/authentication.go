@@ -191,6 +191,7 @@ func (s *Service) Modify() http.HandlerFunc {
 		}
 
 		changes := bson.M{}
+
 		if request.FirstName != nil {
 			changes["first_name"] = request.FirstName
 		}
@@ -203,7 +204,9 @@ func (s *Service) Modify() http.HandlerFunc {
 			changes["email"] = request.Email
 		}
 
-		user, err := s.UpdateUser(ctx, userID, changes)
+		update := bson.M{"$set": changes}
+
+		user, err := s.UpdateUser(ctx, userID, update)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				// Insert AuthUser into database
