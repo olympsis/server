@@ -41,9 +41,9 @@ func (u *Service) FindUsers(ctx context.Context, filter interface{}, users *[]mo
 func (u *Service) UpdateUser(ctx context.Context, filter interface{}, update interface{}, user *models.UserDao) error {
 
 	// update user
-	_, err := u.Database.UserCollection.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
+	res := u.Database.UserCollection.FindOneAndUpdate(ctx, filter, update)
+	if res.Err() != nil {
+		return res.Err()
 	}
 
 	return nil

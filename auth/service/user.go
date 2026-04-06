@@ -47,9 +47,9 @@ func (a *Service) FindUsers(ctx context.Context, filter bson.M, users *[]models.
 func (a *Service) UpdateUser(ctx context.Context, uuid string, update bson.M) (*models.UserData, error) {
 
 	// update user
-	_, err := a.Database.AuthCollection.UpdateOne(ctx, bson.M{"user_id": uuid}, update)
-	if err != nil {
-		return nil, err
+	res := a.Database.AuthCollection.FindOneAndUpdate(ctx, bson.M{"user_id": uuid}, update)
+	if res.Err() != nil {
+		return nil, res.Err()
 	}
 
 	// find and return updated user

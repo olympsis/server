@@ -273,11 +273,29 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 				user := models.User{
 					ID:           bson.NewObjectID(),
 					UserID:       uuid,
-					UserName:     *req.UserName,
-					Sports:       *req.Sports,
 					Visibility:   "public",
 					HasOnboarded: true,
 				}
+				if req.UserName != nil {
+					user.UserName = *req.UserName
+				}
+				if req.Sports != nil {
+					user.Sports = *req.Sports
+				}
+				if req.Gender != nil {
+					user.Gender = req.Gender
+				}
+				if req.Bio != nil {
+					user.Bio = *req.Bio
+				}
+				if req.ImageURL != nil {
+					user.ImageURL = req.ImageURL
+				}
+				if req.Hometown != nil {
+					user.Hometown = req.Hometown
+				}
+
+				err = s.InsertUser(context.Background(), &user)
 
 				// insert auth user in database
 				err = s.InsertUser(context.Background(), &user)
