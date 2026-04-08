@@ -12,8 +12,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
+	"github.com/sideshow/apns2/token"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -62,13 +64,68 @@ func (s *Service) GetConfig() http.HandlerFunc {
 	}
 }
 
+// generateMapKitJWT creates a signed ES256 JWT for Apple's MapKit token API
+// using the .p8 private key file, key ID, and team ID.
+func (s *Service) generateMapKitJWT() (string, error) {
+	filePath := os.Getenv("MAPKIT_FILE_PATH")
+	if filePath == "" {
+		return "", fmt.Errorf("MAPKIT_FILE_PATH environment variable is not set")
+	}
+	keyID := os.Getenv("MAPKIT_KEY_ID")
+	if keyID == "" {
+		return "", fmt.Errorf("MAPKIT_KEY_ID environment variable is not set")
+	}
+	teamID := os.Getenv("APPLE_TEAM_ID")
+	if teamID == "" {
+		return "", fmt.Errorf("APPLE_TEAM_ID environment variable is not set")
+	}
+
+	// Read the .p8 private key using the same parser as APNS
+	authKey, err := token.AuthKeyFromFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read MapKit key from %s: %w", filePath, err)
+	}
+
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"iss": teamID,
+		"iat": now.Unix(),
+		"exp": now.Add(30 * time.Minute).Unix(),
+	}
+
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	jwtToken.Header["kid"] = keyID
+
+	signedToken, err := jwtToken.SignedString(authKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign MapKit JWT: %w", err)
+	}
+
+	return signedToken, nil
+}
+
 func (s *Service) GetMapkitServerToken() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := os.Getenv("MAPKIT_TOKEN")
-		if token == "" {
-			s.Logger.Error("MAPKIT_TOKEN environment variable is not set")
-			http.Error(w, `{"msg":"server configuration error"}`, http.StatusInternalServerError)
-			return
+		var bearerToken string
+
+		mode := os.Getenv("MODE")
+		if mode != "PRODUCTION" {
+			// In dev mode, generate the JWT from the local .p8 key file
+			generated, err := s.generateMapKitJWT()
+			if err != nil {
+				s.Logger.Errorf("[Sys] failed to generate MapKit JWT: %v", err)
+				http.Error(w, `{"msg":"failed to generate mapkit token"}`, http.StatusInternalServerError)
+				return
+			}
+			bearerToken = generated
+		} else {
+			// In production, use the pre-configured MAPKIT_TOKEN
+			bearerToken = os.Getenv("MAPKIT_TOKEN")
+			if bearerToken == "" {
+				s.Logger.Error("MAPKIT_TOKEN environment variable is not set")
+				http.Error(w, `{"msg":"server configuration error"}`, http.StatusInternalServerError)
+				return
+			}
 		}
 
 		maxRetries := 3
@@ -81,7 +138,7 @@ func (s *Service) GetMapkitServerToken() http.HandlerFunc {
 				http.Error(w, `{"msg":"failed to create request"}`, http.StatusInternalServerError)
 				return
 			}
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearerToken))
 
 			client := &http.Client{Timeout: 10 * time.Second}
 			resp, err := client.Do(req)

@@ -34,7 +34,9 @@ services:
         ports:
             - 9080:9080
     server:
-        build: .
+        build:
+            context: .
+            no_cache: true
         container_name: server
         restart: always
         ports:
@@ -44,6 +46,7 @@ services:
             - ./files/localhost.key:/app/localhost.key:ro
             - ./files/localhost.crt:/app/localhost.crt:ro
             - ./files/AuthKey_5PR7XV2XXL.p8:/app/AuthKey_5PR7XV2XXL.p8:ro
+            - ./files/AuthKey_FQ38XX3HXG.p8:/app/AuthKey_FQ38XX3HXG.p8:ro
         env_file: .env.dev
         depends_on:
             - gateway
