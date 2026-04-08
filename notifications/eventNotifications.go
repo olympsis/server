@@ -16,10 +16,14 @@ func (n *Service) NewEvent(id *bson.ObjectID, event *models.EventDao) error {
 	}
 
 	// Find the topics
-	var organizerTopics []string
+	organizerTopics := make([]string, 0)
 	organizers := *event.Organizers
 	for idx := range organizers {
 		organizerTopics = append(organizerTopics, organizers[idx].ID.Hex())
+	}
+
+	if len(organizerTopics) == 0 {
+		return errors.New("no organizer topics found")
 	}
 
 	filter := bson.M{
@@ -93,10 +97,14 @@ func (n *Service) CancelEvent(id *bson.ObjectID, actor string) error {
 	}
 
 	// Find the topics
-	var organizerTopics []string
+	organizerTopics := make([]string, 0)
 	organizers := *event.Organizers
 	for idx := range organizers {
 		organizerTopics = append(organizerTopics, organizers[idx].ID.Hex())
+	}
+
+	if len(organizerTopics) == 0 {
+		return errors.New("no organizer topics found")
 	}
 
 	filter := bson.M{
@@ -163,10 +171,14 @@ func (n *Service) NewEventComment(id bson.ObjectID, comment string) error {
 	}
 
 	// Find the topics
-	var organizerTopics []string
+	organizerTopics := make([]string, 0)
 	organizers := *event.Organizers
 	for idx := range organizers {
 		organizerTopics = append(organizerTopics, organizers[idx].ID.Hex())
+	}
+
+	if len(organizerTopics) == 0 {
+		return errors.New("no organizer topics found")
 	}
 
 	filter := bson.M{
