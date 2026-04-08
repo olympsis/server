@@ -4,6 +4,7 @@ import (
 	"olympsis-server/middleware"
 	"olympsis-server/server"
 
+	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -22,11 +23,20 @@ func NewConfigApi(i *server.ServerInterface) *SystemAPI {
 	}
 }
 
-func (e *SystemAPI) Ready() {
+func (e *SystemAPI) Ready(firebase *auth.Client) {
 	e.Router.Handle("/v1/system/config",
 		middleware.Chain(
 			e.Service.GetConfig(),
 			middleware.Logging(),
+			middleware.CORS(),
+		),
+	).Methods("GET", "OPTIONS")
+
+	e.Router.Handle("/v1/system/mapkit-server-token",
+		middleware.Chain(
+			e.Service.GetMapkitServerToken(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
 			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")

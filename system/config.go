@@ -3,9 +3,14 @@ package system
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"math"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/server"
+	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
@@ -54,6 +59,86 @@ func (s *Service) GetConfig() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(config)
+	}
+}
+
+func (s *Service) GetMapkitServerToken() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := os.Getenv("MAPKIT_TOKEN")
+		if token == "" {
+			s.Logger.Error("MAPKIT_TOKEN environment variable is not set")
+			http.Error(w, `{"msg":"server configuration error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		maxRetries := 3
+		var lastErr error
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			req, err := http.NewRequest("GET", "https://maps-api.apple.com/v1/token", nil)
+			if err != nil {
+				s.Logger.Errorf("[Sys] failed to create mapkit token request: %v", err)
+				http.Error(w, `{"msg":"failed to create request"}`, http.StatusInternalServerError)
+				return
+			}
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				lastErr = err
+				s.Logger.Errorf("[Sys] mapkit token request failed (attempt %d/%d): %v", attempt+1, maxRetries, err)
+				time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * time.Second)
+				continue
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				lastErr = err
+				s.Logger.Errorf("[Sys] failed to read mapkit token response (attempt %d/%d): %v", attempt+1, maxRetries, err)
+				time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * time.Second)
+				continue
+			}
+
+			// Retry on 500 errors
+			if resp.StatusCode == http.StatusInternalServerError {
+				lastErr = fmt.Errorf("apple API returned 500")
+				s.Logger.Errorf("[Sys] mapkit token API returned 500 (attempt %d/%d)", attempt+1, maxRetries)
+				time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * time.Second)
+				continue
+			}
+
+			// For any other non-200 status, return immediately (no retry)
+			if resp.StatusCode != http.StatusOK {
+				s.Logger.Errorf("[Sys] mapkit token API returned status %d: %s", resp.StatusCode, string(body))
+				http.Error(w, fmt.Sprintf(`{"msg":"apple API error: %d"}`, resp.StatusCode), resp.StatusCode)
+				return
+			}
+
+			// Parse the response to extract the access token and expiry
+			var appleResp struct {
+				AccessToken      string `json:"accessToken"`
+				ExpiresInSeconds int    `json:"expiresInSeconds"`
+			}
+			if err := json.Unmarshal(body, &appleResp); err != nil {
+				s.Logger.Errorf("[Sys] failed to parse mapkit token response: %v", err)
+				http.Error(w, `{"msg":"failed to parse token response"}`, http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":            appleResp.AccessToken,
+				"expiresInSeconds": appleResp.ExpiresInSeconds,
+			})
+			return
+		}
+
+		// All retries exhausted
+		s.Logger.Errorf("[Sys] mapkit token request failed after %d retries: %v", maxRetries, lastErr)
+		http.Error(w, `{"msg":"failed to get mapkit server token"}`, http.StatusInternalServerError)
 	}
 }
 

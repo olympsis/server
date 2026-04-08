@@ -129,7 +129,7 @@ func main() {
 	localeAPI.Ready()
 	healthAPI.Ready()
 	snapShotAPI.Ready()
-	systemAPI.Ready()
+	systemAPI.Ready(client)
 
 	// Apply compression universally
 	r.Use(middleware.GzipMiddleware)
