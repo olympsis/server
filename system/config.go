@@ -9,13 +9,12 @@ import (
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/server"
+	"olympsis-server/utils"
 	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
-	"github.com/sideshow/apns2/token"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -65,43 +64,23 @@ func (s *Service) GetConfig() http.HandlerFunc {
 }
 
 // generateMapKitJWT creates a signed ES256 JWT for Apple's MapKit token API
-// using the .p8 private key file, key ID, and team ID.
+// using the shared utility in utils/mapkit.go.
 func (s *Service) generateMapKitJWT() (string, error) {
-	filePath := os.Getenv("MAPKIT_FILE_PATH")
-	if filePath == "" {
+	config := utils.MapKitConfig{
+		KeyFilePath: os.Getenv("MAPKIT_FILE_PATH"),
+		KeyID:       os.Getenv("MAPKIT_KEY_ID"),
+		TeamID:      os.Getenv("APPLE_TEAM_ID"),
+	}
+	if config.KeyFilePath == "" {
 		return "", fmt.Errorf("MAPKIT_FILE_PATH environment variable is not set")
 	}
-	keyID := os.Getenv("MAPKIT_KEY_ID")
-	if keyID == "" {
+	if config.KeyID == "" {
 		return "", fmt.Errorf("MAPKIT_KEY_ID environment variable is not set")
 	}
-	teamID := os.Getenv("APPLE_TEAM_ID")
-	if teamID == "" {
+	if config.TeamID == "" {
 		return "", fmt.Errorf("APPLE_TEAM_ID environment variable is not set")
 	}
-
-	// Read the .p8 private key using the same parser as APNS
-	authKey, err := token.AuthKeyFromFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read MapKit key from %s: %w", filePath, err)
-	}
-
-	now := time.Now()
-	claims := jwt.MapClaims{
-		"iss": teamID,
-		"iat": now.Unix(),
-		"exp": now.Add(30 * time.Minute).Unix(),
-	}
-
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-	jwtToken.Header["kid"] = keyID
-
-	signedToken, err := jwtToken.SignedString(authKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign MapKit JWT: %w", err)
-	}
-
-	return signedToken, nil
+	return utils.GenerateMapKitJWT(config)
 }
 
 func (s *Service) GetMapkitServerToken() http.HandlerFunc {

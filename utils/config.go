@@ -100,8 +100,17 @@ func GetServerConfig(manager *secrets.Manager) ServerConfig {
 	storage := os.Getenv("STORAGE_URL")
 	config.StorageServiceURL = storage
 
-	// Set up MapKit token
+	// Set up MapKit token (static, for production /v1/token endpoint)
 	config.MapKitToken = manager.GetRequired("MAPKIT_TOKEN")
+
+	// Set up MapKit JWT generation config (for snapshot API and dev mode)
+	mapkitFilePath := os.Getenv("MAPKIT_FILE_PATH")
+	mapkitKeyID := os.Getenv("MAPKIT_KEY_ID")
+	config.MapKitConfig = MapKitConfig{
+		KeyFilePath: mapkitFilePath,
+		KeyID:       mapkitKeyID,
+		TeamID:      config.AppleTeamID,
+	}
 
 	// Set up Stripe token
 	config.StripeToken = manager.GetRequired("STRIPE_TOKEN")

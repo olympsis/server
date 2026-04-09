@@ -23,7 +23,7 @@ func NewMapSnapshotAPI(i *server.ServerInterface, config *utils.ServerConfig) *M
 	// Set the storage interface
 	snapService.StorageInterface = utils.NewStorageInterface(
 		config.StorageServiceURL,
-		config.MapKitToken,
+		config.MapKitConfig,
 		i.Logger,
 	)
 

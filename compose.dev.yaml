@@ -54,7 +54,7 @@ services:
             - redis
 
     storage:
-        image: us-central1-docker.pkg.dev/olympsis-485522/storage/dev:v0.3.0
+        image: us-central1-docker.pkg.dev/olympsis-485522/storage/dev:v0.3.1
         container_name: storage
         restart: always
         ports:

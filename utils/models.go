@@ -10,7 +10,8 @@ type ServerConfig struct {
 	AppleTeamID string // Apple Team ID
 	APNSFileURl string // URL key path
 
-	MapKitToken string // Apple Mapkit token
+	MapKitToken  string       // Apple Mapkit token (static, used in production for /v1/token endpoint)
+	MapKitConfig MapKitConfig // Credentials for generating fresh MapKit JWTs
 	StripeToken string // Stripe API token
 
 	StorageServiceURL string

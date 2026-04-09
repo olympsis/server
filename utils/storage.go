@@ -18,21 +18,21 @@ type StorageInterface struct {
 	Client     http.Client
 	Logger     *logrus.Logger
 
-	MapKitToken string
+	MapKitConfig MapKitConfig // Credentials for generating fresh MapKit JWTs
 }
 
-func NewStorageInterface(u string, token string, logger *logrus.Logger) *StorageInterface {
+func NewStorageInterface(u string, mapkitConfig MapKitConfig, logger *logrus.Logger) *StorageInterface {
 	return &StorageInterface{
-		ServiceURL:  u,
-		Status:      "good",
-		Client:      http.Client{},
-		Logger:      logger,
-		MapKitToken: token,
+		ServiceURL:   u,
+		Status:       "good",
+		Client:       http.Client{},
+		Logger:       logger,
+		MapKitConfig: mapkitConfig,
 	}
 }
 
 // GetMapSnapshot checks if the snapshot exists in storage, and if not, fetches it
-// from MapKit and uploads it. Returns a URL path: /mapkit-snapshot/{hash}.png
+// from MapKit and uploads it. Returns a URL path: mapkit-snapshots/{hash}.png
 func (s *StorageInterface) GetMapSnapshot(name string) (string, error) {
 	imageHash := CreateImageHash(name)
 
@@ -47,13 +47,19 @@ func (s *StorageInterface) GetMapSnapshot(name string) (string, error) {
 }
 
 // GetMapKitSnapshot fetches the snapshot from Apple MapKit, uploads it to storage
-// in the background, and returns a URL path: /mapkit-snapshot/{hash}.png
+// in the background, and returns a URL path: mapkit-snapshots/{hash}.png
 func (s *StorageInterface) GetMapKitSnapshot(name string) (string, error) {
-	token := os.Getenv("MAPKIT_TOKEN")
+	// Generate a fresh JWT for each request since MapKit tokens expire after 30 minutes
+	mapkitToken, err := GenerateMapKitJWT(s.MapKitConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate MapKit JWT: %w", err)
+	}
+
+	token := os.Getenv("SNAPSHOT_TOKEN")
 	imageHash := CreateImageHash(name)
 	encodedLocation := url.QueryEscape(name)
 	zoom := 15
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s&z=%d", encodedLocation, s.MapKitToken, zoom), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://snapshot.apple-mapkit.com/api/v1/snapshot?center=%s&token=%s&z=%d", encodedLocation, mapkitToken, zoom), nil)
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +99,7 @@ func (s *StorageInterface) GetMapKitSnapshot(name string) (string, error) {
 		}
 	}()
 
-	return fmt.Sprintf("/mapkit-snapshot/%s", imageHash), nil
+	return fmt.Sprintf("mapkit-snapshots/%s", imageHash), nil
 }
 
 // SnapshotExistsInStorage checks if a snapshot exists in GCS using a HEAD request
