@@ -54,3 +54,18 @@ func (r *RedisDatabase) MarkNotificationSent(eventID string, ttl time.Duration) 
 	r.logger.Infof("Notification sent for event_ID: %s", eventID)
 	return r.client.Set(context.Background(), eventID, "1", ttl).Err()
 }
+
+// Get retrieves a value from the cache by key. Returns empty string and no error
+// if the key does not exist (redis.Nil is treated as a cache miss).
+func (r *RedisDatabase) Get(ctx context.Context, key string) (string, error) {
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
+}
+
+// Set stores a value in the cache with the given TTL.
+func (r *RedisDatabase) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	return r.client.Set(ctx, key, value, ttl).Err()
+}

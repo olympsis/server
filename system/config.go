@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"olympsis-server/database"
+	redisDB "olympsis-server/redis"
 	"olympsis-server/server"
 	"olympsis-server/utils"
 	"os"
@@ -23,9 +24,10 @@ import (
 Config Service Struct
 */
 type Service struct {
-	Database *database.Database // database for read/write operations
-	Logger   *logrus.Logger     // logger for logging errors
-	Router   *mux.Router        // router for handling incoming requests
+	Database *database.Database    // database for read/write operations
+	Logger   *logrus.Logger        // logger for logging errors
+	Router   *mux.Router           // router for handling incoming requests
+	Cache    *redisDB.RedisDatabase // optional redis cache for token caching
 }
 
 func NewSystemService(i *server.ServerInterface) *Service {
@@ -33,6 +35,7 @@ func NewSystemService(i *server.ServerInterface) *Service {
 		Logger:   i.Logger,
 		Router:   i.Router,
 		Database: i.Database,
+		Cache:    i.Cache,
 	}
 }
 
@@ -83,8 +86,53 @@ func (s *Service) generateMapKitJWT() (string, error) {
 	return utils.GenerateMapKitJWT(config)
 }
 
+const mapkitCacheKey = "mapkit:server_token"
+
+// mapkitCachedToken is the structure stored in redis for the cached Apple MapKit token.
+type mapkitCachedToken struct {
+	Token            string `json:"token"`
+	ExpiresInSeconds int    `json:"expiresInSeconds"`
+	// CachedAt is the unix timestamp when this entry was stored, so we can
+	// compute the remaining TTL when serving from cache.
+	CachedAt int64 `json:"cachedAt"`
+}
+
+// refreshBuffer is the time before token expiry at which we proactively
+// fetch a new token from Apple instead of serving the cached one.
+const refreshBuffer = 150 // 2.5 minutes in seconds
+
 func (s *Service) GetMapkitServerToken() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// --- Try to serve from cache ---
+		if s.Cache != nil {
+			cached, err := s.Cache.Get(ctx, mapkitCacheKey)
+			if err != nil {
+				s.Logger.Errorf("[Sys] redis GET error for mapkit token: %v", err)
+				// Fall through to fetch from Apple
+			} else if cached != "" {
+				var entry mapkitCachedToken
+				if err := json.Unmarshal([]byte(cached), &entry); err == nil {
+					elapsed := int(time.Now().Unix() - entry.CachedAt)
+					remaining := entry.ExpiresInSeconds - elapsed
+
+					// Only serve from cache if more than 2.5 minutes remain
+					if remaining > refreshBuffer {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						json.NewEncoder(w).Encode(map[string]interface{}{
+							"token":            entry.Token,
+							"expiresInSeconds": remaining,
+						})
+						return
+					}
+					// Token is expiring soon, fall through to refresh
+				}
+			}
+		}
+
+		// --- Resolve the bearer token used to authenticate with Apple ---
 		var bearerToken string
 
 		mode := os.Getenv("MODE")
@@ -107,6 +155,7 @@ func (s *Service) GetMapkitServerToken() http.HandlerFunc {
 			}
 		}
 
+		// --- Fetch token from Apple with retries ---
 		maxRetries := 3
 		var lastErr error
 
@@ -161,6 +210,22 @@ func (s *Service) GetMapkitServerToken() http.HandlerFunc {
 				s.Logger.Errorf("[Sys] failed to parse mapkit token response: %v", err)
 				http.Error(w, `{"msg":"failed to parse token response"}`, http.StatusInternalServerError)
 				return
+			}
+
+			// --- Cache the fresh token in redis ---
+			if s.Cache != nil {
+				entry := mapkitCachedToken{
+					Token:            appleResp.AccessToken,
+					ExpiresInSeconds: appleResp.ExpiresInSeconds,
+					CachedAt:         time.Now().Unix(),
+				}
+				data, _ := json.Marshal(entry)
+				// Set the redis TTL to match the token's lifetime so it auto-expires
+				ttl := time.Duration(appleResp.ExpiresInSeconds) * time.Second
+				if err := s.Cache.Set(ctx, mapkitCacheKey, string(data), ttl); err != nil {
+					s.Logger.Errorf("[Sys] failed to cache mapkit token in redis: %v", err)
+					// Non-fatal — we still return the token to the caller
+				}
 			}
 
 			w.Header().Set("Content-Type", "application/json")

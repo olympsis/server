@@ -15,6 +15,7 @@ import (
 	"olympsis-server/notifications"
 	"olympsis-server/organization"
 	"olympsis-server/post"
+	redisDB "olympsis-server/redis"
 	"olympsis-server/report"
 	"olympsis-server/server"
 	storageAPI "olympsis-server/storage"
@@ -56,13 +57,13 @@ func main() {
 	d.EstablishConnection(manager, &config)
 
 	// Set up redis
-	// rConfig := utils.GetRedisConfig(manager)
-	// cache := redis.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
-	// cacheDB := redis.New(&cache, l)
-	// if err := cache.Ping(context.Background()).Err(); err != nil {
-	// 	l.Fatalf("Error setting up redis client. Error: %s", err.Error())
-	// 	os.Exit(1)
-	// }
+	rConfig := utils.GetRedisConfig(manager)
+	cache := redisDB.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
+	cacheDB := redisDB.New(&cache, l)
+	if err := cache.Ping(context.Background()).Err(); err != nil {
+		l.Fatalf("Error setting up redis client. Error: %s", err.Error())
+		os.Exit(1)
+	}
 
 	// Set up Firebase authentication
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
@@ -98,6 +99,8 @@ func main() {
 
 		Stripe: sc,     // stripe
 		Auth:   client, // firebase
+
+		Cache: &cacheDB, // redis
 
 		Notification: notif, // notifications
 	}
