@@ -12,9 +12,9 @@ type ServerConfig struct {
 
 	MapKitToken  string       // Apple Mapkit token (static, used in production for /v1/token endpoint)
 	MapKitConfig MapKitConfig // Credentials for generating fresh MapKit JWTs
-	StripeToken string // Stripe API token
+	StripeToken  string       // Stripe API token
 
-	StorageServiceURL string
+	GCPCredentialsFilePath string // GCP service account credentials for Storage & Vision APIs
 
 	KeyFilePath  string // TLS key file
 	CertFilePath string // TLS cert file

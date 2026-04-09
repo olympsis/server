@@ -1,32 +1,29 @@
 package utils
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
+	"olympsis-server/types"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
 type StorageInterface struct {
-	ServiceURL string
-	Status     string
-	Client     http.Client
-	Logger     *logrus.Logger
+	Client  http.Client
+	Logger  *logrus.Logger
+	Storage types.StorageUploader // Direct reference to upload files without external HTTP calls
 
 	MapKitConfig MapKitConfig // Credentials for generating fresh MapKit JWTs
 }
 
-func NewStorageInterface(u string, mapkitConfig MapKitConfig, logger *logrus.Logger) *StorageInterface {
+func NewStorageInterface(storage types.StorageUploader, mapkitConfig MapKitConfig, logger *logrus.Logger) *StorageInterface {
 	return &StorageInterface{
-		ServiceURL:   u,
-		Status:       "good",
 		Client:       http.Client{},
 		Logger:       logger,
+		Storage:      storage,
 		MapKitConfig: mapkitConfig,
 	}
 }
@@ -55,7 +52,6 @@ func (s *StorageInterface) GetMapKitSnapshot(name string) (string, error) {
 		return "", fmt.Errorf("failed to generate MapKit JWT: %w", err)
 	}
 
-	token := os.Getenv("SNAPSHOT_TOKEN")
 	imageHash := CreateImageHash(name)
 	encodedLocation := url.QueryEscape(name)
 	zoom := 15
@@ -92,10 +88,10 @@ func (s *StorageInterface) GetMapKitSnapshot(name string) (string, error) {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Upload to storage in the background
+	// Upload to storage directly using the storage service (no external HTTP call)
 	go func() {
-		if err := s.UploadMapKitSnapshotToStorage(token, imageHash, imageData); err != nil {
-			s.Logger.Errorf("Failed to upload image to storage: %v", err)
+		if err := s.Storage.UploadToStorage(imageData, "olympsis-mapkit-snapshots", imageHash); err != nil {
+			s.Logger.Errorf("Failed to upload snapshot to storage: %v", err)
 		}
 	}()
 
@@ -118,29 +114,4 @@ func (s *StorageInterface) SnapshotExistsInStorage(name string) (bool, error) {
 	defer resp.Body.Close()
 
 	return resp.StatusCode == http.StatusOK, nil
-}
-
-func (s *StorageInterface) UploadMapKitSnapshotToStorage(token string, name string, data []byte) error {
-	// Create the request to the storage service
-	req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/v1/storage/olympsis-mapkit-snapshots", s.ServiceURL), bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set necessary headers
-	req.Header.Set("Content-Type", "image/jpeg")
-	req.Header.Set("X-Filename", name)
-
-	// Make the request
-	resp, err := s.Client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("storage service returned non-200 status code: %d", resp.StatusCode)
-	}
-
-	return nil
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"olympsis-server/database"
 	"olympsis-server/notifications"
+	"olympsis-server/types"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -20,4 +21,5 @@ type ServerInterface struct {
 	Auth *auth.Client // Firebase auth client
 
 	Notification *notifications.Service
+	Storage      types.StorageUploader // GCP Storage upload capability
 }

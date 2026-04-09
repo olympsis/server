@@ -17,6 +17,7 @@ import (
 	"olympsis-server/post"
 	"olympsis-server/report"
 	"olympsis-server/server"
+	storageAPI "olympsis-server/storage"
 	"olympsis-server/system"
 	"olympsis-server/user"
 	"olympsis-server/utils"
@@ -101,6 +102,14 @@ func main() {
 		Notification: notif, // notifications
 	}
 
+	// Set up storage service first (other modules depend on it)
+	storageModule := storageAPI.NewStorageAPI(serverInterface)
+	if err := storageModule.Service.ConnectToClient(config.GCPCredentialsFilePath); err != nil {
+		l.Fatalf("Failed to connect storage service to GCP: %s", err.Error())
+		os.Exit(1)
+	}
+	serverInterface.Storage = storageModule.Service
+
 	// Set up API
 	announceAPI := announcement.NewAnnouncementAPI(serverInterface)
 	authAPI := auth.NewAuthAPI(serverInterface)
@@ -130,6 +139,7 @@ func main() {
 	healthAPI.Ready()
 	snapShotAPI.Ready()
 	systemAPI.Ready(client)
+	storageModule.Ready(client)
 
 	// Apply compression universally
 	r.Use(middleware.GzipMiddleware)

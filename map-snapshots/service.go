@@ -20,9 +20,9 @@ func NewMapSnapshotAPI(i *server.ServerInterface, config *utils.ServerConfig) *M
 	// Create a service instance first
 	snapService := service.NewSnapService(i)
 
-	// Set the storage interface
+	// Set the storage interface using the storage service directly (no external HTTP calls)
 	snapService.StorageInterface = utils.NewStorageInterface(
-		config.StorageServiceURL,
+		i.Storage,
 		config.MapKitConfig,
 		i.Logger,
 	)

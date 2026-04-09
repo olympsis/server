@@ -96,9 +96,12 @@ func GetServerConfig(manager *secrets.Manager) ServerConfig {
 		config.CertFilePath = certPath
 	}
 
-	// Storage url
-	storage := os.Getenv("STORAGE_URL")
-	config.StorageServiceURL = storage
+	// GCP credentials file for Storage & Vision APIs
+	gcpCreds := os.Getenv("STORAGE_FILE_PATH")
+	if gcpCreds == "" {
+		panic("GCS credentials file path required in config")
+	}
+	config.GCPCredentialsFilePath = gcpCreds
 
 	// Set up MapKit token (static, for production /v1/token endpoint)
 	config.MapKitToken = manager.GetRequired("MAPKIT_TOKEN")
@@ -111,9 +114,6 @@ func GetServerConfig(manager *secrets.Manager) ServerConfig {
 		KeyID:       mapkitKeyID,
 		TeamID:      config.AppleTeamID,
 	}
-
-	// Set up Stripe token
-	config.StripeToken = manager.GetRequired("STRIPE_TOKEN")
 
 	return config
 }
