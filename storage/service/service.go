@@ -69,6 +69,9 @@ func (s *Service) UploadObject() http.HandlerFunc {
 			return
 		}
 
+		// TODO: temporary bucket name mapping — remove once clients send the correct name
+		fileBucket = resolveBucket(fileBucket)
+
 		// Parse the file from the request body.
 		// Supports both multipart/form-data (Android client) and raw binary uploads.
 		var bodyData []byte
@@ -176,6 +179,9 @@ func (s *Service) DeleteObject() http.HandlerFunc {
 			http.Error(rw, `{ "msg" : "invalid file bucket name" }`, http.StatusBadRequest)
 			return
 		}
+
+		// TODO: temporary bucket name mapping — remove once clients send the correct name
+		fileBucket = resolveBucket(fileBucket)
 
 		// Get the filename from the request header
 		fileName, err := GrabFileName(&r.Header)

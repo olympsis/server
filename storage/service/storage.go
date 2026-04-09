@@ -45,6 +45,21 @@ func (s *Service) _deleteObject(bucket string, name string) error {
 	return nil
 }
 
+// bucketAliases maps legacy/incorrect bucket names sent by clients to the
+// actual GCS bucket. TODO: remove once all clients are updated.
+var bucketAliases = map[string]string{
+	"olympsis-event-images": "olympsis-event-media",
+}
+
+// resolveBucket returns the actual GCS bucket name, applying any temporary
+// alias mapping if one exists.
+func resolveBucket(name string) string {
+	if actual, ok := bucketAliases[name]; ok {
+		return actual
+	}
+	return name
+}
+
 // GrabFileName extracts the filename from the X-Filename request header
 func GrabFileName(h *http.Header) (string, error) {
 	fileName := h.Get("X-Filename")
