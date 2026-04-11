@@ -36,7 +36,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.Location(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -45,7 +44,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.GetUserPastEvents(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -54,7 +52,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.GetGroupPastEvents(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -63,7 +60,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			e.Service.GetEvents(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -72,7 +68,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			e.Service.GetEvent(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -82,7 +77,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateEvent(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -92,7 +86,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateAnEvent(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -102,7 +95,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.Cancel(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -112,7 +104,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteAnEvent(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -126,7 +117,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.AddParticipant(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -136,7 +126,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.RemoveParticipant(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -146,7 +135,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.RemoveParticipant(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -160,7 +148,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.AddComment(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -170,7 +157,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.RemoveComment(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -184,7 +170,6 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			e.Service.NotifyParticipants(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 }

@@ -33,7 +33,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetFields(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -42,7 +41,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -51,7 +49,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.InsertAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -60,7 +57,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.UpdateAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -69,7 +65,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.DeleteAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -80,7 +75,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetFields(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -89,7 +83,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.GetAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -98,7 +91,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.InsertAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -107,7 +99,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.UpdateAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -116,7 +107,6 @@ func (s *VenueAPI) Ready() {
 		middleware.Chain(
 			s.Service.DeleteAField(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 }

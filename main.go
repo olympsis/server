@@ -151,7 +151,6 @@ func main() {
 	r.Handle("/v1/notifications", middleware.Chain(
 		serverInterface.Notification.HandleNotificationRequest(),
 		middleware.Logging(),
-		middleware.CORS(),
 	)).Methods("POST", "OPTIONS")
 
 	// Set up event polling

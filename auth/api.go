@@ -26,7 +26,6 @@ func (s *AuthAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			s.Service.Register(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -34,7 +33,6 @@ func (s *AuthAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			s.Service.Login(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -43,7 +41,6 @@ func (s *AuthAPI) Ready(firebase *auth.Client) {
 			s.Service.Modify(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -52,7 +49,6 @@ func (s *AuthAPI) Ready(firebase *auth.Client) {
 			s.Service.Delete(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 }

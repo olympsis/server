@@ -33,7 +33,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 	p.Router.Handle("/v1/posts", middleware.Chain(
 		p.Service.GetPosts(),
 		middleware.Logging(),
-		middleware.CORS(),
 	)).Methods("GET", "OPTIONS")
 
 	// get a post
@@ -41,7 +40,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 		p.Service.GetPost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
-		middleware.CORS(),
 	)).Methods("GET", "OPTIONS")
 
 	// create a post
@@ -49,7 +47,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 		p.Service.CreatePost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
-		middleware.CORS(),
 	)).Methods("POST", "OPTIONS")
 
 	// update a post
@@ -57,7 +54,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 		p.Service.ModifyPost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
-		middleware.CORS(),
 	)).Methods("PUT", "OPTIONS")
 
 	// delete a post
@@ -65,7 +61,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 		p.Service.DeletePost(),
 		middleware.Logging(),
 		middleware.UserMiddleware(firebase),
-		middleware.CORS(),
 	)).Methods("DELETE", "OPTIONS")
 
 	/*
@@ -78,7 +73,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 			p.Service.AddLike(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -88,7 +82,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 			p.Service.RemoveLike(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -102,7 +95,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 			p.Service.AddComment(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -112,7 +104,6 @@ func (p *PostAPI) Ready(firebase *auth.Client) {
 			p.Service.DeleteComment(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 

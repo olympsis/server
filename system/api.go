@@ -28,7 +28,6 @@ func (e *SystemAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			e.Service.GetConfig(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -37,7 +36,6 @@ func (e *SystemAPI) Ready(firebase *auth.Client) {
 			e.Service.GetMapkitServerToken(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 }

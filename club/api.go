@@ -35,7 +35,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetClubs(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -44,7 +43,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			s.Service.GetClub(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -54,7 +52,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.ModifyClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -64,7 +61,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.CreateClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -74,7 +70,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.DeleteClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -84,7 +79,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.LeaveClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -98,7 +92,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetApplications(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -108,7 +101,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.CreateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -118,7 +110,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.UpdateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -128,7 +119,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.DeleteApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -142,7 +132,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.ChangeMemberRank(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -152,7 +141,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.KickMember(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -162,7 +150,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.LeaveClub(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -175,7 +162,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.PinClubPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -184,7 +170,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.UnpinClubPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -198,7 +183,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.CreateFinancialAccount(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -208,7 +192,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetFinancialOverview(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -218,7 +201,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetTransactionHistory(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -228,7 +210,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.InitiatePayout(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -238,7 +219,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetPayoutHistory(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -248,7 +228,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetFinancialAccount(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -258,7 +237,6 @@ func (s *ClubAPI) Ready(firebase *auth.Client) {
 			s.Service.GetCustomerSheetConfig(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 }

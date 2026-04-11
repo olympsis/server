@@ -26,7 +26,6 @@ func (h *HealthAPI) Ready() {
 		"/v1/health",
 		middleware.Chain(
 			HealthCheckHandler(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -34,7 +33,6 @@ func (h *HealthAPI) Ready() {
 		"/v1/health/wsg",
 		middleware.Chain(
 			HandleWhatsGood(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 }

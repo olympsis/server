@@ -36,7 +36,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateOrganization(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -46,7 +45,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetOrganizations(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -55,7 +53,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 		middleware.Chain(
 			e.Service.GetOrganization(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -65,7 +62,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateOrganization(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -75,7 +71,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteOrganization(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -88,7 +83,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -98,7 +92,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetApplications(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -108,7 +101,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -118,7 +110,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -128,7 +119,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteApplication(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -141,7 +131,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.CreateInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -151,7 +140,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetInvitations(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -161,7 +149,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.GetInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -171,7 +158,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UpdateInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -181,7 +167,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.DeleteInvitation(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -194,7 +179,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.PinOrgPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -203,7 +187,6 @@ func (e *OrganizationAPI) Ready(firebase *auth.Client) {
 			e.Service.UnpinOrgPost(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 }

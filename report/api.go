@@ -36,7 +36,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadBugReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -46,7 +45,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateBugReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -56,7 +54,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateBugReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -66,7 +63,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteBugReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -80,7 +76,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadPostReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -90,7 +85,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreatePostReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -100,7 +94,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdatePostReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -110,7 +103,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeletePostReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -124,7 +116,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadMemberReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -134,7 +125,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateMemberReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -144,7 +134,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateMemberReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -154,7 +143,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteMemberReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -168,7 +156,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadFieldReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -178,7 +165,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateFieldReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -188,7 +174,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateFieldReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -198,7 +183,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteFieldReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 
@@ -212,7 +196,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.ReadEventReports(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -222,7 +205,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.CreateEventReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -232,7 +214,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.UpdateEventReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("PUT", "OPTIONS")
 
@@ -242,7 +223,6 @@ func (e *ReportAPI) Setup(firebase *auth.Client) {
 			e.Service.DeleteEventReport(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 }

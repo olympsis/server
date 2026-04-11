@@ -29,7 +29,6 @@ func (e *LocaleAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetCountries(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -37,7 +36,6 @@ func (e *LocaleAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetAdministrativeAreas(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 
@@ -45,7 +43,6 @@ func (e *LocaleAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetSubAdministrativeAreas(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 }

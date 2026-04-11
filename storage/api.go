@@ -31,7 +31,6 @@ func (s *StorageAPI) Ready(firebase *auth.Client) {
 			s.Service.UploadObject(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("POST", "OPTIONS")
 
@@ -41,7 +40,6 @@ func (s *StorageAPI) Ready(firebase *auth.Client) {
 			s.Service.DeleteObject(),
 			middleware.Logging(),
 			middleware.UserMiddleware(firebase),
-			middleware.CORS(),
 		),
 	).Methods("DELETE", "OPTIONS")
 }

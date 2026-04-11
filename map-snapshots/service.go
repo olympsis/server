@@ -40,7 +40,6 @@ func (e *MapSnapShotAPI) Ready() {
 		middleware.Chain(
 			e.Service.GetMapSnapShot(),
 			middleware.Logging(),
-			middleware.CORS(),
 		),
 	).Methods("GET", "OPTIONS")
 }
