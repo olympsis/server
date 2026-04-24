@@ -3,16 +3,15 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"olympsis-server/database"
 	"olympsis-server/notifications"
 	"olympsis-server/server"
-	"os"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
@@ -62,44 +61,33 @@ Returns:
 	Http handler
 		- Writes object back to client
 */
-func (f *Service) InsertAField() http.HandlerFunc {
+func (f *Service) CreateVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		var req models.Venue
 
-		// decode request
+		// Decode request
+		var req models.Venue
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			f.Log.Error(err.Error())
-			http.Error(rw, "bad body", http.StatusBadRequest)
+			f.Log.Errorf(`Failed to decode venue request body. Error: %s`, err.Error())
+			http.Error(rw, `{ "msg": "Invalid request body" }`, http.StatusBadRequest)
 			return
 		}
 
-		field := models.Venue{
-			ID:          bson.NewObjectID(),
-			Owner:       req.Owner,
-			Name:        req.Name,
-			Description: req.Description,
-			Sports:      req.Sports,
-			Images:      req.Images,
-			Location:    req.Location,
-			City:        req.City,
-			State:       req.State,
-			Country:     req.Country,
+		// Add timestamps
+		now := bson.NewDateTimeFromTime(time.Now())
+		req.CreatedAt = &now
+		req.UpdatedAt = &now
 
-			RequiresBooking: req.RequiresBooking,
-			BookingURL:      req.BookingURL,
-		}
-
-		// create auth user in database
-		err = f.InsertField(context.Background(), &field)
+		// Create venue in database
+		res, err := f.InsertField(context.Background(), &req)
 		if err != nil {
-			f.Log.Error(err.Error())
-			http.Error(rw, "insertion failed", http.StatusInternalServerError)
+			f.Log.Errorf(`Failed to add venue to the database. Error: %s`, err.Error())
+			http.Error(rw, `{ "msg": "failed create venue" }`, http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusCreated)
-		json.NewEncoder(rw).Encode(field)
+		fmt.Fprintf(rw, `{ "id" : "%s" }`, res.InsertedID.(bson.ObjectID))
 	}
 
 }
@@ -116,7 +104,7 @@ Returns:
 	Http handler
 		- Writes list of fields back to client
 */
-func (f *Service) GetFields() http.HandlerFunc {
+func (f *Service) GetVenues() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
@@ -182,7 +170,7 @@ Returns:
 	Http handler
 		- Writes user data back to client
 */
-func (f *Service) GetAField() http.HandlerFunc {
+func (f *Service) GetVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
 		vars := mux.Vars(r)
@@ -223,7 +211,7 @@ Returns:
 	Http handler
 		- Writes updated field back to client
 */
-func (f *Service) UpdateAField() http.HandlerFunc {
+func (f *Service) UpdateVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		var req models.Venue
 
@@ -298,7 +286,7 @@ Returns:
 	Http handler
 		- Writes token back to client
 */
-func (f *Service) DeleteAField() http.HandlerFunc {
+func (f *Service) DeleteVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
 		vars := mux.Vars(r)
@@ -320,52 +308,4 @@ func (f *Service) DeleteAField() http.HandlerFunc {
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`OK`))
 	}
-}
-
-/*
-Decode an Authentication Token
-  - Decodes auth token
-  - uses go jwt
-
-Args:
-
-	token - string of token
-
-Returns:
-
-	claims - jwt claims
-	error -  if there is an error return error else nil
-*/
-func (f *Service) DecodeToken(token string) (jwt.MapClaims, error) {
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("KEY")), nil
-	})
-
-	if err != nil {
-		return nil, err
-	} else {
-		return claims, nil
-	}
-}
-
-/*
-Grab Token from request
-Args:
-
-	r - http request
-
-Returns:
-
-	string - token
-	error -  if there is an error return error else nil
-*/
-func (f *Service) GrabToken(r *http.Request) (string, error) {
-	bearerToken := r.Header.Get("Authorization")
-
-	if bearerToken == "" {
-		return "", errors.New("no token found")
-	}
-
-	return bearerToken, nil
 }

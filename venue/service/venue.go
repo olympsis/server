@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/olympsis/models"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // Insert new user into database
-func (f *Service) InsertField(ctx context.Context, field *models.Venue) error {
-	f.Database.VenuesCollection.InsertOne(ctx, field)
-	return nil
+func (f *Service) InsertField(ctx context.Context, field *models.Venue) (*mongo.InsertOneResult, error) {
+	return f.Database.VenuesCollection.InsertOne(ctx, field)
 }
 
 // Get user from database

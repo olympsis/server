@@ -31,7 +31,7 @@ func (s *VenueAPI) Ready() {
 	// get fields
 	s.Router.Handle("/v1/fields",
 		middleware.Chain(
-			s.Service.GetFields(),
+			s.Service.GetVenues(),
 			middleware.Logging(),
 		),
 	).Methods("GET", "OPTIONS")
@@ -39,7 +39,7 @@ func (s *VenueAPI) Ready() {
 	// get a field
 	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
-			s.Service.GetAField(),
+			s.Service.GetVenue(),
 			middleware.Logging(),
 		),
 	).Methods("GET", "OPTIONS")
@@ -47,7 +47,7 @@ func (s *VenueAPI) Ready() {
 	// create field
 	s.Router.Handle("/v1/fields",
 		middleware.Chain(
-			s.Service.InsertAField(),
+			s.Service.CreateVenue(),
 			middleware.Logging(),
 		),
 	).Methods("POST", "OPTIONS")
@@ -55,7 +55,7 @@ func (s *VenueAPI) Ready() {
 	// update a field
 	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
-			s.Service.UpdateAField(),
+			s.Service.UpdateVenue(),
 			middleware.Logging(),
 		),
 	).Methods("PUT", "OPTIONS")
@@ -63,7 +63,7 @@ func (s *VenueAPI) Ready() {
 	// delete a field
 	s.Router.Handle("/v1/fields/{id}",
 		middleware.Chain(
-			s.Service.DeleteAField(),
+			s.Service.DeleteVenue(),
 			middleware.Logging(),
 		),
 	).Methods("DELETE", "OPTIONS")
@@ -73,7 +73,7 @@ func (s *VenueAPI) Ready() {
 	// get fields
 	s.Router.Handle("/v1/venues",
 		middleware.Chain(
-			s.Service.GetFields(),
+			s.Service.GetVenues(),
 			middleware.Logging(),
 		),
 	).Methods("GET", "OPTIONS")
@@ -81,7 +81,7 @@ func (s *VenueAPI) Ready() {
 	// get a field
 	s.Router.Handle("/v1/venues/{id}",
 		middleware.Chain(
-			s.Service.GetAField(),
+			s.Service.GetVenue(),
 			middleware.Logging(),
 		),
 	).Methods("GET", "OPTIONS")
@@ -89,7 +89,7 @@ func (s *VenueAPI) Ready() {
 	// create field
 	s.Router.Handle("/v1/venues",
 		middleware.Chain(
-			s.Service.InsertAField(),
+			s.Service.CreateVenue(),
 			middleware.Logging(),
 		),
 	).Methods("POST", "OPTIONS")
@@ -97,7 +97,7 @@ func (s *VenueAPI) Ready() {
 	// update a field
 	s.Router.Handle("/v1/venues/{id}",
 		middleware.Chain(
-			s.Service.UpdateAField(),
+			s.Service.UpdateVenue(),
 			middleware.Logging(),
 		),
 	).Methods("PUT", "OPTIONS")
@@ -105,7 +105,7 @@ func (s *VenueAPI) Ready() {
 	// delete a field
 	s.Router.Handle("/v1/venues/{id}",
 		middleware.Chain(
-			s.Service.DeleteAField(),
+			s.Service.DeleteVenue(),
 			middleware.Logging(),
 		),
 	).Methods("DELETE", "OPTIONS")
