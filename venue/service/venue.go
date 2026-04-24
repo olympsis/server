@@ -7,19 +7,19 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-// Insert new user into database
-func (f *Service) InsertField(ctx context.Context, field *models.Venue) (*mongo.InsertOneResult, error) {
+// Insert new venue into the database
+func (f *Service) InsertVenue(ctx context.Context, field *models.Venue) (*mongo.InsertOneResult, error) {
 	return f.Database.VenuesCollection.InsertOne(ctx, field)
 }
 
-// Get user from database
-func (f *Service) FindField(ctx context.Context, filter interface{}, field *models.Venue) error {
+// Get a venue from the database
+func (f *Service) FindVenue(ctx context.Context, filter interface{}, field *models.Venue) error {
 	f.Database.VenuesCollection.FindOne(ctx, filter).Decode(&field)
 	return nil
 }
 
-// get users from database
-func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]models.Venue) error {
+// Get venues from the database
+func (f *Service) FindVenues(ctx context.Context, filter interface{}, fields *[]models.Venue) error {
 
 	cursor, err := f.Database.VenuesCollection.Find(ctx, filter)
 	if err != nil {
@@ -37,8 +37,8 @@ func (f *Service) FindFields(ctx context.Context, filter interface{}, fields *[]
 	return nil
 }
 
-// update user in database
-func (f *Service) UpdateField(ctx context.Context, filter interface{}, update interface{}, field *models.Venue) error {
+// Modify a venue in the database
+func (f *Service) ModifyVenue(ctx context.Context, filter interface{}, update interface{}, field *models.Venue) error {
 	// update user
 	_, err := f.Database.VenuesCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -46,7 +46,7 @@ func (f *Service) UpdateField(ctx context.Context, filter interface{}, update in
 	}
 
 	// find and return updated user
-	err = f.FindField(ctx, filter, field)
+	err = f.FindVenue(ctx, filter, field)
 	if err != nil {
 		return err
 	}
@@ -54,8 +54,8 @@ func (f *Service) UpdateField(ctx context.Context, filter interface{}, update in
 	return nil
 }
 
-// update users in database
-func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update interface{}, fields *[]models.Venue) error {
+// Modify venues in the database
+func (f *Service) ModifyVenues(ctx context.Context, filter interface{}, update interface{}, fields *[]models.Venue) error {
 	// update users
 	_, err := f.Database.VenuesCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
@@ -80,7 +80,7 @@ func (f *Service) UpdateFields(ctx context.Context, filter interface{}, update i
 	return nil
 }
 
-// delete user in database
+// Remove venue from database
 func (f *Service) DeleteField(ctx context.Context, filter interface{}) error {
 
 	// delete user
@@ -91,7 +91,7 @@ func (f *Service) DeleteField(ctx context.Context, filter interface{}) error {
 	return nil
 }
 
-// delete users in database
+// Remove venues from database
 func (f *Service) DeleteFields(ctx context.Context, filter interface{}) error {
 
 	// delete users

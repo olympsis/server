@@ -79,7 +79,7 @@ func (f *Service) CreateVenue() http.HandlerFunc {
 		req.UpdatedAt = &now
 
 		// Create venue in database
-		res, err := f.InsertField(context.Background(), &req)
+		res, err := f.InsertVenue(context.Background(), &req)
 		if err != nil {
 			f.Log.Errorf(`Failed to add venue to the database. Error: %s`, err.Error())
 			http.Error(rw, `{ "msg": "failed create venue" }`, http.StatusInternalServerError)
@@ -137,7 +137,7 @@ func (f *Service) GetVenues() http.HandlerFunc {
 			},
 		}
 
-		err := f.FindFields(context.Background(), filter, &fields)
+		err := f.FindVenues(context.Background(), filter, &fields)
 		if err != nil {
 			f.Log.Error(err.Error())
 			http.Error(rw, "failed to search fields", http.StatusInternalServerError)
@@ -185,7 +185,7 @@ func (f *Service) GetVenue() http.HandlerFunc {
 		var field models.Venue
 		oid, _ := bson.ObjectIDFromHex(id)
 		filter := bson.D{bson.E{Key: "_id", Value: oid}}
-		err := f.FindField(context.Background(), filter, &field)
+		err := f.FindVenue(context.Background(), filter, &field)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				http.Error(rw, "field not found", http.StatusNotFound)
@@ -263,7 +263,7 @@ func (f *Service) UpdateVenue() http.HandlerFunc {
 		}
 
 		var field models.Venue
-		err = f.UpdateField(context.Background(), filter, updates, &field)
+		err = f.ModifyVenue(context.Background(), filter, updates, &field)
 		if err != nil {
 			f.Log.Error(err.Error())
 			http.Error(rw, "failed to update field", http.StatusInternalServerError)
@@ -286,7 +286,7 @@ Returns:
 	Http handler
 		- Writes token back to client
 */
-func (f *Service) DeleteVenue() http.HandlerFunc {
+func (f *Service) RemoveVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		// grab club id from path
 		vars := mux.Vars(r)
