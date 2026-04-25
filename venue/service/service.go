@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/aggregations"
 	"olympsis-server/database"
 	"olympsis-server/notifications"
 	"olympsis-server/server"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -107,58 +107,46 @@ Returns:
 func (f *Service) GetVenues() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
-		// Validate query headers
+		// Validate query parameters
 		err := validateVenuesQuery(r)
 		if err != nil {
 			http.Error(rw, fmt.Sprintf(`{ "msg": "%s" }`, err.Error()), http.StatusBadRequest)
 			return
 		}
 
-		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
-		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
-		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
-		sports := r.URL.Query().Get("sports")
-
-		if longitude == 0 || latitude == 0 || sports == "" {
-			http.Error(rw, "you need longitude/latitude", http.StatusBadRequest)
-			return
+		// Parse pagination with defaults
+		skip := 0
+		if s := r.URL.Query().Get("skip"); s != "" {
+			if val, err := strconv.ParseInt(s, 10, 32); err == nil && val >= 0 {
+				skip = int(val)
+			}
+		}
+		limit := 50
+		if l := r.URL.Query().Get("limit"); l != "" {
+			if val, err := strconv.ParseInt(l, 10, 32); err == nil && val > 0 {
+				limit = int(val)
+			}
 		}
 
-		splicedSports := strings.Split(sports, ",")
+		// Build the aggregation query pipeline from request params
+		queryPipeline := generateVenuesQuery(r)
 
-		var fields []models.Venue
-		loc := models.GeoJSON{
-			Type:        "Point",
-			Coordinates: []float64{longitude, latitude},
-		}
-
-		filter := bson.M{
-			"location": bson.M{
-				"$near": bson.M{
-					"$geometry":    loc,
-					"$maxDistance": radius,
-				},
-			},
-			"sports": bson.M{
-				"$in": splicedSports,
-			},
-		}
-
-		err = f.FindVenues(context.Background(), filter, &fields)
+		// Run the aggregation with core lookups and pagination
+		venues, err := aggregations.AggregateVenues(queryPipeline, limit, skip, f.Database)
 		if err != nil {
 			f.Log.Error(err.Error())
-			http.Error(rw, "failed to search fields", http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "failed to search venues" }`, http.StatusInternalServerError)
 			return
 		}
 
-		if len(fields) == 0 {
-			http.Error(rw, "no fields found", http.StatusNoContent)
+		if len(*venues) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
 
 		resp := models.VenuesResponse{
-			TotalVenues: len(fields),
-			Venues:      fields,
+			TotalVenues: len(*venues),
+			Venues:      *venues,
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
@@ -179,30 +167,32 @@ Returns:
 */
 func (f *Service) GetVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		// grab club id from path
 		vars := mux.Vars(r)
 		if len(vars["id"]) == 0 || len(vars["id"]) < 24 {
-			http.Error(rw, "bad field id", http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "bad venue id" }`, http.StatusBadRequest)
 			return
 		}
 
-		id := vars["id"]
+		oid, err := bson.ObjectIDFromHex(vars["id"])
+		if err != nil {
+			http.Error(rw, `{ "msg": "invalid venue id" }`, http.StatusBadRequest)
+			return
+		}
 
-		// find field data in database
-		var field models.Venue
-		oid, _ := bson.ObjectIDFromHex(id)
-		filter := bson.D{bson.E{Key: "_id", Value: oid}}
-		err := f.FindVenue(context.Background(), filter, &field)
+		venue, err := aggregations.AggregateVenue(oid, f.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				http.Error(rw, "field not found", http.StatusNotFound)
+				http.Error(rw, `{ "msg": "venue not found" }`, http.StatusNotFound)
 				return
 			}
+			f.Log.Error(err.Error())
+			http.Error(rw, `{ "msg": "failed to get venue" }`, http.StatusInternalServerError)
+			return
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(field)
+		json.NewEncoder(rw).Encode(venue)
 	}
 }
 
