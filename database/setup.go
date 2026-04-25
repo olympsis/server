@@ -403,17 +403,15 @@ func (d *Database) SetUpVenueCollections(db *mongo.Database, config *utils.Colle
 		return len(collections) > 0
 	}
 
-	// Create the collection if it doesn't exist
+	// --- Venues Collection ---
 	if !collectionExists(config.VenuesCollection) {
 		err := db.CreateCollection(context.Background(), config.VenuesCollection)
 		if err != nil {
 			return fmt.Errorf("could not create venues collection: %v", err)
 		}
 
-		// Assign the collection to the Database struct
 		d.VenuesCollection = db.Collection(config.VenuesCollection)
 
-		// Define all venue indexes
 		venueIndexes := []mongo.IndexModel{
 			{
 				Keys:    bson.M{"location": "2dsphere"},
@@ -437,67 +435,81 @@ func (d *Database) SetUpVenueCollections(db *mongo.Database, config *utils.Colle
 			},
 		}
 
-		// Helper function to safely create indexes
-		safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
-			// First, list existing indexes
-			cursor, err := collection.Indexes().List(context.Background())
-			if err != nil {
-				return fmt.Errorf("could not list existing indexes: %v", err)
-			}
-			defer cursor.Close(context.Background())
-
-			// Extract existing index names
-			existingIndexes := make(map[string]bool)
-			var indexDoc bson.M
-			for cursor.Next(context.Background()) {
-				if err := cursor.Decode(&indexDoc); err != nil {
-					return fmt.Errorf("could not decode index document: %v", err)
-				}
-				if name, exists := indexDoc["name"].(string); exists {
-					existingIndexes[name] = true
-				}
-			}
-
-			if err := cursor.Err(); err != nil {
-				return fmt.Errorf("error during index cursor iteration: %v", err)
-			}
-
-			// Filter out indexes that already exist
-			var newIndexes []mongo.IndexModel
-			for _, idx := range indexes {
-				name := getIndexName(idx.Options)
-				if name == nil {
-					// No name specified, keep the index
-					newIndexes = append(newIndexes, idx)
-					continue
-				}
-
-				indexName := *name
-				if existingIndexes[indexName] {
-					// Skip this index as it already exists
-					continue
-				}
-				newIndexes = append(newIndexes, idx)
-			}
-
-			// Create only new indexes
-			if len(newIndexes) > 0 {
-				_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
-				if err != nil {
-					return fmt.Errorf("could not create indexes: %v", err)
-				}
-			}
-
-			return nil
-		}
-
-		// Create all indexes using the safe method
-		if err := safeCreateIndexes(d.VenuesCollection, venueIndexes); err != nil {
+		if err := createIndexes(d.VenuesCollection, venueIndexes, "venues"); err != nil {
 			return fmt.Errorf("failed to create venue indexes: %v", err)
 		}
 	} else {
-		// Assign the collection to the Database struct
 		d.VenuesCollection = db.Collection(config.VenuesCollection)
+	}
+
+	// --- Venue Units Collection ---
+	if !collectionExists(config.VenueUnitsCollection) {
+		err := db.CreateCollection(context.Background(), config.VenueUnitsCollection)
+		if err != nil {
+			return fmt.Errorf("could not create venue units collection: %v", err)
+		}
+
+		d.VenueUnitsCollection = db.Collection(config.VenueUnitsCollection)
+
+		venueUnitIndexes := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "venue_id", Value: 1}},
+				Options: options.Index().SetName("venue_id_index"),
+			},
+			{
+				Keys:    bson.M{"location": "2dsphere"},
+				Options: options.Index().SetName("unit_location_2dsphere_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "sports", Value: 1}},
+				Options: options.Index().SetName("unit_sports_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "unit_type", Value: 1}},
+				Options: options.Index().SetName("unit_type_index"),
+			},
+		}
+
+		if err := createIndexes(d.VenueUnitsCollection, venueUnitIndexes, "venue_units"); err != nil {
+			return fmt.Errorf("failed to create venue unit indexes: %v", err)
+		}
+	} else {
+		d.VenueUnitsCollection = db.Collection(config.VenueUnitsCollection)
+	}
+
+	// --- Transit Lines Collection ---
+	if !collectionExists(config.TransitLinesCollection) {
+		err := db.CreateCollection(context.Background(), config.TransitLinesCollection)
+		if err != nil {
+			return fmt.Errorf("could not create transit lines collection: %v", err)
+		}
+
+		d.TransitLinesCollection = db.Collection(config.TransitLinesCollection)
+
+		transitLineIndexes := []mongo.IndexModel{
+			{
+				// Compound index for querying by system + name (the primary query pattern)
+				Keys: bson.D{
+					{Key: "system", Value: 1},
+					{Key: "name", Value: 1},
+				},
+				Options: options.Index().SetName("system_name_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "locality", Value: 1}},
+				Options: options.Index().SetName("locality_index"),
+			},
+			{
+				Keys:    bson.D{{Key: "type", Value: 1}},
+				Options: options.Index().SetName("transit_type_index"),
+			},
+		}
+
+		if err := createIndexes(d.TransitLinesCollection, transitLineIndexes, "transit_lines"); err != nil {
+			return fmt.Errorf("failed to create transit line indexes: %v", err)
+		}
+	} else {
+		d.TransitLinesCollection = db.Collection(config.TransitLinesCollection)
 	}
 
 	return nil
@@ -513,60 +525,6 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 			return false
 		}
 		return len(collections) > 0
-	}
-
-	// Helper function to safely create indexes
-	safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
-		// First, list existing indexes
-		cursor, err := collection.Indexes().List(context.Background())
-		if err != nil {
-			return fmt.Errorf("could not list existing indexes: %v", err)
-		}
-		defer cursor.Close(context.Background())
-
-		// Extract existing index names
-		existingIndexes := make(map[string]bool)
-		var indexDoc bson.M
-		for cursor.Next(context.Background()) {
-			if err := cursor.Decode(&indexDoc); err != nil {
-				return fmt.Errorf("could not decode index document: %v", err)
-			}
-			if name, exists := indexDoc["name"].(string); exists {
-				existingIndexes[name] = true
-			}
-		}
-
-		if err := cursor.Err(); err != nil {
-			return fmt.Errorf("error during index cursor iteration: %v", err)
-		}
-
-		// Filter out indexes that already exist
-		var newIndexes []mongo.IndexModel
-		for _, idx := range indexes {
-			name := getIndexName(idx.Options)
-			if name == nil {
-				// No name specified, keep the index
-				newIndexes = append(newIndexes, idx)
-				continue
-			}
-
-			indexName := *name
-			if existingIndexes[indexName] {
-				// Skip this index as it already exists
-				continue
-			}
-			newIndexes = append(newIndexes, idx)
-		}
-
-		// Create only new indexes
-		if len(newIndexes) > 0 {
-			_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
-			if err != nil {
-				return fmt.Errorf("could not create indexes: %v", err)
-			}
-		}
-
-		return nil
 	}
 
 	// Set up Club Collection
@@ -615,7 +573,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubCollection, clubIndexes); err != nil {
+		if err := createIndexes(d.ClubCollection, clubIndexes, "clubs"); err != nil {
 			return fmt.Errorf("failed to create club indexes: %v", err)
 		}
 	} else {
@@ -648,7 +606,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubInvitationCollection, invitationIndexes); err != nil {
+		if err := createIndexes(d.ClubInvitationCollection, invitationIndexes, "club_invitations"); err != nil {
 			return fmt.Errorf("failed to create club invitation indexes: %v", err)
 		}
 	} else {
@@ -688,7 +646,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubMembersCollection, membersIndexes); err != nil {
+		if err := createIndexes(d.ClubMembersCollection, membersIndexes, "club_members"); err != nil {
 			return fmt.Errorf("failed to create club members indexes: %v", err)
 		}
 	} else {
@@ -728,7 +686,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubApplicationCollection, applicationIndexes); err != nil {
+		if err := createIndexes(d.ClubApplicationCollection, applicationIndexes, "club_applications"); err != nil {
 			return fmt.Errorf("failed to create club application indexes: %v", err)
 		}
 	} else {
@@ -758,7 +716,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 			},
 		}
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubFinancialAccountsCollection, financialAccountIndexes); err != nil {
+		if err := createIndexes(d.ClubFinancialAccountsCollection, financialAccountIndexes, "club_financial_accounts"); err != nil {
 			return fmt.Errorf("failed to create club financial accounts indexes: %v", err)
 		}
 	} else {
@@ -804,7 +762,7 @@ func (d *Database) SetUpClubCollections(db *mongo.Database, config *utils.Collec
 			},
 		}
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.ClubTransactionsCollection, transactionIndexes); err != nil {
+		if err := createIndexes(d.ClubTransactionsCollection, transactionIndexes, "club_transactions"); err != nil {
 			return fmt.Errorf("failed to create club transactions indexes: %v", err)
 		}
 	} else {
@@ -824,60 +782,6 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 			return false
 		}
 		return len(collections) > 0
-	}
-
-	// Helper function to safely create indexes
-	safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
-		// First, list existing indexes
-		cursor, err := collection.Indexes().List(context.Background())
-		if err != nil {
-			return fmt.Errorf("could not list existing indexes: %v", err)
-		}
-		defer cursor.Close(context.Background())
-
-		// Extract existing index names
-		existingIndexes := make(map[string]bool)
-		var indexDoc bson.M
-		for cursor.Next(context.Background()) {
-			if err := cursor.Decode(&indexDoc); err != nil {
-				return fmt.Errorf("could not decode index document: %v", err)
-			}
-			if name, exists := indexDoc["name"].(string); exists {
-				existingIndexes[name] = true
-			}
-		}
-
-		if err := cursor.Err(); err != nil {
-			return fmt.Errorf("error during index cursor iteration: %v", err)
-		}
-
-		// Filter out indexes that already exist
-		var newIndexes []mongo.IndexModel
-		for _, idx := range indexes {
-			name := getIndexName(idx.Options)
-			if name == nil {
-				// No name specified, keep the index
-				newIndexes = append(newIndexes, idx)
-				continue
-			}
-
-			indexName := *name
-			if existingIndexes[indexName] {
-				// Skip this index as it already exists
-				continue
-			}
-			newIndexes = append(newIndexes, idx)
-		}
-
-		// Create only new indexes
-		if len(newIndexes) > 0 {
-			_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
-			if err != nil {
-				return fmt.Errorf("could not create indexes: %v", err)
-			}
-		}
-
-		return nil
 	}
 
 	// Set up Organization Collection
@@ -918,7 +822,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrgCollection, orgIndexes); err != nil {
+		if err := createIndexes(d.OrgCollection, orgIndexes, "organizations"); err != nil {
 			return fmt.Errorf("failed to create organization indexes: %v", err)
 		}
 	} else {
@@ -951,7 +855,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrgInvitationCollection, invitationIndexes); err != nil {
+		if err := createIndexes(d.OrgInvitationCollection, invitationIndexes, "org_invitations"); err != nil {
 			return fmt.Errorf("failed to create organization invitation indexes: %v", err)
 		}
 	} else {
@@ -991,7 +895,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrgApplicationCollection, applicationIndexes); err != nil {
+		if err := createIndexes(d.OrgApplicationCollection, applicationIndexes, "org_applications"); err != nil {
 			return fmt.Errorf("failed to create organization application indexes: %v", err)
 		}
 	} else {
@@ -1031,7 +935,7 @@ func (d *Database) SetUpOrganizationCollections(db *mongo.Database, config *util
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.OrganizationMembersCollection, membersIndexes); err != nil {
+		if err := createIndexes(d.OrganizationMembersCollection, membersIndexes, "org_members"); err != nil {
 			return fmt.Errorf("failed to create organization members indexes: %v", err)
 		}
 	} else {
@@ -1050,60 +954,6 @@ func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.Collec
 			return false
 		}
 		return len(collections) > 0
-	}
-
-	// Helper function to safely create indexes
-	safeCreateIndexes := func(collection *mongo.Collection, indexes []mongo.IndexModel) error {
-		// First, list existing indexes
-		cursor, err := collection.Indexes().List(context.Background())
-		if err != nil {
-			return fmt.Errorf("could not list existing indexes: %v", err)
-		}
-		defer cursor.Close(context.Background())
-
-		// Extract existing index names
-		existingIndexes := make(map[string]bool)
-		var indexDoc bson.M
-		for cursor.Next(context.Background()) {
-			if err := cursor.Decode(&indexDoc); err != nil {
-				return fmt.Errorf("could not decode index document: %v", err)
-			}
-			if name, exists := indexDoc["name"].(string); exists {
-				existingIndexes[name] = true
-			}
-		}
-
-		if err := cursor.Err(); err != nil {
-			return fmt.Errorf("error during index cursor iteration: %v", err)
-		}
-
-		// Filter out indexes that already exist
-		var newIndexes []mongo.IndexModel
-		for _, idx := range indexes {
-			name := getIndexName(idx.Options)
-			if name == nil {
-				// No name specified, keep the index
-				newIndexes = append(newIndexes, idx)
-				continue
-			}
-
-			indexName := *name
-			if existingIndexes[indexName] {
-				// Skip this index as it already exists
-				continue
-			}
-			newIndexes = append(newIndexes, idx)
-		}
-
-		// Create only new indexes
-		if len(newIndexes) > 0 {
-			_, err := collection.Indexes().CreateMany(context.Background(), newIndexes)
-			if err != nil {
-				return fmt.Errorf("could not create indexes: %v", err)
-			}
-		}
-
-		return nil
 	}
 
 	// Set up Posts Collection
@@ -1148,7 +998,7 @@ func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.PostsCollection, postIndexes); err != nil {
+		if err := createIndexes(d.PostsCollection, postIndexes, "posts"); err != nil {
 			return fmt.Errorf("failed to create post indexes: %v", err)
 		}
 	} else {
@@ -1188,7 +1038,7 @@ func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.PostReactionsCollection, reactionIndexes); err != nil {
+		if err := createIndexes(d.PostReactionsCollection, reactionIndexes, "post_reactions"); err != nil {
 			return fmt.Errorf("failed to create post reactions indexes: %v", err)
 		}
 	} else {
@@ -1225,7 +1075,7 @@ func (d *Database) SetUpPostCollections(db *mongo.Database, config *utils.Collec
 		}
 
 		// Create indexes using the safe method
-		if err := safeCreateIndexes(d.PostCommentsCollection, commentsIndexes); err != nil {
+		if err := createIndexes(d.PostCommentsCollection, commentsIndexes, "post_comments"); err != nil {
 			return fmt.Errorf("failed to create post comments indexes: %v", err)
 		}
 	} else {

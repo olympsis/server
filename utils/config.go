@@ -266,6 +266,14 @@ func GetCollectionsConfig() CollectionsConfig {
 	if venuesCollection == "" {
 		panic("venue collection name required in config")
 	}
+	venueUnitsCollection := os.Getenv("VENUE_UNITS_COLLECTION")
+	if venueUnitsCollection == "" {
+		panic("venue units collection name required in config")
+	}
+	transitLinesCollection := os.Getenv("TRANSIT_LINES_COLLECTION")
+	if transitLinesCollection == "" {
+		panic("transit lines collection name required in config")
+	}
 	venueRequestCollection := os.Getenv("VENUE_REQUEST_COL")
 	// if venueRequestCollection == "" {
 	// 	panic("venue request collection name required in config")
@@ -409,6 +417,8 @@ func GetCollectionsConfig() CollectionsConfig {
 		EventParticipantsCollection: eventParticipantsCollection,
 
 		VenuesCollection:       venuesCollection,
+		VenueUnitsCollection:   venueUnitsCollection,
+		TransitLinesCollection: transitLinesCollection,
 		VenueRequestCollection: venueRequestCollection,
 
 		PostCollection:          postCollection,

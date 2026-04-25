@@ -68,6 +68,8 @@ type CollectionsConfig struct {
 
 	// Venues
 	VenuesCollection       string
+	VenueUnitsCollection   string
+	TransitLinesCollection string
 	VenueRequestCollection string
 
 	// Posts

@@ -18,9 +18,11 @@ type Database struct {
 
 	AnnouncementCollection *mongo.Collection
 
-	AuthCollection   *mongo.Collection
-	UserCollection   *mongo.Collection
-	VenuesCollection *mongo.Collection
+	AuthCollection          *mongo.Collection
+	UserCollection          *mongo.Collection
+	VenuesCollection        *mongo.Collection
+	VenueUnitsCollection    *mongo.Collection
+	TransitLinesCollection  *mongo.Collection
 
 	PostsCollection         *mongo.Collection
 	PostCommentsCollection  *mongo.Collection
