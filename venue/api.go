@@ -44,6 +44,14 @@ func (s *VenueAPI) Ready() {
 		),
 	).Methods("GET", "OPTIONS")
 
+	// Get venue units
+	s.Router.Handle("/v1/venues/{id}/units",
+		middleware.Chain(
+			s.Service.GetVenueUnits(),
+			middleware.Logging(),
+		),
+	).Methods("GET", "OPTIONS")
+
 	// Create a venue
 	s.Router.Handle("/v1/venues",
 		middleware.Chain(

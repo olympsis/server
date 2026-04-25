@@ -75,7 +75,7 @@ func (f *Service) CreateVenue() http.HandlerFunc {
 
 		// Add timestamps
 		now := bson.NewDateTimeFromTime(time.Now())
-		req.CreatedAt = &now
+		req.CreatedAt = now
 		req.UpdatedAt = &now
 
 		// Create venue in database
@@ -197,6 +197,58 @@ func (f *Service) GetVenue() http.HandlerFunc {
 }
 
 /*
+Get Venue Units (GET)
+  - Grab venue id from path params
+  - Query venue units collection by venue_id
+
+Returns:
+
+	Http handler
+		- Writes list of venue units back to client
+*/
+func (f *Service) GetVenueUnits() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		if len(vars["id"]) == 0 || len(vars["id"]) < 24 {
+			http.Error(rw, `{ "msg": "bad venue id" }`, http.StatusBadRequest)
+			return
+		}
+
+		oid, err := bson.ObjectIDFromHex(vars["id"])
+		if err != nil {
+			http.Error(rw, `{ "msg": "invalid venue id" }`, http.StatusBadRequest)
+			return
+		}
+
+		filter := bson.M{"venue_id": oid}
+		cursor, err := f.Database.VenueUnitsCollection.Find(context.Background(), filter)
+		if err != nil {
+			f.Log.Error(err.Error())
+			http.Error(rw, `{ "msg": "failed to get venue units" }`, http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+
+		var units []models.VenueUnit
+		err = cursor.All(context.Background(), &units)
+		if err != nil {
+			f.Log.Error(err.Error())
+			http.Error(rw, `{ "msg": "failed to decode venue units" }`, http.StatusInternalServerError)
+			return
+		}
+
+		if len(units) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(units)
+	}
+}
+
+/*
 Update Field Data (PUT)
 
   - Updates field data
@@ -232,32 +284,40 @@ func (f *Service) UpdateVenue() http.HandlerFunc {
 		changes := bson.M{}
 		updates := bson.M{"$set": changes}
 
-		changes["owner"] = req.Owner
-
 		if req.Name != "" {
 			changes["name"] = req.Name
 		}
 		if req.Description != "" {
-			changes["notes"] = req.Description
+			changes["description"] = req.Description
 		}
 		if len(req.Sports) != 0 {
 			changes["sports"] = req.Sports
 		}
-		if len(req.Images) != 0 {
-			changes["images"] = req.Images
+		if len(req.Media) != 0 {
+			changes["media"] = req.Media
+		}
+		if req.URL != "" {
+			changes["url"] = req.URL
 		}
 		if req.Location.Type != "" {
 			changes["location"] = req.Location
 		}
-		if req.City != "" {
-			changes["city"] = req.City
+		if req.Address != "" {
+			changes["address"] = req.Address
 		}
-		if req.State != "" {
-			changes["state"] = req.State
+		if req.AdministrativeArea != "" {
+			changes["administrative_area"] = req.AdministrativeArea
 		}
-		if req.Country != "" {
-			changes["country"] = req.Country
+		if req.CountryCode != "" {
+			changes["country_code"] = req.CountryCode
 		}
+		if req.Timezone != "" {
+			changes["timezone"] = req.Timezone
+		}
+
+		// Set updated_at timestamp
+		now := bson.NewDateTimeFromTime(time.Now())
+		changes["updated_at"] = now
 
 		var field models.Venue
 		err = f.ModifyVenue(context.Background(), filter, updates, &field)
