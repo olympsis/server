@@ -107,6 +107,13 @@ Returns:
 func (f *Service) GetVenues() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		// Validate query headers
+		err := validateVenuesQuery(r)
+		if err != nil {
+			http.Error(rw, fmt.Sprintf(`{ "msg": "%s" }`, err.Error()), http.StatusBadRequest)
+			return
+		}
+
 		longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
 		latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
 		radius, _ := strconv.ParseFloat(r.URL.Query().Get("radius"), 64)
@@ -137,7 +144,7 @@ func (f *Service) GetVenues() http.HandlerFunc {
 			},
 		}
 
-		err := f.FindVenues(context.Background(), filter, &fields)
+		err = f.FindVenues(context.Background(), filter, &fields)
 		if err != nil {
 			f.Log.Error(err.Error())
 			http.Error(rw, "failed to search fields", http.StatusInternalServerError)
