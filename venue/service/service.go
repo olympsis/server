@@ -82,19 +82,20 @@ func (f *Service) CreateVenue() http.HandlerFunc {
 		ctx := context.Background()
 		now := bson.NewDateTimeFromTime(time.Now())
 		venue := &req.Venue
-		venue.CreatedAt = now
+		venue.CreatedAt = &now
 		venue.UpdatedAt = &now
 
 		// Insert units into their own collection and collect their IDs
 		if len(req.Units) > 0 {
 			// Generate the venue ID upfront so units can reference it
-			venue.ID = bson.NewObjectID()
+			venueID := bson.NewObjectID()
+			venue.ID = &venueID
 
 			docs := make([]interface{}, len(req.Units))
 			unitIDs := make([]bson.ObjectID, len(req.Units))
 			for i := range req.Units {
 				req.Units[i].ID = bson.NewObjectID()
-				req.Units[i].VenueID = venue.ID
+				req.Units[i].VenueID = venueID
 				unitIDs[i] = req.Units[i].ID
 				docs[i] = req.Units[i]
 			}
@@ -106,11 +107,11 @@ func (f *Service) CreateVenue() http.HandlerFunc {
 				return
 			}
 
-			venue.Units = unitIDs
+			venue.Units = &unitIDs
 		}
 
 		// Insert venue
-		res, err := f.InsertVenue(ctx, venue)
+		res, err := f.Database.VenuesCollection.InsertOne(ctx, venue)
 		if err != nil {
 			f.Log.Errorf(`Failed to add venue to the database. Error: %s`, err.Error())
 			http.Error(rw, `{ "msg": "failed to create venue" }`, http.StatusInternalServerError)

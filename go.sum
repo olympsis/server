@@ -108,6 +108,8 @@ github.com/olympsis/models v0.0.0-20260425031333-2553adec00d0 h1:dlZL4HMljLPlihP
 github.com/olympsis/models v0.0.0-20260425031333-2553adec00d0/go.mod h1:ebCBVf+4eieV6vewnMXOU+YhTyZU8/EO6GMPJ9i1WM8=
 github.com/olympsis/models v0.0.0-20260425034204-26c0480c632e h1:pG7mzaDZW3r7vZZowSqK/J9SUHoCANvn7j3zhpo0Pr4=
 github.com/olympsis/models v0.0.0-20260425034204-26c0480c632e/go.mod h1:ebCBVf+4eieV6vewnMXOU+YhTyZU8/EO6GMPJ9i1WM8=
+github.com/olympsis/models v0.0.0-20260425042020-ca3a200efea3 h1:kU4wTnd+H+yyRWQlN64+LPToIzJfEHz/wAQiiwOAkbs=
+github.com/olympsis/models v0.0.0-20260425042020-ca3a200efea3/go.mod h1:ebCBVf+4eieV6vewnMXOU+YhTyZU8/EO6GMPJ9i1WM8=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=

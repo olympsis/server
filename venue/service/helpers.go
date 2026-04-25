@@ -15,16 +15,16 @@ import (
 func validateCreateVenueRequest(req *models.VenueCreationRequest) error {
 	v := &req.Venue
 
-	if v.OwnerID.IsZero() {
+	if v.OwnerID == nil || v.OwnerID.IsZero() {
 		return fmt.Errorf("owner_id is required")
 	}
-	if strings.TrimSpace(v.Name) == "" {
+	if v.Name == nil || strings.TrimSpace(*v.Name) == "" {
 		return fmt.Errorf("name is required")
 	}
-	if len(v.Sports) == 0 {
+	if v.Sports == nil || len(*v.Sports) == 0 {
 		return fmt.Errorf("at least one sport is required")
 	}
-	if v.Location.Type == "" || v.Location.Coordinates == nil {
+	if v.Location == nil || v.Location.Type == "" || v.Location.Coordinates == nil {
 		return fmt.Errorf("a valid location with type and coordinates is required")
 	}
 	// Validate coordinates based on GeoJSON type
@@ -42,16 +42,16 @@ func validateCreateVenueRequest(req *models.VenueCreationRequest) error {
 	default:
 		return fmt.Errorf("unsupported location type: %s", v.Location.Type)
 	}
-	if strings.TrimSpace(v.Address) == "" {
+	if v.Address == nil || strings.TrimSpace(*v.Address) == "" {
 		return fmt.Errorf("address is required")
 	}
-	if strings.TrimSpace(v.AdministrativeArea) == "" {
+	if v.AdministrativeArea == nil || strings.TrimSpace(*v.AdministrativeArea) == "" {
 		return fmt.Errorf("administrative_area is required")
 	}
-	if strings.TrimSpace(v.CountryCode) == "" {
+	if v.CountryCode == nil || strings.TrimSpace(*v.CountryCode) == "" {
 		return fmt.Errorf("country_code is required")
 	}
-	if strings.TrimSpace(v.Timezone) == "" {
+	if v.Timezone == nil || strings.TrimSpace(*v.Timezone) == "" {
 		return fmt.Errorf("timezone is required")
 	}
 

@@ -77,7 +77,7 @@ func AggregateVenues(
 	response := make([]models.Venue, 0, limit)
 	err = cur.All(ctx, &response)
 	if err != nil {
-		database.Logger.Error("Failed to decode venue. Error: ", err.Error())
+		return nil, err
 	}
 
 	return &response, nil
