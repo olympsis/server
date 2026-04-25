@@ -101,6 +101,119 @@ func validateVenuesQuery(r *http.Request) error {
 	return nil
 }
 
-func generateVenuesQuery(r *http.Request) bson.M {
-	return bson.M{}
+// generateVenuesQuery builds a MongoDB aggregation pipeline from the validated
+// query parameters. The caller runs this pipeline against the venues collection.
+//
+// Query combination rules:
+//   - Location + transit can combine
+//   - Bbox + transit can combine
+//   - Location always takes priority over bbox (bbox is ignored when location is present)
+//
+// Pipeline stages (in order):
+//  1. $geoNear (location) OR $match with $geoWithin (bbox) — spatial filter
+//  2. $match on sports — if a specific list was provided
+//  3. $lookup + $match on transit lines — if transit params were provided
+func generateVenuesQuery(r *http.Request) bson.A {
+	query := r.URL.Query()
+
+	longitudeStr := query.Get("longitude")
+	latitudeStr := query.Get("latitude")
+	radiusStr := query.Get("radius")
+	transitSystem := query.Get("transit_system")
+	transitNames := query.Get("transit_names")
+	bboxStr := query.Get("bbox")
+	sportsStr := query.Get("sports")
+
+	hasLocation := longitudeStr != "" && latitudeStr != "" && radiusStr != ""
+	hasTransit := transitSystem != "" && transitNames != ""
+	hasBbox := bboxStr != ""
+
+	pipeline := bson.A{}
+
+	// --- Spatial stage: location takes priority over bbox ---
+	if hasLocation {
+		longitude, _ := strconv.ParseFloat(longitudeStr, 64)
+		latitude, _ := strconv.ParseFloat(latitudeStr, 64)
+		radius, _ := strconv.ParseFloat(radiusStr, 64)
+
+		// $geoNear must be the first stage in the pipeline
+		pipeline = append(pipeline, bson.M{
+			"$geoNear": bson.M{
+				"near": bson.M{
+					"type":        "Point",
+					"coordinates": bson.A{longitude, latitude},
+				},
+				"distanceField": "distance",
+				"maxDistance":    radius,
+				"spherical":     true,
+			},
+		})
+	} else if hasBbox {
+		coords := strings.Split(bboxStr, ",")
+		west, _ := strconv.ParseFloat(strings.TrimSpace(coords[0]), 64)
+		south, _ := strconv.ParseFloat(strings.TrimSpace(coords[1]), 64)
+		east, _ := strconv.ParseFloat(strings.TrimSpace(coords[2]), 64)
+		north, _ := strconv.ParseFloat(strings.TrimSpace(coords[3]), 64)
+
+		pipeline = append(pipeline, bson.M{
+			"$match": bson.M{
+				"location": bson.M{
+					"$geoWithin": bson.M{
+						"$box": bson.A{
+							bson.A{west, south},  // bottom-left
+							bson.A{east, north},  // top-right
+						},
+					},
+				},
+			},
+		})
+	}
+
+	// --- Sports filter ---
+	if sportsStr != "" && sportsStr != "all" {
+		sports := strings.Split(sportsStr, ",")
+		pipeline = append(pipeline, bson.M{
+			"$match": bson.M{
+				"sports": bson.M{
+					"$in": sports,
+				},
+			},
+		})
+	}
+
+	// --- Transit filter: lookup transit lines and match by system + name ---
+	if hasTransit {
+		names := strings.Split(transitNames, ",")
+
+		// Join the transit_lines ObjectID array against the transitLines collection
+		pipeline = append(pipeline, bson.M{
+			"$lookup": bson.M{
+				"from":         "transitLines",
+				"localField":   "transit_lines",
+				"foreignField": "_id",
+				"as":           "_transit_lines",
+			},
+		})
+
+		// Keep only venues whose looked-up transit lines match the requested system + names
+		pipeline = append(pipeline, bson.M{
+			"$match": bson.M{
+				"_transit_lines": bson.M{
+					"$elemMatch": bson.M{
+						"system": transitSystem,
+						"name":   bson.M{"$in": names},
+					},
+				},
+			},
+		})
+
+		// Drop the temporary lookup field so it doesn't leak into the response
+		pipeline = append(pipeline, bson.M{
+			"$project": bson.M{
+				"_transit_lines": 0,
+			},
+		})
+	}
+
+	return pipeline
 }
