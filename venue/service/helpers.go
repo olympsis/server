@@ -6,8 +6,70 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
+
+// validateCreateVenueRequest checks that all required fields are present
+// on the venue and any inline units.
+func validateCreateVenueRequest(req *models.VenueCreationRequest) error {
+	v := &req.Venue
+
+	if v.OwnerID.IsZero() {
+		return fmt.Errorf("owner_id is required")
+	}
+	if strings.TrimSpace(v.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(v.Sports) == 0 {
+		return fmt.Errorf("at least one sport is required")
+	}
+	if v.Location.Type == "" || v.Location.Coordinates == nil {
+		return fmt.Errorf("a valid location with type and coordinates is required")
+	}
+	// Validate coordinates based on GeoJSON type
+	switch v.Location.Type {
+	case "Point":
+		coords, ok := v.Location.Coordinates.([]interface{})
+		if !ok || len(coords) < 2 {
+			return fmt.Errorf("Point location requires [longitude, latitude] coordinates")
+		}
+	case "Polygon":
+		coords, ok := v.Location.Coordinates.([]interface{})
+		if !ok || len(coords) == 0 {
+			return fmt.Errorf("Polygon location requires at least one ring of coordinates")
+		}
+	default:
+		return fmt.Errorf("unsupported location type: %s", v.Location.Type)
+	}
+	if strings.TrimSpace(v.Address) == "" {
+		return fmt.Errorf("address is required")
+	}
+	if strings.TrimSpace(v.AdministrativeArea) == "" {
+		return fmt.Errorf("administrative_area is required")
+	}
+	if strings.TrimSpace(v.CountryCode) == "" {
+		return fmt.Errorf("country_code is required")
+	}
+	if strings.TrimSpace(v.Timezone) == "" {
+		return fmt.Errorf("timezone is required")
+	}
+
+	// Validate inline units if provided
+	for i, unit := range req.Units {
+		if strings.TrimSpace(unit.Name) == "" {
+			return fmt.Errorf("unit at index %d: name is required", i)
+		}
+		if strings.TrimSpace(unit.UnitType) == "" {
+			return fmt.Errorf("unit at index %d: unit_type is required", i)
+		}
+		if len(unit.Sports) == 0 {
+			return fmt.Errorf("unit at index %d: at least one sport is required", i)
+		}
+	}
+
+	return nil
+}
 
 // validateVenuesQuery checks that the request has a valid combination of query parameters.
 // Valid query types:

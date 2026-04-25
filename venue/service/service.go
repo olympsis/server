@@ -65,31 +65,62 @@ func (f *Service) CreateVenue() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
 		// Decode request
-		var req models.Venue
+		var req models.VenueCreationRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			f.Log.Errorf(`Failed to decode venue request body. Error: %s`, err.Error())
-			http.Error(rw, `{ "msg": "Invalid request body" }`, http.StatusBadRequest)
+			http.Error(rw, `{ "msg": "invalid request body" }`, http.StatusBadRequest)
 			return
 		}
 
-		// Add timestamps
-		now := bson.NewDateTimeFromTime(time.Now())
-		req.CreatedAt = now
-		req.UpdatedAt = &now
+		// Validate required fields
+		if err := validateCreateVenueRequest(&req); err != nil {
+			http.Error(rw, fmt.Sprintf(`{ "msg": "%s" }`, err.Error()), http.StatusBadRequest)
+			return
+		}
 
-		// Create venue in database
-		res, err := f.InsertVenue(context.Background(), &req)
+		ctx := context.Background()
+		now := bson.NewDateTimeFromTime(time.Now())
+		venue := &req.Venue
+		venue.CreatedAt = now
+		venue.UpdatedAt = &now
+
+		// Insert units into their own collection and collect their IDs
+		if len(req.Units) > 0 {
+			// Generate the venue ID upfront so units can reference it
+			venue.ID = bson.NewObjectID()
+
+			docs := make([]interface{}, len(req.Units))
+			unitIDs := make([]bson.ObjectID, len(req.Units))
+			for i := range req.Units {
+				req.Units[i].ID = bson.NewObjectID()
+				req.Units[i].VenueID = venue.ID
+				unitIDs[i] = req.Units[i].ID
+				docs[i] = req.Units[i]
+			}
+
+			_, err := f.Database.VenueUnitsCollection.InsertMany(ctx, docs)
+			if err != nil {
+				f.Log.Errorf(`Failed to insert venue units. Error: %s`, err.Error())
+				http.Error(rw, `{ "msg": "failed to create venue units" }`, http.StatusInternalServerError)
+				return
+			}
+
+			venue.Units = unitIDs
+		}
+
+		// Insert venue
+		res, err := f.InsertVenue(ctx, venue)
 		if err != nil {
 			f.Log.Errorf(`Failed to add venue to the database. Error: %s`, err.Error())
-			http.Error(rw, `{ "msg": "failed create venue" }`, http.StatusInternalServerError)
+			http.Error(rw, `{ "msg": "failed to create venue" }`, http.StatusInternalServerError)
 			return
 		}
 
+		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
-		fmt.Fprintf(rw, `{ "id" : "%s" }`, res.InsertedID.(bson.ObjectID))
+		fmt.Fprintf(rw, `{ "id": "%s" }`, res.InsertedID.(bson.ObjectID))
 	}
-
 }
 
 /*
