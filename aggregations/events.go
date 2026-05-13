@@ -87,6 +87,159 @@ func AggregateEvents(
 	return &response, nil
 }
 
+// AggregatePastEvents fetches past events scoped to a specific user.
+// If a non-empty userID is provided, results are limited to events the user
+// participated in. If userID is nil or empty, an empty result set is returned
+// since "past events" without a user context has no meaningful scope.
+func AggregatePastEvents(
+	userID *string,
+	limit int,
+	skip int,
+	database *database.Database,
+) (*[]models.Event, error) {
+	ctx := context.TODO()
+
+	// Without a user we have nothing to scope past events to — return empty.
+	if userID == nil || *userID == "" {
+		empty := make([]models.Event, 0)
+		return &empty, nil
+	}
+
+	// Build the aggregation pipeline
+	pipeline := BuildPastEventsAggregation(*userID, limit, skip)
+
+	// Execute the aggregation
+	cur, err := database.EventsCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	// Process the results
+	response := make([]models.Event, 0, limit)
+	for cur.Next(ctx) {
+		var event models.Event
+		err := cur.Decode(&event)
+		if err != nil {
+			database.Logger.Error("Failed to decode event. Error: ", err.Error())
+			continue
+		}
+		response = append(response, event)
+	}
+
+	return &response, nil
+}
+
+// Builds a pipeline for filtering and returning past events that the
+// supplied user participated in. Used by the GetEvents handler when the
+// caller requests status=past.
+func BuildPastEventsAggregation(
+	userID string,
+	limit int,
+	skip int,
+) bson.A {
+	// Current time used to identify events that have already ended.
+	currentTime := bson.NewDateTimeFromTime(time.Now())
+
+	// Only events whose stop_time is in the past.
+	timePipeline := bson.M{
+		"$match": bson.M{
+			"stop_time": bson.M{
+				"$lt": currentTime,
+			},
+		},
+	}
+
+	// Exclude cancelled events (cancelled_at unset or nil).
+	cancelledPipeline := bson.M{
+		"$match": bson.M{
+			"$or": bson.A{
+				bson.M{"cancelled_at": bson.M{"$exists": false}},
+				bson.M{"cancelled_at": nil},
+			},
+		},
+	}
+
+	// Exclude archived events (archived_at unset or nil).
+	archivedPipeline := bson.M{
+		"$match": bson.M{
+			"$or": bson.A{
+				bson.M{"archived_at": bson.M{"$exists": false}},
+				bson.M{"archived_at": nil},
+			},
+		},
+	}
+
+	// Pull participant records that match this user into a temp field. We use a
+	// sub-pipeline on the $lookup so we only carry the participant row for the
+	// requesting user — keeps memory usage down on events with many attendees.
+	userParticipantPipeline := bson.M{
+		"$lookup": bson.M{
+			"from":         "eventParticipants",
+			"localField":   "_id",
+			"foreignField": "event_id",
+			"as":           "_temp_participants",
+			"pipeline": bson.A{
+				bson.M{
+					"$match": bson.M{
+						"user_id": userID,
+					},
+				},
+			},
+		},
+	}
+
+	// Keep only events where the user was actually a participant.
+	filterUserParticipantPipeline := bson.M{
+		"$match": bson.M{
+			"$expr": bson.M{
+				"$gt": bson.A{bson.M{"$size": "$_temp_participants"}, 0},
+			},
+		},
+	}
+
+	// Most-recent-first ordering by end time.
+	sortPipeline := bson.M{
+		"$sort": bson.M{
+			"stop_time": -1,
+		},
+	}
+
+	// Pagination stages.
+	skipPipeline := bson.M{
+		"$skip": skip,
+	}
+
+	limitPipeline := bson.M{
+		"$limit": limit,
+	}
+
+	// Shared lookup/projection stages used by all event aggregations.
+	corePipeline := BuildEventCorePipeline()
+
+	// Pre-lookup filters: narrow the candidate set as much as possible before
+	// the expensive joins in the core pipeline run.
+	completePipeline := bson.A{
+		timePipeline,
+		cancelledPipeline,
+		archivedPipeline,
+		userParticipantPipeline,
+		filterUserParticipantPipeline,
+		sortPipeline,
+	}
+
+	// Apply the core lookups (poster, participants, comments, teams, etc.).
+	completePipeline = append(completePipeline, corePipeline...)
+
+	// Pagination applied last so skip/limit work against the fully-filtered set.
+	completePipeline = append(completePipeline,
+		skipPipeline,
+		limitPipeline,
+	)
+
+	return completePipeline
+}
+
 // Builds a pipeline for filtering and returning multiple events
 func BuildEventsAggregation(
 	userID *string,

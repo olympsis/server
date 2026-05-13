@@ -187,11 +187,59 @@ func (s *Service) GetEvents() http.HandlerFunc {
 			return
 		}
 
+		// Validate the status filter. Only "ended" currently routes to a distinct
+		// handler path; the other enum values are accepted as no-ops so clients
+		// sending them up front do not break. Any value outside the EventStatus
+		// enum is rejected to avoid silently ignoring typos.
+		switch queryParams.Status {
+		case "",
+			models.EventStatusPending,
+			models.EventStatusLive,
+			models.EventStatusEnded,
+			models.EventStatusCanceled:
+			// recognized — proceed
+		default:
+			http.Error(w, fmt.Sprintf(`{"msg":"invalid status: %s"}`, queryParams.Status), http.StatusBadRequest)
+			return
+		}
+
 		// Parse user info (if authenticated)
 		userID := r.Header.Get("userID")
 		var user *models.UserData
 		var clubs, orgs []bson.ObjectID
 		var sportsList []string
+
+		// User past events query handling.
+		// When status=ended, the caller is asking for past events scoped to the
+		// authenticated user.
+		if queryParams.Status == models.EventStatusEnded {
+			pastEvents, err := aggregations.AggregatePastEvents(
+				&userID,
+				queryParams.Limit,
+				queryParams.Skip,
+				s.Database,
+			)
+			if err != nil {
+				s.Logger.Error("Failed to find past events: ", err.Error())
+				http.Error(w, `{"msg":"failed to find past events"}`, http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if pastEvents == nil || len(*pastEvents) == 0 {
+				json.NewEncoder(w).Encode(models.EventsResponse{
+					TotalEvents: 0,
+					Events:      []models.Event{},
+				})
+				return
+			}
+			json.NewEncoder(w).Encode(models.EventsResponse{
+				TotalEvents: int32(len(*pastEvents)),
+				Events:      *pastEvents,
+			})
+			return
+		}
 
 		// Initialize empty slices to avoid nil references
 		venues := []bson.ObjectID{}

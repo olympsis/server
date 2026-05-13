@@ -28,6 +28,8 @@ type EventQueryParams struct {
 	Radius   float64
 	Skip     int
 	Limit    int
+
+	Status models.EventStatus
 }
 
 // LocationQueryParams holds validated query parameters for the Location endpoint

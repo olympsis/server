@@ -18,9 +18,15 @@ func parseEventsQueryParams(r *http.Request) (*EventQueryParams, error) {
 	// Required: either location or venues
 	locationStr := query.Get("location")
 	venuesStr := query.Get("venues")
+	status := models.EventStatus(query.Get("status"))
 
-	if locationStr == "" && venuesStr == "" {
+	if locationStr == "" && venuesStr == "" && status != models.EventStatusEnded {
 		return nil, fmt.Errorf("location (long,lat) or venues ids required")
+	}
+
+	// Handle past events query
+	if status != "" {
+		params.Status = status
 	}
 
 	// Parse location if provided
