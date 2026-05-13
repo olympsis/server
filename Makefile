@@ -1,4 +1,4 @@
-VERSION := v0.9.0
+VERSION := v0.9.2
 PROJECT_ID := olympsis-485522
 LOCATION := us-central1-docker.pkg.dev
 SERVICE_NAME := server
@@ -68,10 +68,14 @@ prod-up:
 prod-down:
 	docker-compose -f compose.yaml down
 
-mac-mini:
+mac-mini: #Build binary, ship to mac-mini, and publish via git-lfs under tag $(VERSION)
 	go build -v olympsis-server
 	scp olympsis-server joel@joels-mac-mini:/Users/joel/Documents/olympsis-platform/builds
-	rm olympsis-server
+	git add olympsis-server
+	git commit -m "release: $(VERSION)" -- olympsis-server
+	git tag -f $(VERSION)
+	git push origin HEAD
+	git push origin -f $(VERSION)
 
 clean: ## Remove previous build
 	rm -f $(SERVICE_NAME)

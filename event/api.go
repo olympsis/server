@@ -56,10 +56,15 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("GET", "OPTIONS")
 
 	// get events
+	//
+	// Uses OptionalUserMiddleware so unauthenticated callers can still browse
+	// upcoming events, but an authenticated caller gets userID set on the
+	// request — required by status=ended (past events scoped to the user).
 	e.Router.Handle("/v1/events",
 		middleware.Chain(
 			e.Service.GetEvents(),
 			middleware.Logging(),
+			middleware.OptionalUserMiddleware(firebase),
 		),
 	).Methods("GET", "OPTIONS")
 

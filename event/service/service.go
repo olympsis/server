@@ -629,7 +629,7 @@ func (s *Service) Cancel() http.HandlerFunc {
 		timestamp := bson.NewDateTimeFromTime(time.Now())
 		update := bson.M{
 			"$set": bson.M{
-				"canceled_at": timestamp,
+				"cancelled_at": timestamp,
 			},
 		}
 		if err = s.UpdateEvent(r.Context(), filter, update); err != nil {
