@@ -65,6 +65,35 @@ services:
     #     ports:
     #         - 8082:7003
 
+    # Telegram/Discord "bot father". Posts event reminders into linked club chats and
+    # parses replies into RSVPs via the Claude API. Build/push from ../bots (see
+    # bots/Dockerfile) and point SERVER_URL/INTERNAL_SECRET at the server above.
+    bots:
+        container_name: bots
+        image: us-central1-docker.pkg.dev/olympsis-485522/bots/release:v0.1.0
+        restart: always
+        pull_policy: always
+        ports:
+            - 8082:80
+        networks:
+            - olympsis
+        environment:
+            MODE: PRODUCTION
+            PORT: "80"
+            MONGO_ADDRESS: mongodb://admin:olympsis@mongo:27017/?retryWrites=true&w=majority
+            DATABASE_NAME: olympsis
+            SERVER_URL: http://server:80
+            # INTERNAL_SECRET must match the server's INTERNAL_SECRET (set in .env.prod)
+            INTERNAL_SECRET: ${INTERNAL_SECRET}
+            TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+            DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+            DISCORD_APP_ID: ${DISCORD_APP_ID}
+            ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+            ANTHROPIC_MODEL: claude-haiku-4-5-20251001
+        depends_on:
+            - server
+            - mongo
+
     mongo:
         container_name: mongo
         image: mongo

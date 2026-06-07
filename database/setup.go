@@ -1168,3 +1168,48 @@ func (d *Database) SetUpNotificationsCollections(db *mongo.Database, config *uti
 	d.NotificationTopicsCollection = db.Collection(config.NotificationTopicsCollection)
 	return nil
 }
+
+// SetUpIntegrationCollections initializes the Telegram/Discord "bot father" collections:
+// club_chat_links (one binding per club+platform) and chat_identities (platform user ->
+// Olympsis user mappings). These are shared with the bots microservice.
+func (d *Database) SetUpIntegrationCollections(db *mongo.Database, config *utils.CollectionsConfig) error {
+	// Club chat links
+	if !d.collectionExists(db, config.ClubChatLinksCollection) {
+		if err := d.createCollection(db, config.ClubChatLinksCollection); err != nil {
+			return err
+		}
+	}
+	d.ClubChatLinksCollection = db.Collection(config.ClubChatLinksCollection)
+	chatLinkIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "club_id", Value: 1}, {Key: "platform", Value: 1}},
+			Options: options.Index().SetName("club_platform_index").SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "link_code", Value: 1}},
+			Options: options.Index().SetName("link_code_index").SetSparse(true),
+		},
+	}
+	if err := createIndexes(d.ClubChatLinksCollection, chatLinkIndexes, "club_chat_links"); err != nil {
+		return err
+	}
+
+	// Chat identities
+	if !d.collectionExists(db, config.ChatIdentitiesCollection) {
+		if err := d.createCollection(db, config.ChatIdentitiesCollection); err != nil {
+			return err
+		}
+	}
+	d.ChatIdentitiesCollection = db.Collection(config.ChatIdentitiesCollection)
+	identityIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "platform", Value: 1}, {Key: "platform_user_id", Value: 1}},
+			Options: options.Index().SetName("platform_user_index").SetUnique(true),
+		},
+	}
+	if err := createIndexes(d.ChatIdentitiesCollection, identityIndexes, "chat_identities"); err != nil {
+		return err
+	}
+
+	return nil
+}

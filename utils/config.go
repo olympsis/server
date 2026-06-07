@@ -115,6 +115,12 @@ func GetServerConfig(manager *secrets.Manager) ServerConfig {
 		TeamID:      config.AppleTeamID,
 	}
 
+	// Bots (Telegram/Discord) integration. Optional: when BOTS_URL is unset the
+	// integration is disabled and BotInterface calls no-op.
+	config.BotsURL = os.Getenv("BOTS_URL")
+	config.BotsSecret = os.Getenv("INTERNAL_SECRET")
+	config.DiscordAppID = os.Getenv("DISCORD_APP_ID")
+
 	return config
 }
 
@@ -390,6 +396,17 @@ func GetCollectionsConfig() CollectionsConfig {
 		panic("notificationTopics collection name required in config")
 	}
 
+	// Integration collections (Telegram/Discord). Optional with sensible defaults so
+	// existing deployments don't need new env vars to keep booting.
+	clubChatLinksCollection := os.Getenv("CLUB_CHAT_LINKS_COLLECTION")
+	if clubChatLinksCollection == "" {
+		clubChatLinksCollection = "club_chat_links"
+	}
+	chatIdentitiesCollection := os.Getenv("CHAT_IDENTITIES_COLLECTION")
+	if chatIdentitiesCollection == "" {
+		chatIdentitiesCollection = "chat_identities"
+	}
+
 	return CollectionsConfig{
 		AnnouncementCollection: announcementCollection,
 
@@ -450,5 +467,8 @@ func GetCollectionsConfig() CollectionsConfig {
 		NotificationLogsCollection:   notificationLogs,
 		UserNotificationsCollection:  userNotifications,
 		NotificationTopicsCollection: notificationTopics,
+
+		ClubChatLinksCollection:  clubChatLinksCollection,
+		ChatIdentitiesCollection: chatIdentitiesCollection,
 	}
 }

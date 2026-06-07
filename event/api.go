@@ -4,6 +4,7 @@ import (
 	"olympsis-server/event/service"
 	"olympsis-server/middleware"
 	"olympsis-server/server"
+	"os"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -142,6 +143,15 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 			middleware.UserMiddleware(firebase),
 		),
 	).Methods("DELETE", "OPTIONS")
+
+	// record a bot-captured RSVP (internal: called by the bots service)
+	e.Router.Handle("/v1/events/{id}/participants/bot",
+		middleware.Chain(
+			e.Service.AddParticipantViaBot(),
+			middleware.Logging(),
+			middleware.InternalMiddleware(os.Getenv("INTERNAL_SECRET")),
+		),
+	).Methods("POST", "OPTIONS")
 
 	/*
 		EVENT COMMENTS

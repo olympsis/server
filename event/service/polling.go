@@ -5,6 +5,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/notifications"
 	"olympsis-server/redis"
+	"olympsis-server/utils"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,7 @@ type EventPollingService struct {
 	logger *logrus.Logger
 	cache  *redis.RedisDatabase
 	sender *notifications.Service
+	bots   *utils.BotInterface
 }
 
 // Stripped down event object to reduce memory footprint
@@ -25,11 +27,12 @@ type StrippedEvent struct {
 	StopTime bson.DateTime `bson:"stop_time"`
 }
 
-func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.Service) *EventPollingService {
+func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.Service, b *utils.BotInterface) *EventPollingService {
 	return &EventPollingService{
 		db:     d,
 		cache:  c,
 		sender: s,
+		bots:   b,
 		logger: l,
 	}
 }
@@ -108,6 +111,14 @@ func (p *EventPollingService) processUpcomingEvents() {
 			queue.Add(eventID)
 		}
 		queue.ProcessWithRetry(p.sender, p.cache, stopTime)
+	}
+
+	// Fan reminders out to any linked Telegram/Discord chats. This is deduped
+	// independently of APNS so a push failure doesn't suppress the chat reminder.
+	if p.bots.Enabled() {
+		for _, event := range events {
+			p.dispatchChatReminder(event)
+		}
 	}
 
 	p.logger.Info("Stopping Event Polling Reminder Processing...")

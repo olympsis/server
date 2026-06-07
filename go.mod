@@ -2,6 +2,8 @@ module olympsis-server
 
 go 1.24.0
 
+replace github.com/olympsis/models => ../models
+
 require (
 	cloud.google.com/go/storage v1.43.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible

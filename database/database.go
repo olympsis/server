@@ -51,6 +51,10 @@ type Database struct {
 	ClubTransactionsCollection      *mongo.Collection
 	ClubFinancialAccountsCollection *mongo.Collection
 
+	// Integrations (Telegram/Discord bot father)
+	ClubChatLinksCollection  *mongo.Collection
+	ChatIdentitiesCollection *mongo.Collection
+
 	BugReportCollection    *mongo.Collection
 	PostReportCollection   *mongo.Collection
 	MemberReportCollection *mongo.Collection
@@ -177,6 +181,12 @@ func (d *Database) SetUpCollections(config *utils.DatabaseConfig, collectionConf
 
 	// Initialize Organization Collections
 	err = d.SetUpOrganizationCollections(database, collectionConfig)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Integration Collections (Telegram/Discord)
+	err = d.SetUpIntegrationCollections(database, collectionConfig)
 	if err != nil {
 		return err
 	}
