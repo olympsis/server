@@ -8,7 +8,9 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
+	eventservice "olympsis-server/event/service"
 	"olympsis-server/health"
+	"olympsis-server/integration"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
 	"olympsis-server/middleware"
@@ -88,6 +90,9 @@ func main() {
 	// Set up Notification Service
 	notif := notifications.New(apnsClient, l, d)
 
+	// Set up Bots (Telegram/Discord) client. No-ops when BOTS_URL is unset.
+	bots := utils.NewBotInterface(config.BotsURL, config.BotsSecret, l)
+
 	// Set up stripe API
 	sc := stripe.NewClient(config.StripeToken)
 
@@ -103,6 +108,7 @@ func main() {
 		Cache: &cacheDB, // redis
 
 		Notification: notif, // notifications
+		Bots:         bots, // telegram/discord bot father
 	}
 
 	// Set up storage service first (other modules depend on it)
@@ -127,6 +133,7 @@ func main() {
 	healthAPI := health.NewHealthAPI(serverInterface)
 	snapShotAPI := mapsnapshots.NewMapSnapshotAPI(serverInterface, &config)
 	systemAPI := system.NewConfigApi(serverInterface)
+	integrationAPI := integration.NewIntegrationAPI(serverInterface, &config)
 
 	// Initialize APIs
 	announceAPI.Ready(client)
@@ -143,6 +150,7 @@ func main() {
 	snapShotAPI.Ready()
 	systemAPI.Ready(client)
 	storageModule.Ready(client)
+	integrationAPI.Ready(client)
 
 	// Apply compression universally
 	r.Use(middleware.GzipMiddleware)
@@ -153,9 +161,11 @@ func main() {
 		middleware.Logging(),
 	)).Methods("POST", "OPTIONS")
 
-	// Set up event polling
-	// eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
-	// go eventPolling.Start(context.Background())
+	// Set up event polling. Sends APNS reminders ~30 min before events start and, for
+	// events whose club has a linked Telegram/Discord chat, fans the reminder out to the
+	// bots service as well.
+	eventPolling := eventservice.NewEventPollingService(d, l, &cacheDB, notif, bots)
+	go eventPolling.Start(context.Background())
 
 	// Set up server configuration
 	s := &http.Server{

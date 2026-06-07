@@ -18,6 +18,10 @@ type ServerConfig struct {
 
 	KeyFilePath  string // TLS key file
 	CertFilePath string // TLS cert file
+
+	BotsURL      string // base URL of the bots (Telegram/Discord) microservice; empty disables it
+	BotsSecret   string // shared secret for server<->bots internal calls
+	DiscordAppID string // Discord application id, used to build the bot invite URL
 }
 
 type DatabaseConfig struct {
@@ -105,4 +109,8 @@ type CollectionsConfig struct {
 	NotificationLogsCollection   string
 	UserNotificationsCollection  string
 	NotificationTopicsCollection string
+
+	// Integrations (Telegram/Discord bot father)
+	ClubChatLinksCollection  string
+	ChatIdentitiesCollection string
 }

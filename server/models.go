@@ -5,6 +5,7 @@ import (
 	"olympsis-server/notifications"
 	redisDB "olympsis-server/redis"
 	"olympsis-server/types"
+	"olympsis-server/utils"
 
 	"firebase.google.com/go/auth"
 	"github.com/gorilla/mux"
@@ -25,4 +26,6 @@ type ServerInterface struct {
 
 	Notification *notifications.Service
 	Storage      types.StorageUploader // GCP Storage upload capability
+
+	Bots *utils.BotInterface // Telegram/Discord bot father client (no-op when unconfigured)
 }
