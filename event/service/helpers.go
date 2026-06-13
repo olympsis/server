@@ -9,6 +9,24 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
+const metersPerMile = 1609.34
+
+// legacyMilesRadiusThreshold disambiguates the unit of an incoming events
+// `radius` value during the miles -> meters migration.
+//
+// The canonical unit for `radius` is now METERS (matching the venues/clubs
+// APIs and the Android/web clients). Older iOS builds still send MILES, but
+// iOS hard-caps that value at 100, while every meters-based caller sends a far
+// larger number (the clients' ~40 mi default already serializes to ~64,373 m).
+// The two ranges don't overlap, so we can infer the unit from the magnitude:
+//
+//	radius <  threshold  -> legacy miles client; convert to meters
+//	radius >= threshold  -> already meters; use as-is
+//
+// This shim lets us flip the default to meters without breaking iOS builds in
+// the wild. Remove it once every shipped iOS build sends meters.
+const legacyMilesRadiusThreshold = 1000.0
+
 // Helper function to generate the document containing the changes for an event dao
 func buildUpdateChanges(req *models.EventDao) bson.M {
 	changes := bson.M{}
@@ -299,8 +317,13 @@ func GenerateEventInstancesBatched(parentID bson.ObjectID, baseEvent *models.Eve
 
 // Find nearby venues based on location, sports, and radius
 func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []bson.ObjectID, error) {
-	// Convert radius from miles to meters (1 mile = 1609.34 meters)
-	radiusInMeters := radius * 1609.34
+	// Normalize the radius to meters. `radius` is canonically in meters, but
+	// legacy iOS builds still send miles; values below the threshold are
+	// treated as miles and converted. See legacyMilesRadiusThreshold.
+	radiusInMeters := radius
+	if radius < legacyMilesRadiusThreshold {
+		radiusInMeters = radius * metersPerMile
+	}
 
 	// Create filter for geospatial query
 	filter := bson.M{

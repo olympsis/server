@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	_ "net/http/pprof" // registers pprof handlers on DefaultServeMux (served on the localhost-only listener in main)
 	"olympsis-server/announcement"
 	"olympsis-server/auth"
 	"olympsis-server/club"
@@ -44,12 +45,32 @@ func main() {
 	l := logrus.New()
 
 	// Constrained-hardware runtime tuning. An explicit GOMEMLIMIT env var (e.g.
-	// from the launchd plist) takes precedence; this only sets a conservative
+	// from the PM2 ecosystem env) takes precedence; this only sets a conservative
 	// default soft heap limit when none is set, so the binary self-limits on the
 	// shared 16 GB Mac mini. 1.5 GiB leaves headroom for MongoDB's cache — raise
 	// GOMEMLIMIT if pprof shows the server genuinely needs more.
 	if os.Getenv("GOMEMLIMIT") == "" {
 		debug.SetMemoryLimit(1536 << 20) // 1.5 GiB
+	}
+
+	// Expose pprof on a localhost-only listener for memory/goroutine profiling
+	// (to confirm the leak fixes hold over time). It is NOT registered on the
+	// main router, so it is never reachable through KrakenD — only from the box
+	// itself. Tunnel in with `ssh -L 6060:localhost:6060 <host>`, then open
+	// http://localhost:6060/debug/pprof/. Override the bind address with
+	// PPROF_ADDR, or set PPROF_ADDR=off to disable. No write timeout on purpose:
+	// CPU/trace profiles need to stream for their full duration.
+	pprofAddr := os.Getenv("PPROF_ADDR")
+	if pprofAddr == "" {
+		pprofAddr = "localhost:6060"
+	}
+	if pprofAddr != "off" {
+		go func() {
+			l.Infof("Starting pprof listener on %s", pprofAddr)
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				l.Errorf("pprof listener stopped: %s", err.Error())
+			}
+		}()
 	}
 
 	// Set up Mux router

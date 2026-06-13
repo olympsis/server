@@ -584,6 +584,7 @@ func (s *Service) CheckIn() http.HandlerFunc {
 		response := models.CheckIn{}
 
 		var wgError error
+		var mu sync.Mutex // guards wgError and the shared response fields written below
 		var wg sync.WaitGroup
 
 		// Find user thread
@@ -593,9 +594,14 @@ func (s *Service) CheckIn() http.HandlerFunc {
 			user, err := aggregations.AggregateUser(&uuid, s.Database)
 			if err != nil {
 				s.Log.Error("Failed to find user. Error: ", err.Error())
-				wgError = err
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				wgError = err
+				return
+			}
 			if user != nil {
 				response.User = *user
 			}
@@ -608,9 +614,14 @@ func (s *Service) CheckIn() http.HandlerFunc {
 			clubs, err := aggregations.FindUserClubs(ctx, uuid, s.Database)
 			if err != nil {
 				s.Log.Error("Failed to find clubs. Error: ", err.Error())
-				wgError = err
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				wgError = err
+				return
+			}
 			if clubs != nil {
 				response.Clubs = clubs
 			}
@@ -623,9 +634,14 @@ func (s *Service) CheckIn() http.HandlerFunc {
 			orgs, err := aggregations.FindUserOrganizations(ctx, uuid, s.Database)
 			if err != nil {
 				s.Log.Error("Failed to find organizations. Error: ", err.Error())
-				wgError = err
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				wgError = err
+				return
+			}
 			if orgs != nil {
 				response.Organizations = orgs
 			}

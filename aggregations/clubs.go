@@ -9,6 +9,14 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
+// earthRadiusMeters is the Earth's equatorial radius in meters. $centerSphere
+// expects its radius in radians, computed as distance / sphereRadius using the
+// same unit for both. The clubs `radius` is canonically in meters (matching the
+// events/venues APIs), so we divide by the radius in meters. MongoDB documents
+// the equatorial radius as 6378.1 km; the previous code divided by 3963.2 (the
+// same radius in miles), which is why this API used to expect miles.
+const earthRadiusMeters = 6378100.0
+
 // AggregateClub gets a single club by ID with all related data
 func AggregateClub(id bson.ObjectID, database *database.Database) (*models.Club, error) {
 	ctx := context.Background()
@@ -75,7 +83,7 @@ func AggregateClubs(
 					"$geoWithin": bson.M{
 						"$centerSphere": bson.A{
 							location.Coordinates,
-							radius / 3963.2, // miles to radians
+							radius / earthRadiusMeters, // meters to radians
 						},
 					},
 				},

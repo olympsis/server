@@ -79,17 +79,18 @@ func parseEventsQueryParams(r *http.Request) (*EventQueryParams, error) {
 		params.Sports = []string{}
 	}
 
-	// Parse radius with default
+	// Parse radius with default. Canonically meters (~10 mi); see
+	// FindNearbyVenues for how legacy miles callers are detected/converted.
 	radiusStr := query.Get("radius")
 	if radiusStr != "" {
 		radius, err := strconv.ParseFloat(radiusStr, 64)
 		if err != nil {
-			params.Radius = 16095 // Default radius in meters
+			params.Radius = 16095 // Default radius in meters (~10 mi)
 		} else {
 			params.Radius = radius
 		}
 	} else {
-		params.Radius = 16095 // Default radius
+		params.Radius = 16095 // Default radius in meters (~10 mi)
 	}
 
 	// Parse skip with default
