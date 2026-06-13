@@ -22,6 +22,10 @@ type Carousel struct {
 	cond          *sync.Cond
 	logger        *logrus.Logger
 	onProcessJob  func(*models.NotificationPushRequest) error
+
+	maxQueueSize int           // upper bound on queued jobs (backpressure)
+	stopped      bool          // set by Stop(); the worker drains then exits
+	done         chan struct{} // closed by the worker once it has exited
 }
 
 type Service struct {
@@ -40,6 +44,12 @@ func New(c *apns2.Client, l *logrus.Logger, db *database.Database) *Service {
 	service.carousel = NewCarousel(l, service.processPushRequest)
 	service.carousel.Start()
 	return &service
+}
+
+// Stop gracefully shuts down the notification carousel, draining any queued
+// jobs before returning. Call once during server shutdown.
+func (n *Service) Stop() {
+	n.carousel.Stop()
 }
 
 func (n *Service) CreateTopic(name string, users []string) error {

@@ -215,6 +215,10 @@ func main() {
 		l.Errorf("Server shutdown error: %s", err.Error())
 	}
 
+	// Drain the notification carousel before closing Mongo, since processing
+	// queued jobs still needs the database connection.
+	notif.Stop()
+
 	// Close the MongoDB connection pool.
 	if err := d.Client.Disconnect(tc); err != nil {
 		l.Errorf("Database disconnect error: %s", err.Error())
