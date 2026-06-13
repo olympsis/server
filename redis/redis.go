@@ -19,6 +19,17 @@ func NewClient(addr string, username *string, password *string, db int) redis.Un
 	opts.Addr = addr
 	opts.DB = db
 
+	// Pool/timeout tuning for the constrained Mac mini. go-redis defaults to
+	// PoolSize = 10 * GOMAXPROCS (≈80-120 conns on this box); cap it well below
+	// that and let idle connections be reclaimed.
+	opts.PoolSize = 10
+	opts.MinIdleConns = 1
+	opts.ConnMaxIdleTime = 5 * time.Minute
+	opts.DialTimeout = 3 * time.Second
+	opts.ReadTimeout = 3 * time.Second
+	opts.WriteTimeout = 3 * time.Second
+	opts.PoolTimeout = 4 * time.Second
+
 	mode := os.Getenv("MODE")
 
 	if username != nil && mode == "PRODUCTION" {

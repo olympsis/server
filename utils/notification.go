@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/olympsis/models"
 	"github.com/sirupsen/logrus"
@@ -21,7 +22,7 @@ func NewNotificationInterface(u string, logger *logrus.Logger) *NotificationInte
 	return &NotificationInterface{
 		ServiceURL: u,
 		Status:     "good",
-		Client:     http.Client{},
+		Client:     http.Client{Timeout: 10 * time.Second}, // without a timeout the async SendNotification goroutine leaks on a hung endpoint
 		Logger:     logger,
 	}
 }

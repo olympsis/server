@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"olympsis-server/types"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -21,7 +22,7 @@ type StorageInterface struct {
 
 func NewStorageInterface(storage types.StorageUploader, mapkitConfig MapKitConfig, logger *logrus.Logger) *StorageInterface {
 	return &StorageInterface{
-		Client:       http.Client{},
+		Client:       http.Client{Timeout: 15 * time.Second}, // bound MapKit/GCS calls so a hung remote can't park a goroutine forever
 		Logger:       logger,
 		Storage:      storage,
 		MapKitConfig: mapkitConfig,

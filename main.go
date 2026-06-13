@@ -8,6 +8,7 @@ import (
 	"olympsis-server/club"
 	"olympsis-server/database"
 	"olympsis-server/event"
+	eventService "olympsis-server/event/service"
 	"olympsis-server/health"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
@@ -27,6 +28,7 @@ import (
 	"olympsis-server/venue"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -40,6 +42,15 @@ import (
 func main() {
 	// Set up logger
 	l := logrus.New()
+
+	// Constrained-hardware runtime tuning. An explicit GOMEMLIMIT env var (e.g.
+	// from the launchd plist) takes precedence; this only sets a conservative
+	// default soft heap limit when none is set, so the binary self-limits on the
+	// shared 16 GB Mac mini. 1.5 GiB leaves headroom for MongoDB's cache — raise
+	// GOMEMLIMIT if pprof shows the server genuinely needs more.
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(1536 << 20) // 1.5 GiB
+	}
 
 	// Set up Mux router
 	r := mux.NewRouter()
@@ -153,9 +164,11 @@ func main() {
 		middleware.Logging(),
 	)).Methods("POST", "OPTIONS")
 
-	// Set up event polling
-	// eventPolling := service.NewEventPollingService(d, l, &cacheDB, notif)
-	// go eventPolling.Start(context.Background())
+	// Set up event polling. Tie its lifecycle to a cancellable context so the
+	// 5-minute ticker goroutine stops cleanly on shutdown instead of leaking.
+	pollCtx, pollCancel := context.WithCancel(context.Background())
+	eventPolling := eventService.NewEventPollingService(d, l, &cacheDB, notif)
+	go eventPolling.Start(pollCtx)
 
 	// Set up server configuration
 	s := &http.Server{
@@ -192,8 +205,18 @@ func main() {
 
 	l.Infof("Received Termination(%s), graceful shutdown \n", sig)
 
+	// Stop the event polling ticker goroutine before tearing down dependencies.
+	pollCancel()
+
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
 	defer c()
 
-	s.Shutdown(tc)
+	if err := s.Shutdown(tc); err != nil {
+		l.Errorf("Server shutdown error: %s", err.Error())
+	}
+
+	// Close the MongoDB connection pool.
+	if err := d.Client.Disconnect(tc); err != nil {
+		l.Errorf("Database disconnect error: %s", err.Error())
+	}
 }
