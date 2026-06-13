@@ -100,6 +100,7 @@ func (orm *MemberReportORM) Find(ctx context.Context, filter interface{}, opts *
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(context.TODO())
 
 	var reports []models.MemberReport
 	for cur.Next(context.TODO()) {

@@ -30,6 +30,7 @@ func (s *Service) FindClubs(ctx context.Context, filter interface{}, clubs *[]mo
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var club models.Club

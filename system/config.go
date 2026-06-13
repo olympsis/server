@@ -24,9 +24,9 @@ import (
 Config Service Struct
 */
 type Service struct {
-	Database *database.Database    // database for read/write operations
-	Logger   *logrus.Logger        // logger for logging errors
-	Router   *mux.Router           // router for handling incoming requests
+	Database *database.Database     // database for read/write operations
+	Logger   *logrus.Logger         // logger for logging errors
+	Router   *mux.Router            // router for handling incoming requests
 	Cache    *redisDB.RedisDatabase // optional redis cache for token caching
 }
 
@@ -249,6 +249,7 @@ func (s *Service) FindTags(ctx context.Context) (*[]models.Tag, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var tag models.Tag
@@ -267,6 +268,7 @@ func (s *Service) FindSports(ctx context.Context) (*[]models.Sport, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var sport models.Sport

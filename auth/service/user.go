@@ -31,6 +31,7 @@ func (a *Service) FindUsers(ctx context.Context, filter bson.M, users *[]models.
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var user models.AuthUser
@@ -75,6 +76,7 @@ func (a *Service) UpdateUsers(ctx context.Context, filter bson.M, update bson.M,
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var user models.AuthUser

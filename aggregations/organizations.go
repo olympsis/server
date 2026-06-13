@@ -146,6 +146,7 @@ func AggregateOrganizationApplication(id *bson.ObjectID, database *database.Data
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
 
 	var application models.OrganizationApplication
 	if cur.Next(ctx) {
@@ -210,6 +211,7 @@ func AggregateOrganizationApplications(organizationID *bson.ObjectID, status str
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
 
 	var response []models.OrganizationApplication
 	for cur.Next(context.TODO()) {

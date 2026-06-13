@@ -411,6 +411,7 @@ func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
 			u.Log.Error("Failed to fetch invitations: " + err.Error())
 			return
 		}
+		defer cursor.Close(context.TODO())
 		for cursor.Next(context.TODO()) {
 			var invite models.Invitation
 			err := cursor.Decode(&invite)
@@ -463,6 +464,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		defer cur.Close(context.TODO())
 
 		for cur.Next(context.TODO()) {
 			var meta models.User

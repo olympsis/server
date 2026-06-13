@@ -34,6 +34,7 @@ func (s *Service) FindEvents(ctx context.Context, filter bson.M) (*[]models.Even
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var event models.EventDao

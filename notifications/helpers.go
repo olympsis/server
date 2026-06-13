@@ -17,6 +17,7 @@ func (n *Service) findUsers(arr []string) ([]models.User, error) {
 	if err != nil {
 		return []models.User{}, err
 	}
+	defer cursor.Close(context.Background())
 
 	var users []models.User
 	for cursor.Next(context.Background()) {

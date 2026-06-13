@@ -210,6 +210,7 @@ func AggregateClubApplication(id *bson.ObjectID, database *database.Database) (*
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
 
 	var application models.ClubApplication
 	if cur.Next(ctx) {
@@ -312,6 +313,7 @@ func AggregateClubApplications(clubId *bson.ObjectID, status string, database *d
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
 
 	var response []models.ClubApplication
 	for cur.Next(context.TODO()) {

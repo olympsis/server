@@ -34,6 +34,7 @@ func (s *Service) FindOrganizations(ctx context.Context, filter interface{}, org
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var event models.Organization

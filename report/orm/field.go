@@ -98,6 +98,7 @@ func (orm *FieldReportORM) Find(ctx context.Context, filter interface{}, opts *o
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(context.TODO())
 
 	var reports []models.VenueReport
 	for cur.Next(context.TODO()) {
