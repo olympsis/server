@@ -261,7 +261,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 
 		// If user is authenticated, fetch their data
 		if userID != "" {
-			user, err = aggregations.AggregateUser(&userID, s.Database)
+			user, err = aggregations.AggregateUser(r.Context(), &userID, s.Database)
 			if err != nil {
 				s.Logger.Error("Failed to get user data: ", err.Error())
 				// Fall back to unauthenticated mode instead of failing entirely
@@ -695,7 +695,7 @@ func (s *Service) Location() http.HandlerFunc {
 		var clubs, orgs []bson.ObjectID
 
 		if userID != "" {
-			userData, err = aggregations.AggregateUser(&userID, s.Database)
+			userData, err = aggregations.AggregateUser(r.Context(), &userID, s.Database)
 			if err != nil {
 				s.Logger.Warning("Failed to get user data, proceeding as unauthenticated: ", err.Error())
 				// Continue with unauthenticated user rather than failing

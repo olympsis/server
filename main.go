@@ -6,7 +6,7 @@ import (
 	_ "net/http/pprof" // registers pprof handlers on DefaultServeMux (served on the localhost-only listener in main)
 	"olympsis-server/announcement"
 	"olympsis-server/auth"
-	"olympsis-server/club"
+	// "olympsis-server/club" // DISABLED 2026-06-15: clubs & orgs turned off for now
 	"olympsis-server/database"
 	"olympsis-server/event"
 	eventService "olympsis-server/event/service"
@@ -15,7 +15,7 @@ import (
 	mapsnapshots "olympsis-server/map-snapshots"
 	"olympsis-server/middleware"
 	"olympsis-server/notifications"
-	"olympsis-server/organization"
+	// "olympsis-server/organization" // DISABLED 2026-06-15: clubs & orgs turned off for now
 	"olympsis-server/post"
 	redisDB "olympsis-server/redis"
 	"olympsis-server/report"
@@ -150,10 +150,10 @@ func main() {
 	authAPI := auth.NewAuthAPI(serverInterface)
 	userAPI := user.NewUserAPI(serverInterface)
 	fieldAPI := venue.NewVenueAPI(serverInterface)
-	clubAPI := club.NewClubAPI(serverInterface)
+	// clubAPI := club.NewClubAPI(serverInterface) // DISABLED 2026-06-15: clubs & orgs turned off for now
 	postAPI := post.NewPostAPI(serverInterface)
 	eventAPI := event.NewEventAPI(serverInterface)
-	orgAPI := organization.NewOrganizationAPI(serverInterface)
+	// orgAPI := organization.NewOrganizationAPI(serverInterface) // DISABLED 2026-06-15: clubs & orgs turned off for now
 	reportAPI := report.NewReportAPI(serverInterface)
 	localeAPI := locales.NewLocaleAPI(serverInterface)
 	healthAPI := health.NewHealthAPI(serverInterface)
@@ -165,10 +165,10 @@ func main() {
 	authAPI.Ready(client)
 	userAPI.Ready(client)
 	fieldAPI.Ready()
-	clubAPI.Ready(client)
+	// clubAPI.Ready(client) // DISABLED 2026-06-15: clubs & orgs turned off for now
 	postAPI.Ready(client)
 	eventAPI.Ready(client)
-	orgAPI.Ready(client)
+	// orgAPI.Ready(client) // DISABLED 2026-06-15: clubs & orgs turned off for now
 	reportAPI.Setup(client)
 	localeAPI.Ready()
 	healthAPI.Ready()

@@ -9,9 +9,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-func AggregateUser(uuid *string, database *database.Database) (*models.UserData, error) {
-
-	ctx := context.Background()
+// AggregateUser resolves a user's full profile (auth + metadata) for the given
+// uuid. The caller passes its request context so the aggregation honors client
+// cancellation and request deadlines instead of running detached on
+// context.Background().
+func AggregateUser(ctx context.Context, uuid *string, database *database.Database) (*models.UserData, error) {
 
 	// find user auth object
 	match := bson.M{

@@ -8,7 +8,6 @@ import (
 	"olympsis-server/aggregations"
 	"olympsis-server/server"
 	"regexp"
-	"sync"
 	"time"
 
 	"github.com/olympsis/models"
@@ -140,7 +139,7 @@ func (s *Service) CreateUserData() http.HandlerFunc {
 			return
 		}
 
-		usr, err := aggregations.AggregateUser(&uuid, s.Database)
+		usr, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 		if err != nil {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data"}`, http.StatusInternalServerError)
@@ -306,7 +305,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 				}
 
 				// Aggregate user data response
-				usr, err := aggregations.AggregateUser(&uuid, s.Database)
+				usr, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 				if err != nil {
 					s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 					http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
@@ -322,7 +321,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			return
 		}
 
-		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		user, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 		if err != nil {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
@@ -351,7 +350,7 @@ func (s *Service) GetUserData() http.HandlerFunc {
 
 		user_id := r.Header.Get("userID")
 
-		user, err := aggregations.AggregateUser(&user_id, s.Database)
+		user, err := aggregations.AggregateUser(r.Context(), &user_id, s.Database)
 		if err != nil || user.Username == "" {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusNotFound)
@@ -577,81 +576,27 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
-		defer cancel()
-
 		uuid := r.Header.Get("userID")
 		response := models.CheckIn{}
 
-		var wgError error
-		var mu sync.Mutex // guards wgError and the shared response fields written below
-		var wg sync.WaitGroup
-
-		// Find user thread
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			user, err := aggregations.AggregateUser(&uuid, s.Database)
-			if err != nil {
-				s.Log.Error("Failed to find user. Error: ", err.Error())
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				wgError = err
-				return
-			}
-			if user != nil {
-				response.User = *user
-			}
-		}()
-
-		// Find clubs thread
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			clubs, err := aggregations.FindUserClubs(ctx, uuid, s.Database)
-			if err != nil {
-				s.Log.Error("Failed to find clubs. Error: ", err.Error())
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				wgError = err
-				return
-			}
-			if clubs != nil {
-				response.Clubs = clubs
-			}
-		}()
-
-		// Find organizations thread
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			orgs, err := aggregations.FindUserOrganizations(ctx, uuid, s.Database)
-			if err != nil {
-				s.Log.Error("Failed to find organizations. Error: ", err.Error())
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				wgError = err
-				return
-			}
-			if orgs != nil {
-				response.Organizations = orgs
-			}
-		}()
-
-		wg.Wait()
-
-		if wgError != nil {
+		// Clubs & orgs are disabled for now, so check-in only resolves the user's
+		// own profile. That is a single aggregation, so the previous goroutine
+		// fan-out (user + clubs + orgs in parallel, guarded by a WaitGroup/mutex)
+		// is no longer needed — we just call AggregateUser directly. The
+		// Clubs/Organizations fields on models.CheckIn are omitempty, so leaving
+		// them nil drops them from the JSON response entirely.
+		//
+		// To re-enable clubs/orgs, restore the parallel FindUserClubs /
+		// FindUserOrganizations lookups here (see git history) alongside the
+		// route wiring in main.go.
+		user, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
+		if err != nil {
+			s.Log.Error("Failed to find user. Error: ", err.Error())
 			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
+		}
+		if user != nil {
+			response.User = *user
 		}
 
 		w.WriteHeader(http.StatusOK)
