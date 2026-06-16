@@ -246,7 +246,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 
 		// If location is provided, get nearby venues
 		if queryParams.Location != nil {
-			_, venueIDs, err := s.FindNearbyVenues(r.Context(), *queryParams.Location, queryParams.Radius)
+			venueIDs, err := s.FindNearbyVenueIDs(r.Context(), *queryParams.Location, queryParams.Radius)
 			if err != nil {
 				s.Logger.Error("Failed to find venues: ", err.Error())
 				// Continue with empty venues list instead of failing

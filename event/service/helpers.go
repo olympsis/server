@@ -316,8 +316,13 @@ func GenerateEventInstancesBatched(parentID bson.ObjectID, baseEvent *models.Eve
 	return instances
 }
 
-// Find nearby venues based on location, sports, and radius
-func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []bson.ObjectID, error) {
+// nearbyVenuesPipeline returns the spatial stage(s) for a nearby-venues query,
+// ready for the caller to append its remaining stages.
+//
+// $geoNear must be the first stage in an aggregation pipeline ($near is only
+// valid inside a Find/$match filter, not in aggregation), which is why both
+// nearby helpers go through aggregation rather than a plain Find.
+func nearbyVenuesPipeline(location models.GeoJSON, radius float64) bson.A {
 	// Normalize the radius to meters. `radius` is canonically in meters, but
 	// legacy iOS builds still send miles; values below the threshold are
 	// treated as miles and converted. See legacyMilesRadiusThreshold.
@@ -326,26 +331,28 @@ func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON,
 		radiusInMeters = radius * metersPerMile
 	}
 
-	// Spatial stage. A venue's `units` / `transit_lines` are stored as
-	// ObjectID references, so we can't decode the raw documents straight into
-	// models.Venue (whose fields are []VenueUnit / []TransitLine embedded
-	// docs). We run an aggregation instead of a plain Find so we can append
-	// BuildVenueCorePipeline()'s $lookup stages, which resolve those
-	// references into full embedded documents before decoding — the same read
-	// path the venue API uses.
-	//
-	// $geoNear must be the first stage in an aggregation pipeline ($near is
-	// only valid inside a Find/$match filter, not in aggregation).
-	geoNear := bson.M{
-		"$geoNear": bson.M{
-			"near":          location,
-			"distanceField": "distance",
-			"maxDistance":   radiusInMeters,
-			"spherical":     true,
+	return bson.A{
+		bson.M{
+			"$geoNear": bson.M{
+				"near":          location,
+				"distanceField": "distance",
+				"maxDistance":   radiusInMeters,
+				"spherical":     true,
+			},
 		},
 	}
+}
 
-	pipeline := append(bson.A{geoNear}, aggregations.BuildVenueCorePipeline()...)
+// FindNearbyVenues returns full venue documents near a location. It appends
+// BuildVenueCorePipeline()'s $lookup stages so the `units` / `transit_lines`
+// ObjectID references resolve into the embedded []VenueUnit / []TransitLine
+// documents that models.Venue expects — the same read path the venue API uses.
+//
+// Use this only when the venue bodies are actually consumed (e.g. the
+// /v1/events/location response). Callers that just need the IDs to filter by
+// venue should use FindNearbyVenueIDs, which skips the lookups + full decode.
+func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []bson.ObjectID, error) {
+	pipeline := append(nearbyVenuesPipeline(location, radius), aggregations.BuildVenueCorePipeline()...)
 
 	cursor, err := s.Database.VenuesCollection.Aggregate(ctx, pipeline)
 	if err != nil {
@@ -372,4 +379,41 @@ func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON,
 	}
 
 	return &venues, venueIDs, nil
+}
+
+// FindNearbyVenueIDs returns just the ObjectIDs of venues within radius of a
+// location, nearest first. It deliberately skips the unit/transit_lines
+// $lookup + full-document decode that FindNearbyVenues does: callers that only
+// filter by venue (e.g. the nearby-events query) never read the venue bodies,
+// so resolving the references would be wasted work on a hot path.
+func (s *Service) FindNearbyVenueIDs(ctx context.Context, location models.GeoJSON, radius float64) ([]bson.ObjectID, error) {
+	// Project away everything but _id so Mongo doesn't ship full venue
+	// documents we're only going to discard.
+	pipeline := append(nearbyVenuesPipeline(location, radius),
+		bson.M{"$project": bson.M{"_id": 1}},
+	)
+
+	cursor, err := s.Database.VenuesCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	venueIDs := []bson.ObjectID{}
+	for cursor.Next(ctx) {
+		var row struct {
+			ID bson.ObjectID `bson:"_id"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			s.Logger.Warning("Failed to decode venue id: ", err.Error())
+			continue
+		}
+		venueIDs = append(venueIDs, row.ID)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return venueIDs, nil
 }

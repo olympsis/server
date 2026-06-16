@@ -44,7 +44,13 @@ func AggregateVenue(id bson.ObjectID, database *database.Database) (*models.Venu
 }
 
 // AggregateVenues fetches multiple venues using a pre-built query pipeline
-// (from generateVenuesQuery) and appends the core lookups + pagination.
+// (from generateVenuesQuery) and appends pagination + the core lookups.
+//
+// Pagination is applied BEFORE the core $lookup stages so the lookups only
+// resolve unit/transit references for the page we actually return (≤ limit
+// venues) rather than for every matched venue. $geoNear (the first stage in
+// queryPipeline) already emits documents nearest-first and the intervening
+// $match/$skip/$limit stages preserve that order, so the page is unchanged.
 func AggregateVenues(
 	queryPipeline bson.A,
 	limit int,
@@ -59,14 +65,14 @@ func AggregateVenues(
 	pipeline := make(bson.A, 0, len(queryPipeline)+len(corePipeline)+2)
 	pipeline = append(pipeline, queryPipeline...)
 
-	// Append the core lookup stages
-	pipeline = append(pipeline, corePipeline...)
-
-	// Pagination
+	// Pagination — narrow to a single page before the expensive lookups run
 	pipeline = append(pipeline,
 		bson.M{"$skip": skip},
 		bson.M{"$limit": limit},
 	)
+
+	// Append the core lookup stages (resolve references for the page only)
+	pipeline = append(pipeline, corePipeline...)
 
 	cur, err := database.VenuesCollection.Aggregate(ctx, pipeline)
 	if err != nil {
