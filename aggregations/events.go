@@ -384,6 +384,16 @@ func BuildEventsAggregation(
 		},
 	}
 
+	// Order upcoming events soonest-first. This gives the feed a stable,
+	// meaningful order (events starting next lead the list) and makes
+	// pagination deterministic across pages. Kept adjacent to $skip/$limit
+	// below so MongoDB can coalesce it into a bounded top-k sort.
+	sortPipeline := bson.M{
+		"$sort": bson.M{
+			"start_time": 1,
+		},
+	}
+
 	// Pagination pipelines
 	skipPipeline := bson.M{
 		"$skip": skip,
@@ -408,9 +418,10 @@ func BuildEventsAggregation(
 	// Then add the core lookups
 	completePipeline = append(completePipeline, corePipeline...)
 
-	// Finally add the post-lookup stages (visibility filtering and pagination)
+	// Finally add the post-lookup stages (visibility filtering, ordering, pagination)
 	completePipeline = append(completePipeline,
 		visibilityPipeline,
+		sortPipeline,
 		skipPipeline,
 		limitPipeline,
 	)
