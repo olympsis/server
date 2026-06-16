@@ -32,7 +32,7 @@ func (s *Service) ConnectToClient(credentialsFilePath string) error {
 	// Storage Client
 	client, err := storage.NewClient(context.TODO(), option.WithCredentialsFile(credentialsFilePath))
 	if err != nil {
-		s.Logger.Fatal("Failed to create GCP Storage client: " + err.Error())
+		s.Logger.Fatal("[Storage] Failed to create GCP Storage client: " + err.Error())
 		return err
 	}
 	s.Client = client
@@ -40,11 +40,11 @@ func (s *Service) ConnectToClient(credentialsFilePath string) error {
 	// Computer Vision Client
 	vClient, err := vision.NewImageAnnotatorClient(context.TODO(), option.WithCredentialsFile(credentialsFilePath))
 	if err != nil {
-		s.Logger.Fatal("Failed to create Vision API client: " + err.Error())
+		s.Logger.Fatal("[Storage] Failed to create Vision API client: " + err.Error())
 		return err
 	}
 	s.VClient = vClient
-	s.Logger.Info("[Storage] Connected to GCP Storage & Vision clients")
+	s.Logger.Info("[Storage] Initialized...")
 
 	return nil
 }
