@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"olympsis-server/aggregations"
+
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 const metersPerMile = 1609.34
@@ -325,23 +326,29 @@ func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON,
 		radiusInMeters = radius * metersPerMile
 	}
 
-	// Create filter for geospatial query
-	filter := bson.M{
-		"location": bson.M{
-			"$near": bson.M{
-				"$geometry":    location,
-				"$maxDistance": radiusInMeters,
-			},
+	// Spatial stage. A venue's `units` / `transit_lines` are stored as
+	// ObjectID references, so we can't decode the raw documents straight into
+	// models.Venue (whose fields are []VenueUnit / []TransitLine embedded
+	// docs). We run an aggregation instead of a plain Find so we can append
+	// BuildVenueCorePipeline()'s $lookup stages, which resolve those
+	// references into full embedded documents before decoding — the same read
+	// path the venue API uses.
+	//
+	// $geoNear must be the first stage in an aggregation pipeline ($near is
+	// only valid inside a Find/$match filter, not in aggregation).
+	geoNear := bson.M{
+		"$geoNear": bson.M{
+			"near":          location,
+			"distanceField": "distance",
+			"maxDistance":   radiusInMeters,
+			"spherical":     true,
 		},
 	}
 
-	// Rest of the function remains the same
-	cursor, err := s.Database.VenuesCollection.Find(ctx, filter)
+	pipeline := append(bson.A{geoNear}, aggregations.BuildVenueCorePipeline()...)
+
+	cursor, err := s.Database.VenuesCollection.Aggregate(ctx, pipeline)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			// Return empty results rather than error
-			return &[]models.Venue{}, []bson.ObjectID{}, nil
-		}
 		return nil, nil, err
 	}
 	defer cursor.Close(ctx)
