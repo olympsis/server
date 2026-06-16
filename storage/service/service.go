@@ -44,7 +44,7 @@ func (s *Service) ConnectToClient(credentialsFilePath string) error {
 		return err
 	}
 	s.VClient = vClient
-	s.Logger.Info("Connected to GCP Storage & Vision clients")
+	s.Logger.Info("[Storage] Connected to GCP Storage & Vision clients")
 
 	return nil
 }

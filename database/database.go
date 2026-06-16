@@ -79,7 +79,7 @@ func NewDatabase(l *logrus.Logger) *Database {
 
 func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.ServerConfig) {
 
-	d.Logger.Info("Connecting to Database...")
+	d.Logger.Info("[Database] Initializing...")
 
 	/*
 		Connect to Mongo Database
@@ -98,21 +98,21 @@ func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.S
 		SetMaxConnecting(4)
 	client, err := mongo.Connect(opts)
 	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		d.Logger.Fatal("[Database] Failed to connect: " + err.Error())
 	}
 
 	err = client.Ping(context.Background(), readpref.Primary())
 	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		d.Logger.Fatal("[Database] Failed to connect: " + err.Error())
 	}
 
 	d.Client = client
 
 	err = d.SetUpCollections(&dbConfig, &collectionConfig)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to set up database collections. Error: %s", err.Error()))
+		panic(fmt.Sprintf("[Database] Failed to set up collections: %s", err.Error()))
 	}
-	d.Logger.Info("Database connection successful")
+	d.Logger.Info("[Database] Connection successful.")
 }
 
 // Sets up all of the database collections

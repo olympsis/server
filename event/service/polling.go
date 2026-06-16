@@ -84,7 +84,7 @@ func (p *EventPollingService) getEvents(start time.Time, end time.Time) []Stripp
 }
 
 func (p *EventPollingService) processUpcomingEvents() {
-	p.logger.Info("Starting Event Polling Reminder Processing...")
+	p.logger.Info("[E-Polling] Polling initializing...")
 
 	start := time.Now().Add(25 * time.Minute)
 	end := time.Now().Add(35 * time.Minute)
@@ -115,5 +115,5 @@ func (p *EventPollingService) processUpcomingEvents() {
 		queue.ProcessWithRetry(p.sender, p.cache, stopTime)
 	}
 
-	p.logger.Info("Stopping Event Polling Reminder Processing...")
+	p.logger.Info("[E-Polling] Polling teardown...")
 }

@@ -43,7 +43,6 @@ func NewCarousel(l *logrus.Logger, callback func(*models.NotificationPushRequest
 	}
 	c.cond = sync.NewCond(&c.mu)
 	heap.Init(&c.priorityQueue)
-	l.Infof("Carousel queue bound set to %d jobs", c.maxQueueSize)
 	return c
 }
 
@@ -58,10 +57,10 @@ func (c *Carousel) AddJob(priority int, req models.NotificationPushRequest) erro
 	// of unbounded memory growth (no silent drops; the rejection is logged and
 	// returned to the caller).
 	if c.stopped {
-		return errors.New("carousel is shutting down; job rejected")
+		return errors.New("[Carousel] shutting down; job rejected")
 	}
 	if len(c.priorityQueue) >= c.maxQueueSize {
-		c.logger.Warnf("Carousel queue full (%d/%d); rejecting job", len(c.priorityQueue), c.maxQueueSize)
+		c.logger.Warnf("[Carousel] queue full (%d/%d); rejecting job", len(c.priorityQueue), c.maxQueueSize)
 		return errors.New("notification queue is full")
 	}
 
@@ -82,7 +81,6 @@ func (c *Carousel) RemoveJob() *Job {
 }
 
 func (c *Carousel) Start() {
-	c.logger.Info("Starting Carousel...")
 	go func() {
 		for {
 			c.mu.Lock()
@@ -94,7 +92,7 @@ func (c *Carousel) Start() {
 			// goroutine doesn't leak and queued notifications aren't dropped.
 			if len(c.priorityQueue) == 0 && c.stopped {
 				c.mu.Unlock()
-				c.logger.Info("Carousel stopped.")
+				c.logger.Info("[Carousel] Teardown...")
 				close(c.done)
 				return
 			}
@@ -103,6 +101,8 @@ func (c *Carousel) Start() {
 			c.processJob(job)
 		}
 	}()
+
+	c.logger.Info("[Carousel] Initialized...")
 }
 
 // Stop signals the worker to drain the queue and exit, then blocks until it has
@@ -120,10 +120,10 @@ func (c *Carousel) Stop() {
 }
 
 func (c *Carousel) processJob(job *Job) {
-	c.logger.Info(fmt.Sprintf("Processing job: %s(%d)", job.ID, job.Priority))
+	c.logger.Info(fmt.Sprintf("[Carousel] Processing job: %s(%d)", job.ID, job.Priority))
 	err := c.onProcessJob(&job.Request)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Failed to process job: %s \nError: %s", job.ID, err.Error()))
+		c.logger.Error(fmt.Sprintf("[Carousel] Failed to process job: %s \nError: %s", job.ID, err.Error()))
 		return
 	}
 }

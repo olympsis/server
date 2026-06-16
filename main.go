@@ -66,9 +66,9 @@ func main() {
 	}
 	if pprofAddr != "off" {
 		go func() {
-			l.Infof("Starting pprof listener on %s", pprofAddr)
+			l.Infof("[Perf] Starting pprof listener on %s", pprofAddr)
 			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
-				l.Errorf("pprof listener stopped: %s", err.Error())
+				l.Errorf("[Perf] pprof listener stopped: %s", err.Error())
 			}
 		}()
 	}
@@ -93,7 +93,7 @@ func main() {
 	cache := redisDB.NewClient(rConfig.Address, &rConfig.Username, &rConfig.Password, 0)
 	cacheDB := redisDB.New(&cache, l)
 	if err := cache.Ping(context.Background()).Err(); err != nil {
-		l.Fatalf("Error setting up redis client. Error: %s", err.Error())
+		l.Fatalf("[Database] Error setting up redis client. Error: %s", err.Error())
 		os.Exit(1)
 	}
 
@@ -101,19 +101,19 @@ func main() {
 	opt := option.WithCredentialsFile(config.FirebaseFilePath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
-		l.Fatalf("Error starting Firebase app: %s\n", err)
+		l.Fatalf("[Core] Error starting Firebase app: %s\n", err)
 		os.Exit(1)
 	}
 	client, err := app.Auth(context.TODO())
 	if err != nil {
-		l.Fatalf("Error getting Firebase Auth client: %v\n", err)
+		l.Fatalf("[Core] Error getting Firebase Auth client: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Create APNS client
 	apnsClient, err := utils.CreateApns2Client(config.AppleKeyID, config.AppleTeamID, config.APNSFileURl)
 	if err != nil {
-		l.Fatalf("Failed to create Apns2 client. Error: %s", err.Error())
+		l.Fatalf("[Carousel] Failed to create Apns2 client. Error: %s", err.Error())
 		os.Exit(1)
 	}
 
@@ -140,7 +140,7 @@ func main() {
 	// Set up storage service first (other modules depend on it)
 	storageModule := storageAPI.NewStorageAPI(serverInterface)
 	if err := storageModule.Service.ConnectToClient(config.GCPCredentialsFilePath); err != nil {
-		l.Fatalf("Failed to connect storage service to GCP: %s", err.Error())
+		l.Fatalf("[Storage] Failed to connect storage service to GCP: %s", err.Error())
 		os.Exit(1)
 	}
 	serverInterface.Storage = storageModule.Service
@@ -190,6 +190,7 @@ func main() {
 	pollCtx, pollCancel := context.WithCancel(context.Background())
 	eventPolling := eventService.NewEventPollingService(d, l, &cacheDB, notif)
 	go eventPolling.Start(pollCtx)
+	l.Info("[E-Polling] Initialized...")
 
 	// Set up server configuration
 	s := &http.Server{
@@ -202,19 +203,19 @@ func main() {
 
 	// Start server
 	go func() {
-		l.Info(`Starting olympsis server at...` + config.Port)
+		l.Info(`[Core] Starting olympsis server at...` + config.Port)
 
 		switch config.Http {
 		case "SECURE":
 			err := s.ListenAndServeTLS(config.CertFilePath, config.KeyFilePath)
 			if err != nil {
-				l.Info("Error starting server: ", err)
+				l.Info("[Core] Error starting server: ", err)
 				os.Exit(1)
 			}
 		default:
 			err := s.ListenAndServe()
 			if err != nil {
-				l.Info("Error starting server: ", err)
+				l.Info("[Core] Error starting server: ", err)
 				os.Exit(1)
 			}
 		}
@@ -224,7 +225,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigs
 
-	l.Infof("Received Termination(%s), graceful shutdown \n", sig)
+	l.Infof("[Core] Received Termination(%s), graceful shutdown \n", sig)
 
 	// Stop the event polling ticker goroutine before tearing down dependencies.
 	pollCancel()
@@ -233,7 +234,7 @@ func main() {
 	defer c()
 
 	if err := s.Shutdown(tc); err != nil {
-		l.Errorf("Server shutdown error: %s", err.Error())
+		l.Errorf("[Core] Server shutdown error: %s", err.Error())
 	}
 
 	// Drain the notification carousel before closing Mongo, since processing
@@ -242,6 +243,6 @@ func main() {
 
 	// Close the MongoDB connection pool.
 	if err := d.Client.Disconnect(tc); err != nil {
-		l.Errorf("Database disconnect error: %s", err.Error())
+		l.Errorf("[Database] disconnect error: %s", err.Error())
 	}
 }
