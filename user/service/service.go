@@ -579,16 +579,13 @@ func (s *Service) CheckIn() http.HandlerFunc {
 		uuid := r.Header.Get("userID")
 		response := models.CheckIn{}
 
-		// Clubs & orgs are disabled for now, so check-in only resolves the user's
-		// own profile. That is a single aggregation, so the previous goroutine
-		// fan-out (user + clubs + orgs in parallel, guarded by a WaitGroup/mutex)
-		// is no longer needed — we just call AggregateUser directly. The
-		// Clubs/Organizations fields on models.CheckIn are omitempty, so leaving
-		// them nil drops them from the JSON response entirely.
-		//
-		// To re-enable clubs/orgs, restore the parallel FindUserClubs /
-		// FindUserOrganizations lookups here (see git history) alongside the
-		// route wiring in main.go.
+		// Check-in only resolves the user's own profile. Clubs and orgs are
+		// intentionally not embedded here — orgs are served on their own
+		// /v1/organizations routes, and clubs are disabled for now. Since that
+		// leaves a single aggregation, the previous goroutine fan-out (user +
+		// clubs + orgs guarded by a WaitGroup/mutex) is unnecessary; we call
+		// AggregateUser directly. Clubs/Organizations are omitempty on
+		// models.CheckIn, so leaving them nil drops them from the JSON response.
 		user, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 		if err != nil {
 			s.Log.Error("Failed to find user. Error: ", err.Error())
