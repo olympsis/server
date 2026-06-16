@@ -39,7 +39,7 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("GET", "OPTIONS")
 
-	e.Router.Handle("/v1/events/past/user/{uuid}",
+	e.Router.Handle("/v1/events/past/user/{user_id}",
 		middleware.Chain(
 			e.Service.GetUserPastEvents(),
 			middleware.Logging(),
