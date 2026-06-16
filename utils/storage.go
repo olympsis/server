@@ -89,12 +89,17 @@ func (s *StorageInterface) GetMapKitSnapshot(name string) (string, error) {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Upload to storage directly using the storage service (no external HTTP call)
-	go func() {
-		if err := s.Storage.UploadToStorage(imageData, "olympsis-mapkit-snapshots", imageHash); err != nil {
-			s.Logger.Errorf("Failed to upload snapshot to storage: %v", err)
-		}
-	}()
+	// Upload synchronously, before returning the URL. Previously this ran in a
+	// background goroutine and the URL was returned immediately — so on a brand
+	// new snapshot the client requested the image before the upload had
+	// committed, giving a 404 on first load (and a success on every load after,
+	// once the goroutine had finished). GCS is strongly consistent for new
+	// objects, so once UploadToStorage returns the object is guaranteed
+	// readable. Only the first request per unique snapshot pays this cost;
+	// subsequent requests short-circuit on the SnapshotExistsInStorage check.
+	if err := s.Storage.UploadToStorage(imageData, "olympsis-mapkit-snapshots", imageHash); err != nil {
+		return "", fmt.Errorf("failed to upload snapshot to storage: %w", err)
+	}
 
 	return fmt.Sprintf("mapkit-snapshots/%s", imageHash), nil
 }
