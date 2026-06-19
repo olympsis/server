@@ -47,6 +47,73 @@ func AggregateEvent(id bson.ObjectID, database *database.Database) (*models.Even
 	return &event, nil
 }
 
+// AggregateEventsByVenue fetches the upcoming events hosted at a single venue.
+//
+// Powers the iOS venue detail screen (GET /v1/events/venue/{id}). It matches an
+// event to the venue by id, accepting BOTH embedded shapes:
+//   - venues._id      (what the rest of the aggregation layer matches on)
+//   - venues.venue_id (what the Go/iOS VenueDescriptor model carries)
+//
+// so it works regardless of which key a given event was written with. Legacy
+// scraped events that carry neither id (only name + location) are matched
+// client-side by name and are out of scope here.
+//
+// Only live/upcoming events are returned (stop_time >= now), excluding
+// cancelled and archived ones, sorted soonest-first — mirroring the main feed.
+func AggregateEventsByVenue(venueID bson.ObjectID, database *database.Database) (*[]models.Event, error) {
+	ctx := context.TODO()
+
+	currentTime := bson.NewDateTimeFromTime(time.Now())
+
+	matchPipeline := bson.M{
+		"$match": bson.M{
+			"$or": bson.A{
+				bson.M{"venues._id": venueID},
+				bson.M{"venues.venue_id": venueID},
+			},
+			"stop_time": bson.M{"$gte": currentTime},
+			// Exclude cancelled / archived (field absent or null both count as active).
+			"$and": bson.A{
+				bson.M{"$or": bson.A{
+					bson.M{"cancelled_at": bson.M{"$exists": false}},
+					bson.M{"cancelled_at": nil},
+				}},
+				bson.M{"$or": bson.A{
+					bson.M{"archived_at": bson.M{"$exists": false}},
+					bson.M{"archived_at": nil},
+				}},
+			},
+		},
+	}
+
+	sortPipeline := bson.M{"$sort": bson.M{"start_time": 1}}
+	limitPipeline := bson.M{"$limit": 100}
+
+	// Reuse the shared lookups (poster, participants, comments, ...) so these
+	// events come back fully hydrated like every other events endpoint.
+	completePipeline := bson.A{matchPipeline}
+	completePipeline = append(completePipeline, BuildEventCorePipeline()...)
+	completePipeline = append(completePipeline, sortPipeline, limitPipeline)
+
+	cur, err := database.EventsCollection.Aggregate(ctx, completePipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	events := make([]models.Event, 0)
+	for cur.Next(ctx) {
+		var event models.Event
+		if err := cur.Decode(&event); err != nil {
+			database.Logger.Error("Failed to decode venue event. Error: ", err.Error())
+			continue
+		}
+		events = append(events, event)
+	}
+
+	return &events, nil
+}
+
 // AggregateEvents fetches multiple events based on filter criteria
 func AggregateEvents(
 	userID *string,

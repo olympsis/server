@@ -178,6 +178,36 @@ func (e *Service) GetEvent() http.HandlerFunc {
 	}
 }
 
+// GetEventsByVenue returns the upcoming events hosted at a single venue.
+// Backs the iOS venue detail screen: GET /v1/events/venue/{id}.
+func (e *Service) GetEventsByVenue() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			http.Error(rw, `{ "msg": "no/bad venue id found in request" }`, http.StatusBadRequest)
+			return
+		}
+
+		events, err := aggregations.AggregateEventsByVenue(oid, e.Database)
+		if err != nil {
+			e.Logger.Error("Failed to find events for venue. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
+			return
+		}
+
+		resp := models.EventsResponse{Events: []models.Event{}}
+		if events != nil {
+			resp.Events = *events
+			resp.TotalEvents = int32(len(*events))
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
+	}
+}
+
 func (s *Service) GetEvents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get query parameters with validation

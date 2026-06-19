@@ -55,6 +55,15 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("GET", "OPTIONS")
 
+	// get a venue's upcoming events — backs the iOS venue detail page.
+	// Registered before "/v1/events/{id}" so "venue" isn't read as an event id.
+	e.Router.Handle("/v1/events/venue/{id}",
+		middleware.Chain(
+			e.Service.GetEventsByVenue(),
+			middleware.Logging(),
+		),
+	).Methods("GET", "OPTIONS")
+
 	// get events
 	//
 	// Uses OptionalUserMiddleware so unauthenticated callers can still browse
