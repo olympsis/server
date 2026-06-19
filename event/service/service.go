@@ -24,6 +24,7 @@ func NewEventService(i *server.ServerInterface) *Service {
 		Router:       i.Router,
 		Database:     i.Database,
 		Notification: i.Notification,
+		Push:         i.Push,
 	}
 }
 

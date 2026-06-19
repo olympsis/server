@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"olympsis-server/database"
-	"olympsis-server/notifications"
+	"olympsis-server/push"
 	"olympsis-server/redis"
 	"time"
 
@@ -16,7 +16,7 @@ type EventPollingService struct {
 	db     *database.Database
 	logger *logrus.Logger
 	cache  *redis.RedisDatabase
-	sender *notifications.Service
+	sender *push.Service
 }
 
 // Stripped down event object to reduce memory footprint
@@ -25,7 +25,7 @@ type StrippedEvent struct {
 	StopTime bson.DateTime `bson:"stop_time"`
 }
 
-func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.Service) *EventPollingService {
+func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *push.Service) *EventPollingService {
 	return &EventPollingService{
 		db:     d,
 		cache:  c,

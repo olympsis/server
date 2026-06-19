@@ -103,6 +103,11 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 						e.Logger.Errorf("Failed to add user to event notifications topic. Event ID: %s - Error: %s", id, err.Error())
 					}
 
+					// Notify the event's organizers that a new participant joined.
+					if err = e.Push.Participant(id, pid.Hex(), uuid); err != nil {
+						e.Logger.Errorf("Failed to notify organizers of new participant. Event ID: %s - Error: %s", id, err.Error())
+					}
+
 					rw.WriteHeader(http.StatusOK)
 					rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
 					return
@@ -121,6 +126,11 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 		// Add participant to notifications
 		if err = e.Notification.AddUsersToTopic(id, []string{uuid}); err != nil {
 			e.Logger.Errorf("Failed to add user to notifications topic. EventID: %s - Error: %s", id, err.Error())
+		}
+
+		// Notify the event's organizers that a new participant joined.
+		if err = e.Push.Participant(id, pid.Hex(), uuid); err != nil {
+			e.Logger.Errorf("Failed to notify organizers of new participant. Event ID: %s - Error: %s", id, err.Error())
 		}
 
 		rw.WriteHeader(http.StatusOK)

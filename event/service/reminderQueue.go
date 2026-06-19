@@ -1,7 +1,7 @@
 package service
 
 import (
-	"olympsis-server/notifications"
+	"olympsis-server/push"
 	"olympsis-server/redis"
 	"time"
 
@@ -28,11 +28,11 @@ func (q *NotificationReminderQueue) Add(eventID string) {
 	q.items = append(q.items, eventID)
 }
 
-func (q *NotificationReminderQueue) ProcessWithRetry(sender *notifications.Service, cache *redis.RedisDatabase, eventStopTime time.Time) {
+func (q *NotificationReminderQueue) ProcessWithRetry(sender *push.Service, cache *redis.RedisDatabase, eventStopTime time.Time) {
 	var failures []string
 
 	for _, eventID := range q.items {
-		if err := sender.EventReminder(eventID); err != nil {
+		if err := sender.Reminder(eventID); err != nil {
 			q.retries[eventID]++
 			if q.retries[eventID] < q.maxRetries {
 				failures = append(failures, eventID)

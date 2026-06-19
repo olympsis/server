@@ -74,3 +74,8 @@ require (
 	github.com/sideshow/apns2 v0.25.0
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
 )
+
+// DEV ONLY: pick up the local models change (NewEventCommentType -> "event_comment")
+// before it is committed + tagged. For the production cut, commit/push the models
+// repo, `go get github.com/olympsis/models@<new-pseudo-version>`, then remove this.
+replace github.com/olympsis/models => ../models

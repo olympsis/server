@@ -17,6 +17,7 @@ import (
 	"olympsis-server/notifications"
 	"olympsis-server/organization"
 	"olympsis-server/post"
+	"olympsis-server/push"
 	redisDB "olympsis-server/redis"
 	"olympsis-server/report"
 	"olympsis-server/server"
@@ -34,6 +35,7 @@ import (
 	"time"
 
 	firebase "firebase.google.com/go"
+	"firebase.google.com/go/messaging"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/stripe/stripe-go/v82"
@@ -110,6 +112,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Firebase Cloud Messaging client (Android push). Reuses the same Firebase
+	// app + service-account credentials as Auth, so no extra OAuth2 plumbing.
+	var msgClient *messaging.Client
+	if msgClient, err = app.Messaging(context.TODO()); err != nil {
+		l.Fatalf("[Core] Error getting Firebase Messaging client: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Create APNS client
 	apnsClient, err := utils.CreateApns2Client(config.AppleKeyID, config.AppleTeamID, config.APNSFileURl)
 	if err != nil {
@@ -117,8 +127,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set up Notification Service
+	// Set up Notification Service (legacy rich notifications: events + clubs)
 	notif := notifications.New(apnsClient, l, d)
+
+	// Set up Push Service (loc_key event notes: reminder, participant, comment),
+	// delivering to iOS via APNs and Android via FCM v1.
+	pushSvc := push.New(apnsClient, msgClient, l, d)
 
 	// Set up stripe API
 	sc := stripe.NewClient(config.StripeToken)
@@ -134,7 +148,8 @@ func main() {
 
 		Cache: &cacheDB, // redis
 
-		Notification: notif, // notifications
+		Notification: notif,   // legacy rich notifications
+		Push:         pushSvc, // loc_key event push notifications
 	}
 
 	// Set up storage service first (other modules depend on it)
@@ -188,7 +203,7 @@ func main() {
 	// Set up event polling. Tie its lifecycle to a cancellable context so the
 	// 5-minute ticker goroutine stops cleanly on shutdown instead of leaking.
 	pollCtx, pollCancel := context.WithCancel(context.Background())
-	eventPolling := eventService.NewEventPollingService(d, l, &cacheDB, notif)
+	eventPolling := eventService.NewEventPollingService(d, l, &cacheDB, pushSvc)
 	go eventPolling.Start(pollCtx)
 	l.Info("[E-Polling] Initialized...")
 
@@ -237,9 +252,10 @@ func main() {
 		l.Errorf("[Core] Server shutdown error: %s", err.Error())
 	}
 
-	// Drain the notification carousel before closing Mongo, since processing
-	// queued jobs still needs the database connection.
+	// Drain the notification carousel and the push dispatcher before closing
+	// Mongo, since processing queued jobs still needs the database connection.
 	notif.Stop()
+	pushSvc.Stop()
 
 	// Close the MongoDB connection pool.
 	if err := d.Client.Disconnect(tc); err != nil {
