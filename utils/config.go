@@ -4,6 +4,7 @@ import (
 	"errors"
 	"olympsis-server/utils/secrets"
 	"os"
+	"time"
 
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/token"
@@ -23,12 +24,18 @@ func CreateApns2Client(keyID string, teamID string, fileName string) (*apns2.Cli
 	}
 
 	mode := os.Getenv("MODE")
+	var client *apns2.Client
 	switch mode {
 	case "PRODUCTION":
-		return apns2.NewTokenClient(&token).Production(), nil
+		client = apns2.NewTokenClient(&token).Production()
 	default:
-		return apns2.NewTokenClient(&token).Development(), nil
+		client = apns2.NewTokenClient(&token).Development()
 	}
+
+	// Bound each push so a stuck APNS connection can't wedge the carousel's
+	// single worker (which would also stall graceful-shutdown drain).
+	client.HTTPClient.Timeout = 30 * time.Second
+	return client, nil
 }
 
 // Reads from OS environment variables to create server config object

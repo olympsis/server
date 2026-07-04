@@ -25,6 +25,7 @@ func (f *Service) FindVenues(ctx context.Context, filter interface{}, fields *[]
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var user models.Venue
@@ -67,6 +68,7 @@ func (f *Service) ModifyVenues(ctx context.Context, filter interface{}, update i
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var user models.Venue

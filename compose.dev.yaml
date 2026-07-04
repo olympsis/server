@@ -51,14 +51,6 @@ services:
             - mongo
             - redis
 
-    # client-web:
-    #     container_name: client-web
-    #     image: us-central1-docker.pkg.dev/olympsis-485522/client-web/dev:v0.2.0
-    #     restart: always
-    #     ports:
-    #         - 3000:80
-    #     depends_on:
-    #         - gateway
     mongo:
         container_name: mongo
         image: mongo

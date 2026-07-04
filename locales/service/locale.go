@@ -13,6 +13,7 @@ func (s *Service) FindCountries(ctx context.Context, filter bson.M) (*[]models.C
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var country models.Country
@@ -31,6 +32,7 @@ func (s *Service) FindAdministrativeAreas(ctx context.Context, filter bson.M) (*
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var area models.AdministrativeArea
@@ -49,6 +51,7 @@ func (s *Service) FindSubAdministrativeAreas(ctx context.Context, filter bson.M)
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var area models.SubAdministrativeArea

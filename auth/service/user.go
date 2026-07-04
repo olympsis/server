@@ -31,6 +31,7 @@ func (a *Service) FindUsers(ctx context.Context, filter bson.M, users *[]models.
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var user models.AuthUser
@@ -53,7 +54,7 @@ func (a *Service) UpdateUser(ctx context.Context, uuid string, update bson.M) (*
 	}
 
 	// find and return updated user
-	user, err := aggregations.AggregateUser(&uuid, a.Database)
+	user, err := aggregations.AggregateUser(ctx, &uuid, a.Database)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +76,7 @@ func (a *Service) UpdateUsers(ctx context.Context, filter bson.M, update bson.M,
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var user models.AuthUser

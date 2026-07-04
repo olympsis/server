@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"olympsis-server/database"
-	"olympsis-server/notifications"
+	"olympsis-server/push"
 	"olympsis-server/redis"
 	"time"
 
@@ -16,16 +16,16 @@ type EventPollingService struct {
 	db     *database.Database
 	logger *logrus.Logger
 	cache  *redis.RedisDatabase
-	sender *notifications.Service
+	sender *push.Service
 }
 
 // Stripped down event object to reduce memory footprint
 type StrippedEvent struct {
-	ID       string             `bson:"_id"`
+	ID       string        `bson:"_id"`
 	StopTime bson.DateTime `bson:"stop_time"`
 }
 
-func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *notifications.Service) *EventPollingService {
+func NewEventPollingService(d *database.Database, l *logrus.Logger, c *redis.RedisDatabase, s *push.Service) *EventPollingService {
 	return &EventPollingService{
 		db:     d,
 		cache:  c,
@@ -49,6 +49,10 @@ func (p *EventPollingService) Start(ctx context.Context) {
 }
 
 func (p *EventPollingService) getEvents(start time.Time, end time.Time) []StrippedEvent {
+	// Bound the query so a slow Mongo call can't stall the 5-minute tick.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	projection := bson.M{"_id": 1, "stop_time": 1}
 	options := options.Find().SetProjection(projection)
 	filter := bson.M{
@@ -57,15 +61,16 @@ func (p *EventPollingService) getEvents(start time.Time, end time.Time) []Stripp
 			"$lte": bson.NewDateTimeFromTime(end),
 		},
 	}
-	cursor, err := p.db.EventsCollection.Find(context.Background(), filter, options)
+	cursor, err := p.db.EventsCollection.Find(ctx, filter, options)
 	if err != nil {
 		p.logger.Errorf("Error fetching events: %v", err)
 		return []StrippedEvent{}
 	}
+	defer cursor.Close(ctx) // release the cursor on every path (incl. early returns)
 
 	// Decode events
 	var events []StrippedEvent
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(ctx) {
 		var event StrippedEvent
 		err := cursor.Decode(&event)
 		if err != nil {
@@ -79,7 +84,7 @@ func (p *EventPollingService) getEvents(start time.Time, end time.Time) []Stripp
 }
 
 func (p *EventPollingService) processUpcomingEvents() {
-	p.logger.Info("Starting Event Polling Reminder Processing...")
+	p.logger.Info("[E-Polling] Polling initializing...")
 
 	start := time.Now().Add(25 * time.Minute)
 	end := time.Now().Add(35 * time.Minute)
@@ -88,7 +93,7 @@ func (p *EventPollingService) processUpcomingEvents() {
 	events := p.getEvents(start, end)
 
 	// Group events by stop time for efficient queue processing
-	eventsByStopTime := make(map[time.Time][]string)
+	eventsByStopTime := make(map[time.Time][]string, len(events))
 	for _, event := range events {
 		sent, err := p.cache.IsNotificationSent(event.ID)
 		if err != nil {
@@ -110,5 +115,5 @@ func (p *EventPollingService) processUpcomingEvents() {
 		queue.ProcessWithRetry(p.sender, p.cache, stopTime)
 	}
 
-	p.logger.Info("Stopping Event Polling Reminder Processing...")
+	p.logger.Info("[E-Polling] Polling teardown...")
 }

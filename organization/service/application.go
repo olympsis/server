@@ -30,6 +30,7 @@ func (s *Service) FindApplications(ctx context.Context, filter interface{}, orga
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var event models.OrganizationApplication

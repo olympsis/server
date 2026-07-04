@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"olympsis-server/utils"
 	"olympsis-server/utils/secrets"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -18,11 +19,11 @@ type Database struct {
 
 	AnnouncementCollection *mongo.Collection
 
-	AuthCollection          *mongo.Collection
-	UserCollection          *mongo.Collection
-	VenuesCollection        *mongo.Collection
-	VenueUnitsCollection    *mongo.Collection
-	TransitLinesCollection  *mongo.Collection
+	AuthCollection         *mongo.Collection
+	UserCollection         *mongo.Collection
+	VenuesCollection       *mongo.Collection
+	VenueUnitsCollection   *mongo.Collection
+	TransitLinesCollection *mongo.Collection
 
 	PostsCollection         *mongo.Collection
 	PostCommentsCollection  *mongo.Collection
@@ -78,7 +79,7 @@ func NewDatabase(l *logrus.Logger) *Database {
 
 func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.ServerConfig) {
 
-	d.Logger.Info("Connecting to Database...")
+	d.Logger.Info("[Database] Initializing...")
 
 	/*
 		Connect to Mongo Database
@@ -86,53 +87,32 @@ func (d *Database) EstablishConnection(manager *secrets.Manager, config *utils.S
 	dbConfig := utils.GetDatabaseConfig(manager)
 	collectionConfig := utils.GetCollectionsConfig()
 
-	// switch config.Mode {
-	// case "PRODUCTION":
-	// 	opts := options.Client().ApplyURI(`mongodb+srv://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
-	// 	client, err := mongo.Connect(opts)
-	// 	if err != nil {
-	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	// 	}
-
-	// 	err = client.Ping(context.Background(), readpref.Primary())
-	// 	if err != nil {
-	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	// 	}
-
-	// 	d.Client = client
-	// default:
-	// 	opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
-	// 	client, err := mongo.Connect(opts)
-	// 	if err != nil {
-	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	// 	}
-
-	// 	err = client.Ping(context.Background(), readpref.Primary())
-	// 	if err != nil {
-	// 		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
-	// 	}
-
-	// 	d.Client = client
-	// }
-
-	opts := options.Client().ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`)
+	// Connection-pool tuning for the constrained, shared Mac mini. The driver
+	// defaults to MaxPoolSize 100 with no idle timeout; cap it and let idle
+	// connections be reclaimed so we don't hold ~100 sockets/buffers open.
+	opts := options.Client().
+		ApplyURI(`mongodb://` + dbConfig.User + `:` + dbConfig.Password + `@` + dbConfig.Address + `/?retryWrites=true&w=majority`).
+		SetMaxPoolSize(30).
+		SetMinPoolSize(2).
+		SetMaxConnIdleTime(2 * time.Minute).
+		SetMaxConnecting(4)
 	client, err := mongo.Connect(opts)
 	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		d.Logger.Fatal("[Database] Failed to connect: " + err.Error())
 	}
 
 	err = client.Ping(context.Background(), readpref.Primary())
 	if err != nil {
-		d.Logger.Fatal("Failed to connect to Database: " + err.Error())
+		d.Logger.Fatal("[Database] Failed to connect: " + err.Error())
 	}
 
 	d.Client = client
 
 	err = d.SetUpCollections(&dbConfig, &collectionConfig)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to set up database collections. Error: %s", err.Error()))
+		panic(fmt.Sprintf("[Database] Failed to set up collections: %s", err.Error()))
 	}
-	d.Logger.Info("Database connection successful")
+	d.Logger.Info("[Database] Connection successful.")
 }
 
 // Sets up all of the database collections

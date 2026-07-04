@@ -3,6 +3,7 @@ package server
 import (
 	"olympsis-server/database"
 	"olympsis-server/notifications"
+	"olympsis-server/push"
 	redisDB "olympsis-server/redis"
 	"olympsis-server/types"
 
@@ -24,5 +25,6 @@ type ServerInterface struct {
 	Cache *redisDB.RedisDatabase // Redis cache
 
 	Notification *notifications.Service
+	Push         *push.Service         // event push notifications (iOS APNs + Android FCM)
 	Storage      types.StorageUploader // GCP Storage upload capability
 }

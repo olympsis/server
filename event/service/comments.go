@@ -53,10 +53,12 @@ func (s *Service) AddComment() http.HandlerFunc {
 		if err != nil {
 			s.Logger.Error("Failed to insert comment into the database. Error: ", err.Error())
 			http.Error(w, `{"msg": "failed to create comment"}`, http.StatusInternalServerError)
+			return
 		}
 
-		// Notify participants
-		if err = s.Notification.NewEventComment(oid, *req.Text); err != nil {
+		// Notify the event's organizers of the new comment (loc_key push,
+		// carrying the comment id so the tap opens this comment).
+		if err = s.Push.Comment(id, cid.Hex()); err != nil {
 			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
 		}
 

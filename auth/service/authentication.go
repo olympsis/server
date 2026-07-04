@@ -156,7 +156,7 @@ func (a *Service) Login() http.HandlerFunc {
 			return
 		}
 
-		user, err := aggregations.AggregateUser(&token.UID, a.Database)
+		user, err := aggregations.AggregateUser(r.Context(), &token.UID, a.Database)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				a.Log.Error(fmt.Sprintf("[Auth] User data not found for uid: %s\n", token.UID))

@@ -80,6 +80,7 @@ func (orm *PostReportORM) Find(ctx context.Context, filter interface{}, opts *op
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(context.TODO())
 
 	var reports []models.PostReport
 	for cur.Next(context.TODO()) {

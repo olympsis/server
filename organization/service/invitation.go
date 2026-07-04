@@ -28,6 +28,7 @@ func (s *Service) FindInvitations(ctx context.Context, filter interface{}, invit
 	if err != nil {
 		return err
 	}
+	defer cursor.Close(ctx)
 
 	for cursor.Next(context.TODO()) {
 		var invite models.Invitation

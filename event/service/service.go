@@ -24,6 +24,7 @@ func NewEventService(i *server.ServerInterface) *Service {
 		Router:       i.Router,
 		Database:     i.Database,
 		Notification: i.Notification,
+		Push:         i.Push,
 	}
 }
 
@@ -178,6 +179,36 @@ func (e *Service) GetEvent() http.HandlerFunc {
 	}
 }
 
+// GetEventsByVenue returns the upcoming events hosted at a single venue.
+// Backs the iOS venue detail screen: GET /v1/events/venue/{id}.
+func (e *Service) GetEventsByVenue() http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		id := mux.Vars(r)["id"]
+		oid, err := utils.ValidateObjectID(id)
+		if err != nil {
+			http.Error(rw, `{ "msg": "no/bad venue id found in request" }`, http.StatusBadRequest)
+			return
+		}
+
+		events, err := aggregations.AggregateEventsByVenue(oid, e.Database)
+		if err != nil {
+			e.Logger.Error("Failed to find events for venue. Error: ", err.Error())
+			http.Error(rw, `{ "msg": "failed to find events" }`, http.StatusInternalServerError)
+			return
+		}
+
+		resp := models.EventsResponse{Events: []models.Event{}}
+		if events != nil {
+			resp.Events = *events
+			resp.TotalEvents = int32(len(*events))
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(resp)
+	}
+}
+
 func (s *Service) GetEvents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get query parameters with validation
@@ -246,7 +277,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 
 		// If location is provided, get nearby venues
 		if queryParams.Location != nil {
-			_, venueIDs, err := s.FindNearbyVenues(r.Context(), *queryParams.Location, queryParams.Radius)
+			venueIDs, err := s.FindNearbyVenueIDs(r.Context(), *queryParams.Location, queryParams.Radius)
 			if err != nil {
 				s.Logger.Error("Failed to find venues: ", err.Error())
 				// Continue with empty venues list instead of failing
@@ -261,7 +292,7 @@ func (s *Service) GetEvents() http.HandlerFunc {
 
 		// If user is authenticated, fetch their data
 		if userID != "" {
-			user, err = aggregations.AggregateUser(&userID, s.Database)
+			user, err = aggregations.AggregateUser(r.Context(), &userID, s.Database)
 			if err != nil {
 				s.Logger.Error("Failed to get user data: ", err.Error())
 				// Fall back to unauthenticated mode instead of failing entirely
@@ -379,7 +410,7 @@ func (s *Service) GetUserPastEvents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := mux.Vars(r)["user_id"]
 		if id == "" {
-			http.Error(w, `{ "msg": "no/bad group id found in request" }`, http.StatusBadRequest)
+			http.Error(w, `{ "msg": "no/bad user id found in request" }`, http.StatusBadRequest)
 			return
 		}
 
@@ -695,7 +726,7 @@ func (s *Service) Location() http.HandlerFunc {
 		var clubs, orgs []bson.ObjectID
 
 		if userID != "" {
-			userData, err = aggregations.AggregateUser(&userID, s.Database)
+			userData, err = aggregations.AggregateUser(r.Context(), &userID, s.Database)
 			if err != nil {
 				s.Logger.Warning("Failed to get user data, proceeding as unauthenticated: ", err.Error())
 				// Continue with unauthenticated user rather than failing

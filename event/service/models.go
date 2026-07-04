@@ -3,6 +3,7 @@ package service
 import (
 	"olympsis-server/database"
 	"olympsis-server/notifications"
+	"olympsis-server/push"
 
 	"github.com/gorilla/mux"
 	"github.com/olympsis/models"
@@ -17,7 +18,8 @@ type Service struct {
 	Database     *database.Database     // database for read/write operations
 	Logger       *logrus.Logger         // logger for logging errors
 	Router       *mux.Router            // router for handling incoming requests
-	Notification *notifications.Service // notification service for sending notifications
+	Notification *notifications.Service // legacy rich notifications (event create/cancel, kick, etc.)
+	Push         *push.Service          // loc_key event push notifications (reminder, participant, comment)
 }
 
 // Query parameters structure for cleaner handling

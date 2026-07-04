@@ -8,7 +8,6 @@ import (
 	"olympsis-server/aggregations"
 	"olympsis-server/server"
 	"regexp"
-	"sync"
 	"time"
 
 	"github.com/olympsis/models"
@@ -140,7 +139,7 @@ func (s *Service) CreateUserData() http.HandlerFunc {
 			return
 		}
 
-		usr, err := aggregations.AggregateUser(&uuid, s.Database)
+		usr, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 		if err != nil {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data"}`, http.StatusInternalServerError)
@@ -306,7 +305,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 				}
 
 				// Aggregate user data response
-				usr, err := aggregations.AggregateUser(&uuid, s.Database)
+				usr, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 				if err != nil {
 					s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 					http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
@@ -322,7 +321,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 			return
 		}
 
-		user, err := aggregations.AggregateUser(&uuid, s.Database)
+		user, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
 		if err != nil {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusInternalServerError)
@@ -351,7 +350,7 @@ func (s *Service) GetUserData() http.HandlerFunc {
 
 		user_id := r.Header.Get("userID")
 
-		user, err := aggregations.AggregateUser(&user_id, s.Database)
+		user, err := aggregations.AggregateUser(r.Context(), &user_id, s.Database)
 		if err != nil || user.Username == "" {
 			s.Log.Error(fmt.Sprintf("Failed to find user data: %s\n", err.Error()))
 			http.Error(w, `{ "msg": "failed to find user data" }`, http.StatusNotFound)
@@ -411,6 +410,7 @@ func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
 			u.Log.Error("Failed to fetch invitations: " + err.Error())
 			return
 		}
+		defer cursor.Close(context.TODO())
 		for cursor.Next(context.TODO()) {
 			var invite models.Invitation
 			err := cursor.Decode(&invite)
@@ -463,6 +463,7 @@ func (u *Service) SearchUsersByUserName() http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		defer cur.Close(context.TODO())
 
 		for cur.Next(context.TODO()) {
 			var meta models.User
@@ -575,65 +576,24 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 
 func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
-		defer cancel()
-
 		uuid := r.Header.Get("userID")
 		response := models.CheckIn{}
 
-		var wgError error
-		var wg sync.WaitGroup
-
-		// Find user thread
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			user, err := aggregations.AggregateUser(&uuid, s.Database)
-			if err != nil {
-				s.Log.Error("Failed to find user. Error: ", err.Error())
-				wgError = err
-			}
-
-			if user != nil {
-				response.User = *user
-			}
-		}()
-
-		// Find clubs thread
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			clubs, err := aggregations.FindUserClubs(ctx, uuid, s.Database)
-			if err != nil {
-				s.Log.Error("Failed to find clubs. Error: ", err.Error())
-				wgError = err
-			}
-
-			if clubs != nil {
-				response.Clubs = clubs
-			}
-		}()
-
-		// Find organizations thread
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			orgs, err := aggregations.FindUserOrganizations(ctx, uuid, s.Database)
-			if err != nil {
-				s.Log.Error("Failed to find organizations. Error: ", err.Error())
-				wgError = err
-			}
-
-			if orgs != nil {
-				response.Organizations = orgs
-			}
-		}()
-
-		wg.Wait()
-
-		if wgError != nil {
+		// Check-in only resolves the user's own profile. Clubs and orgs are
+		// intentionally not embedded here — orgs are served on their own
+		// /v1/organizations routes, and clubs are disabled for now. Since that
+		// leaves a single aggregation, the previous goroutine fan-out (user +
+		// clubs + orgs guarded by a WaitGroup/mutex) is unnecessary; we call
+		// AggregateUser directly. Clubs/Organizations are omitempty on
+		// models.CheckIn, so leaving them nil drops them from the JSON response.
+		user, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
+		if err != nil {
+			s.Log.Error("Failed to find user. Error: ", err.Error())
 			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
+		}
+		if user != nil {
+			response.User = *user
 		}
 
 		w.WriteHeader(http.StatusOK)

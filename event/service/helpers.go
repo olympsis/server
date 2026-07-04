@@ -4,10 +4,29 @@ import (
 	"context"
 	"time"
 
+	"olympsis-server/aggregations"
+
 	"github.com/olympsis/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
+
+const metersPerMile = 1609.34
+
+// legacyMilesRadiusThreshold disambiguates the unit of an incoming events
+// `radius` value during the miles -> meters migration.
+//
+// The canonical unit for `radius` is now METERS (matching the venues/clubs
+// APIs and the Android/web clients). Older iOS builds still send MILES, but
+// iOS hard-caps that value at 100, while every meters-based caller sends a far
+// larger number (the clients' ~40 mi default already serializes to ~64,373 m).
+// The two ranges don't overlap, so we can infer the unit from the magnitude:
+//
+//	radius <  threshold  -> legacy miles client; convert to meters
+//	radius >= threshold  -> already meters; use as-is
+//
+// This shim lets us flip the default to meters without breaking iOS builds in
+// the wild. Remove it once every shipped iOS build sends meters.
+const legacyMilesRadiusThreshold = 1000.0
 
 // Helper function to generate the document containing the changes for an event dao
 func buildUpdateChanges(req *models.EventDao) bson.M {
@@ -297,28 +316,46 @@ func GenerateEventInstancesBatched(parentID bson.ObjectID, baseEvent *models.Eve
 	return instances
 }
 
-// Find nearby venues based on location, sports, and radius
-func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []bson.ObjectID, error) {
-	// Convert radius from miles to meters (1 mile = 1609.34 meters)
-	radiusInMeters := radius * 1609.34
+// nearbyVenuesPipeline returns the spatial stage(s) for a nearby-venues query,
+// ready for the caller to append its remaining stages.
+//
+// $geoNear must be the first stage in an aggregation pipeline ($near is only
+// valid inside a Find/$match filter, not in aggregation), which is why both
+// nearby helpers go through aggregation rather than a plain Find.
+func nearbyVenuesPipeline(location models.GeoJSON, radius float64) bson.A {
+	// Normalize the radius to meters. `radius` is canonically in meters, but
+	// legacy iOS builds still send miles; values below the threshold are
+	// treated as miles and converted. See legacyMilesRadiusThreshold.
+	radiusInMeters := radius
+	if radius < legacyMilesRadiusThreshold {
+		radiusInMeters = radius * metersPerMile
+	}
 
-	// Create filter for geospatial query
-	filter := bson.M{
-		"location": bson.M{
-			"$near": bson.M{
-				"$geometry":    location,
-				"$maxDistance": radiusInMeters,
+	return bson.A{
+		bson.M{
+			"$geoNear": bson.M{
+				"near":          location,
+				"distanceField": "distance",
+				"maxDistance":   radiusInMeters,
+				"spherical":     true,
 			},
 		},
 	}
+}
 
-	// Rest of the function remains the same
-	cursor, err := s.Database.VenuesCollection.Find(ctx, filter)
+// FindNearbyVenues returns full venue documents near a location. It appends
+// BuildVenueCorePipeline()'s $lookup stages so the `units` / `transit_lines`
+// ObjectID references resolve into the embedded []VenueUnit / []TransitLine
+// documents that models.Venue expects — the same read path the venue API uses.
+//
+// Use this only when the venue bodies are actually consumed (e.g. the
+// /v1/events/location response). Callers that just need the IDs to filter by
+// venue should use FindNearbyVenueIDs, which skips the lookups + full decode.
+func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON, radius float64) (*[]models.Venue, []bson.ObjectID, error) {
+	pipeline := append(nearbyVenuesPipeline(location, radius), aggregations.BuildVenueCorePipeline()...)
+
+	cursor, err := s.Database.VenuesCollection.Aggregate(ctx, pipeline)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			// Return empty results rather than error
-			return &[]models.Venue{}, []bson.ObjectID{}, nil
-		}
 		return nil, nil, err
 	}
 	defer cursor.Close(ctx)
@@ -342,4 +379,41 @@ func (s *Service) FindNearbyVenues(ctx context.Context, location models.GeoJSON,
 	}
 
 	return &venues, venueIDs, nil
+}
+
+// FindNearbyVenueIDs returns just the ObjectIDs of venues within radius of a
+// location, nearest first. It deliberately skips the unit/transit_lines
+// $lookup + full-document decode that FindNearbyVenues does: callers that only
+// filter by venue (e.g. the nearby-events query) never read the venue bodies,
+// so resolving the references would be wasted work on a hot path.
+func (s *Service) FindNearbyVenueIDs(ctx context.Context, location models.GeoJSON, radius float64) ([]bson.ObjectID, error) {
+	// Project away everything but _id so Mongo doesn't ship full venue
+	// documents we're only going to discard.
+	pipeline := append(nearbyVenuesPipeline(location, radius),
+		bson.M{"$project": bson.M{"_id": 1}},
+	)
+
+	cursor, err := s.Database.VenuesCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	venueIDs := []bson.ObjectID{}
+	for cursor.Next(ctx) {
+		var row struct {
+			ID bson.ObjectID `bson:"_id"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			s.Logger.Warning("Failed to decode venue id: ", err.Error())
+			continue
+		}
+		venueIDs = append(venueIDs, row.ID)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return venueIDs, nil
 }

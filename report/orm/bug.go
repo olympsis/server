@@ -85,6 +85,7 @@ func (orm *BugReportORM) Find(ctx context.Context, filter interface{}, opts *opt
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(context.TODO())
 
 	var reports []models.BugReport
 	for cur.Next(context.TODO()) {
