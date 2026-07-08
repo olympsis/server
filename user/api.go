@@ -60,6 +60,15 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("POST", "OPTIONS")
 
+	// search users by username (top 20)
+	u.Router.Handle("/v1/users",
+		middleware.Chain(
+			u.Service.SearchUsers(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("GET", "OPTIONS")
+
 	// update user data
 	u.Router.Handle("/v1/users/user",
 		middleware.Chain(
