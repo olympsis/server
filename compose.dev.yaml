@@ -33,6 +33,12 @@ services:
     server:
         build:
             context: .
+            # DEV ONLY: expose the local models module (referenced by the
+            # `replace => ../models` in go.mod) as a named build context so the
+            # Dockerfile can copy it into the image. Remove alongside the replace
+            # directive when cutting a production build.
+            additional_contexts:
+                models: ../models
             no_cache: true
         container_name: server
         restart: always

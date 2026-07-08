@@ -25,7 +25,7 @@ func NewUserAPI(i *server.ServerInterface) *UserAPI {
 }
 
 func (u *UserAPI) Ready(firebase *auth.Client) {
-	// search username availability
+	// check in
 	u.Router.Handle("/v1/users/check-in",
 		middleware.Chain(
 			u.Service.CheckIn(),
