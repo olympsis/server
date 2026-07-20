@@ -62,6 +62,10 @@ func (s *Service) CreateTeam() http.HandlerFunc {
 			http.Error(w, `{"msg": "event not found"}`, http.StatusNotFound)
 			return
 		}
+		if event.CancelledAt != nil || event.ArchivedAt != nil {
+			http.Error(w, `{"msg": "event is no longer accepting teams"}`, http.StatusConflict)
+			return
+		}
 
 		// Enforce the event's team cap, mirroring how AddParticipant honours
 		// MaxParticipants.
@@ -134,6 +138,26 @@ func (s *Service) RemoveTeam() http.HandlerFunc {
 			return
 		}
 
+		// Authorize before deleting. UserMiddleware only proves WHO the caller is;
+		// without this check any authenticated user could enumerate team ids from
+		// the public event payload and delete other people's teams.
+		userID := r.Header.Get("userID")
+		team, err := s.FindTeam(ctx, bson.M{"_id": teamOID, "event_id": eventOID})
+		if err != nil {
+			http.Error(w, `{"msg": "team not found"}`, http.StatusNotFound)
+			return
+		}
+		event, err := s.FindEvent(ctx, bson.M{"_id": eventOID})
+		if err != nil {
+			s.Logger.Error("Failed to find event. Error: ", err.Error())
+			http.Error(w, `{"msg": "event not found"}`, http.StatusNotFound)
+			return
+		}
+		if !canManageTeam(event, team, userID) {
+			http.Error(w, `{"msg": "not authorized to remove this team"}`, http.StatusForbidden)
+			return
+		}
+
 		// Scope the delete by event id too, so a team id from another event can't
 		// be removed through this route.
 		if err = s.DeleteTeam(ctx, bson.M{"_id": teamOID, "event_id": eventOID}); err != nil {
@@ -145,6 +169,25 @@ func (s *Service) RemoveTeam() http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"msg": "OK"}`))
 	}
+}
+
+// canManageTeam reports whether userID may remove the given team: either they
+// created it (they are its first member — CreateTeam seeds the creator there) or
+// they host the event.
+func canManageTeam(event *models.EventDao, team *models.TeamDao, userID string) bool {
+	if userID == "" {
+		return false
+	}
+	if event.PosterID != nil && *event.PosterID == userID {
+		return true
+	}
+	if team.Members != nil && len(*team.Members) > 0 {
+		creator := (*team.Members)[0].UserID
+		if creator != nil && *creator == userID {
+			return true
+		}
+	}
+	return false
 }
 
 /*****************

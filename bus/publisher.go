@@ -6,16 +6,20 @@
 // service binds its own durable queue. The server is a pure PUBLISHER — it never
 // consumes — so this package has no queue or consume loop.
 //
-// Two properties matter for how this is used:
+// Three properties matter for how this is used:
 //
-//   - Publishing is BEST EFFORT. By the time we publish, the RSVP/comment/event
-//     is already committed to Mongo. A broker hiccup must never turn a
-//     successful write into a failed request, so use Emit, which logs and
-//     swallows. Reserve Publish for the rare caller that genuinely wants the
-//     error.
+//   - Publishing is BEST EFFORT and ASYNCHRONOUS. By the time we publish, the
+//     RSVP/comment/event is already committed to Mongo, so a broker problem must
+//     never fail — or even slow down — the request. Emit hands the message to a
+//     bounded queue drained by a background worker and returns immediately.
+//     Handlers never touch the socket. See the note on publishTimeout for why
+//     this queue is load-bearing rather than a nicety.
 //   - The server must boot without the broker. If RabbitMQ is unreachable (or
 //     unconfigured), the publisher runs disabled and keeps retrying in the
 //     background; every other endpoint works normally in the meantime.
+//   - The queue is bounded and lossy. If the broker stays wedged, messages are
+//     dropped with a log rather than accumulating without limit. Notifications
+//     are not worth an OOM on a shared 16 GB box.
 package bus
 
 import (
@@ -39,33 +43,55 @@ const (
 	RoutingKeyCommentCreated = "comment.created" // -> notif-service
 )
 
-// publishTimeout bounds a single publish so a wedged broker connection can't
-// hold an HTTP handler open.
+// publishTimeout is applied to each publish, but understand what it does NOT do:
+// amqp091-go only checks the context BEFORE it starts writing, and it sets no
+// write deadline on the socket. If the broker raises a memory/disk alarm and
+// stops reading, the underlying WriteFrame blocks indefinitely and no context
+// can interrupt it.
+//
+// That is precisely why Emit is asynchronous. A wedged broker can stall the
+// single worker goroutine; it cannot stall an HTTP handler, because handlers
+// only ever hand off to the queue.
 const publishTimeout = 5 * time.Second
+
+// queueSize bounds the in-memory backlog. Sized for a burst while the broker
+// reconnects, not for a long outage — see the lossy note in the package doc.
+const queueSize = 256
+
+// shutdownDrain caps how long Close waits for the worker to finish. A worker
+// stuck in a blocked WriteFrame must not hold shutdown open forever.
+const shutdownDrain = 5 * time.Second
 
 // ErrDisabled is returned by Publish when no broker URL is configured.
 var ErrDisabled = errors.New("bus: publisher disabled (no RABBITMQ_URL)")
 
+// message is one queued publish.
+type message struct {
+	routingKey string
+	body       []byte
+}
+
 // Publisher owns the broker connection and the single publish channel.
 //
-// amqp Channels are NOT safe for concurrent use and HTTP handlers publish from
-// many goroutines, so every publish is serialized by mu. mu also guards conn/ch
-// against the background reconnect swapping them out mid-publish.
+// amqp Channels are NOT safe for concurrent use. Only the worker goroutine
+// publishes, but the reconnect goroutine swaps the channel out underneath it, so
+// conn/ch/closed are all guarded by mu.
 type Publisher struct {
 	logger   *logrus.Logger
 	url      string
 	exchange string
 
-	mu   sync.Mutex
-	conn *amqp.Connection
-	ch   *amqp.Channel
+	queue chan message
 
-	// closed is signalled by amqp when the connection drops; the maintain
-	// goroutine waits on it to trigger a reconnect.
-	closed chan *amqp.Error
+	mu      sync.Mutex
+	conn    *amqp.Connection
+	ch      *amqp.Channel
+	closed  chan *amqp.Error // fires on connection OR channel close
+	closing bool             // set by Close; stops dial from installing a new conn
 
 	stop chan struct{}
 	once sync.Once
+	wg   sync.WaitGroup
 }
 
 // New builds a publisher. A blank url disables it — every Emit becomes a no-op,
@@ -78,21 +104,26 @@ func New(logger *logrus.Logger, url, exchange string) *Publisher {
 		logger:   logger,
 		url:      url,
 		exchange: exchange,
+		queue:    make(chan message, queueSize),
 		stop:     make(chan struct{}),
 	}
 }
 
-// Enabled reports whether a broker URL was configured.
-func (p *Publisher) Enabled() bool { return p.url != "" }
+// Enabled reports whether this publisher will do anything. Nil-safe so a Service
+// constructed without a Bus degrades to a no-op instead of panicking a handler.
+func (p *Publisher) Enabled() bool { return p != nil && p.url != "" }
 
-// Connect dials the broker and starts the background reconnect watcher.
+// Connect dials the broker, then starts the publish worker and the reconnect
+// watcher.
 //
 // It deliberately does NOT return a fatal error when the broker is down: it logs
 // and lets the watcher keep retrying, so the server still starts. The returned
 // error is informational — main logs it and carries on.
 func (p *Publisher) Connect(ctx context.Context) error {
 	if !p.Enabled() {
-		p.logger.Warn("[Bus] RABBITMQ_URL not set — event publishing is disabled")
+		if p != nil {
+			p.logger.Warn("[Bus] RABBITMQ_URL not set — event publishing is disabled")
+		}
 		return nil
 	}
 
@@ -103,6 +134,8 @@ func (p *Publisher) Connect(ctx context.Context) error {
 		p.logger.Infof("[Bus] connected, publishing to exchange %q", p.exchange)
 	}
 
+	p.wg.Add(2)
+	go p.worker()
 	go p.maintain(ctx)
 	return err
 }
@@ -128,22 +161,52 @@ func (p *Publisher) dial() error {
 		return fmt.Errorf("declare exchange %q: %w", p.exchange, err)
 	}
 
-	closed := make(chan *amqp.Error, 1)
+	// Watch BOTH the connection and the channel. A channel exception (the
+	// exchange being deleted and re-declared with different args, an
+	// ACCESS_REFUSED, any broker-initiated channel close) kills the channel while
+	// leaving the connection healthy. Watching only the connection would leave a
+	// dead channel in place and silently drop every message until a restart.
+	closed := make(chan *amqp.Error, 2)
 	conn.NotifyClose(closed)
+	ch.NotifyClose(closed)
 
 	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Close may have run while we were dialing. Don't install a connection
+	// nothing will ever tear down.
+	if p.closing {
+		conn.Close()
+		return errors.New("bus: publisher closing")
+	}
+
 	p.conn = conn
 	p.ch = ch
 	p.closed = closed
-	p.mu.Unlock()
 	return nil
 }
 
-// maintain reconnects whenever the connection drops. Unlike a consumer, a pure
-// publisher has no delivery loop to notice a dead connection, so we watch
-// NotifyClose explicitly — otherwise every publish after the first drop would
-// fail silently forever.
+// worker is the only goroutine that publishes. Serializing here is what lets
+// handlers hand off without blocking on the broker.
+func (p *Publisher) worker() {
+	defer p.wg.Done()
+	for {
+		select {
+		case <-p.stop:
+			return
+		case msg := <-p.queue:
+			if err := p.Publish(context.Background(), msg.routingKey, msg.body); err != nil {
+				p.logger.Errorf("[Bus] failed to publish %s: %s", msg.routingKey, err.Error())
+			}
+		}
+	}
+}
+
+// maintain reconnects whenever the connection or channel drops. Unlike a
+// consumer, a pure publisher has no delivery loop to notice a dead connection,
+// so we watch NotifyClose explicitly.
 func (p *Publisher) maintain(ctx context.Context) {
+	defer p.wg.Done()
 	for {
 		p.mu.Lock()
 		closed := p.closed
@@ -186,8 +249,9 @@ func (p *Publisher) maintain(ctx context.Context) {
 	}
 }
 
-// Publish sends body to the exchange under routingKey, returning any error.
-// Most callers want Emit instead.
+// Publish sends body to the exchange under routingKey, returning any error. It
+// blocks on the broker, so it is called only from the worker goroutine — use
+// Emit instead.
 func (p *Publisher) Publish(ctx context.Context, routingKey string, body []byte) error {
 	if !p.Enabled() {
 		return ErrDisabled
@@ -210,19 +274,18 @@ func (p *Publisher) Publish(ctx context.Context, routingKey string, body []byte)
 	})
 }
 
-// Emit marshals payload to JSON and publishes it, logging any failure instead of
-// returning it. This is the method handlers should call: the write it describes
-// has already been committed, so a broker problem must not fail the request.
+// Emit marshals payload to JSON and queues it for the worker. It never blocks
+// and never returns an error: the write it describes is already committed, so a
+// broker problem must not fail the request.
 //
-// The message body is the raw JSON of the domain struct with no envelope —
-// the convention every olympsis service follows.
+// The message body is the raw JSON of the domain struct with no envelope — the
+// convention every olympsis service follows.
 //
-// Cancellation is deliberately stripped from ctx. Handlers naturally pass
-// r.Context(), which is cancelled the moment the client disconnects — and a user
-// who closes the app right after commenting would otherwise silently lose the
-// notification for a comment that IS saved. The publish still can't hang: Publish
-// applies its own timeout.
-func (p *Publisher) Emit(ctx context.Context, routingKey string, payload any) {
+// ctx is accepted for symmetry with the handler call sites, but is intentionally
+// NOT used to cancel the publish: handlers pass r.Context(), which dies the
+// moment the client disconnects, and a user who closes the app right after
+// commenting would otherwise lose the notification for a comment that IS saved.
+func (p *Publisher) Emit(_ context.Context, routingKey string, payload any) {
 	if !p.Enabled() {
 		return
 	}
@@ -233,27 +296,51 @@ func (p *Publisher) Emit(ctx context.Context, routingKey string, payload any) {
 		return
 	}
 
-	if err := p.Publish(context.WithoutCancel(ctx), routingKey, body); err != nil {
-		p.logger.Errorf("[Bus] failed to publish %s: %s", routingKey, err.Error())
+	select {
+	case p.queue <- message{routingKey: routingKey, body: body}:
+	default:
+		// Backlog full — the broker has been unreachable for a while. Drop with a
+		// log rather than growing the queue without bound.
+		p.logger.Errorf("[Bus] queue full, dropping %s message", routingKey)
 	}
 }
 
-// Close stops the reconnect watcher and tears down the channel and connection.
-// Call once on shutdown.
+// Close stops the worker and reconnect goroutines and tears down the broker
+// connection. Safe to call more than once.
 func (p *Publisher) Close() error {
+	if p == nil {
+		return nil
+	}
 	p.once.Do(func() { close(p.stop) })
 
+	// Tear the connection down BEFORE waiting on the goroutines: if the worker is
+	// stuck in a blocked write, closing the socket is what unblocks it.
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.closing = true
+	ch, conn := p.ch, p.conn
+	p.ch, p.conn = nil, nil
+	p.mu.Unlock()
 
-	if p.ch != nil {
-		_ = p.ch.Close()
-		p.ch = nil
+	if ch != nil {
+		_ = ch.Close()
 	}
-	if p.conn != nil {
-		err := p.conn.Close()
-		p.conn = nil
-		return err
+	var err error
+	if conn != nil {
+		err = conn.Close()
 	}
-	return nil
+
+	// Bounded wait — a worker wedged on an unresponsive socket must not hold
+	// shutdown open indefinitely.
+	done := make(chan struct{})
+	go func() {
+		p.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(shutdownDrain):
+		p.logger.Warn("[Bus] timed out waiting for publisher goroutines to exit")
+	}
+
+	return err
 }

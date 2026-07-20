@@ -227,7 +227,11 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 		}
 		if len(waitlist) > 0 {
 			participant := waitlist[0]
-			err := e.UpdateParticipant(ctx, bson.M{"_id": participant.ID}, bson.M{"status": models.RSVPYes})
+			// The update MUST be wrapped in $set. A bare {"status": ...} document
+			// is rejected by the driver ("update document must contain key
+			// beginning with '$'"), which is why promotion only ever produced an
+			// error log and never actually promoted anyone.
+			err := e.UpdateParticipant(ctx, bson.M{"_id": participant.ID}, bson.M{"$set": bson.M{"status": models.RSVPYes}})
 			if err != nil {
 				e.Logger.Error("Failed to promote participant from waitlist. Error: ", err.Error())
 			} else {
