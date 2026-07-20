@@ -153,6 +153,28 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 	).Methods("DELETE", "OPTIONS")
 
 	/*
+		EVENT TEAMS
+	*/
+
+	// add a team
+	e.Router.Handle("/v1/events/{id}/teams",
+		middleware.Chain(
+			e.Service.CreateTeam(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// remove a team
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}",
+		middleware.Chain(
+			e.Service.RemoveTeam(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("DELETE", "OPTIONS")
+
+	/*
 		EVENT COMMENTS
 	*/
 

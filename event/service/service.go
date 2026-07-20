@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"olympsis-server/aggregations"
+	"olympsis-server/bus"
 	"olympsis-server/server"
 	"olympsis-server/utils"
 	"time"
@@ -95,6 +96,9 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 				s.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
 			}
 
+			// Fan the invitees out to invite records via invite-service.
+			s.publishInviteRequest(ctx, models.InviteTypeEvent, id.Hex(), userID, req.Invitees)
+
 			rw.WriteHeader(http.StatusCreated)
 			rw.Header().Set("Content-Type", "application/json")
 			rw.Write(fmt.Appendf(nil, `{ "id": "%s" }`, id.Hex()))
@@ -149,10 +153,52 @@ func (s *Service) CreateEvent() http.HandlerFunc {
 			s.Logger.Errorf("Failed to create event log. Error: %s", err.Error())
 		}
 
+		// Invite to the PARENT event only. Fanning out per instance would mean a
+		// recurring weekly event invited every guest 52 times.
+		s.publishInviteRequest(ctx, models.InviteTypeEvent, parentID.Hex(), userID, req.Invitees)
+
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, parentID.Hex()))
 	}
+}
+
+// publishInviteRequest announces a newly created event or team so invite-service
+// can fan the invitee list out into individual invite records — which it then
+// re-publishes as invite.created for notif-service to push.
+//
+// Routing key is derived from the invite type: EVENT -> event.created,
+// TEAM -> team.created.
+//
+// Best effort by design: the event/team is already committed, so a broker
+// problem is logged and the request still succeeds. A caller with no invitees is
+// a no-op, so handlers can call this unconditionally.
+func (s *Service) publishInviteRequest(ctx context.Context, inviteType models.InviteType, contextID, requestorID string, invitees []string) {
+	if len(invitees) == 0 {
+		return
+	}
+
+	var routingKey string
+	switch inviteType {
+	case models.InviteTypeEvent:
+		routingKey = bus.RoutingKeyEventCreated
+	case models.InviteTypeTeam:
+		routingKey = bus.RoutingKeyTeamCreated
+	default:
+		s.Logger.Errorf("Refusing to publish invite request for unsupported type: %s", inviteType)
+		return
+	}
+
+	// ID is the message identifier; invite-service keys off ContextID and does
+	// not read it, so the context id doubles as a traceable value here.
+	s.Bus.Emit(ctx, routingKey, models.InviteRequestMessage{
+		ID:          contextID,
+		Type:        inviteType,
+		ContextID:   contextID,
+		RequestorID: requestorID,
+		InviteeIDs:  invitees,
+		CreatedAt:   time.Now(),
+	})
 }
 
 func (e *Service) GetEvent() http.HandlerFunc {
