@@ -216,6 +216,12 @@ func (p *Publisher) Publish(ctx context.Context, routingKey string, body []byte)
 //
 // The message body is the raw JSON of the domain struct with no envelope —
 // the convention every olympsis service follows.
+//
+// Cancellation is deliberately stripped from ctx. Handlers naturally pass
+// r.Context(), which is cancelled the moment the client disconnects — and a user
+// who closes the app right after commenting would otherwise silently lose the
+// notification for a comment that IS saved. The publish still can't hang: Publish
+// applies its own timeout.
 func (p *Publisher) Emit(ctx context.Context, routingKey string, payload any) {
 	if !p.Enabled() {
 		return
@@ -227,7 +233,7 @@ func (p *Publisher) Emit(ctx context.Context, routingKey string, payload any) {
 		return
 	}
 
-	if err := p.Publish(ctx, routingKey, body); err != nil {
+	if err := p.Publish(context.WithoutCancel(ctx), routingKey, body); err != nil {
 		p.logger.Errorf("[Bus] failed to publish %s: %s", routingKey, err.Error())
 	}
 }

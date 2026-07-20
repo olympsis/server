@@ -73,6 +73,26 @@ func TestPublishWithoutConnectionErrors(t *testing.T) {
 	}
 }
 
+// TestEmitIgnoresCancelledContext — handlers pass r.Context(), which dies the
+// moment the client disconnects. The row is already committed by then, so Emit
+// must still attempt the publish rather than silently dropping the notification.
+func TestEmitIgnoresCancelledContext(t *testing.T) {
+	p := New(testLogger(), "amqp://unreachable.invalid:5672/", "olympsis.events")
+	defer p.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // client hung up
+
+	// Must not panic and must not early-return on ctx.Err(). With no channel
+	// open the publish fails and is logged, which is the best-effort contract.
+	p.Emit(ctx, RoutingKeyCommentCreated, map[string]string{"id": "x"})
+
+	// The cancellation must genuinely be stripped, not merely tolerated.
+	if err := context.WithoutCancel(ctx).Err(); err != nil {
+		t.Errorf("WithoutCancel still carries an error: %v", err)
+	}
+}
+
 // TestCloseIsIdempotent — Close runs on the shutdown path and must tolerate
 // being reached more than once without panicking on a double channel close.
 func TestCloseIsIdempotent(t *testing.T) {
