@@ -205,9 +205,19 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			}
 		}
 
-		// Check waitlist and see if we need to promote another participant
+		// Check waitlist and see if we need to promote another participant.
+		//
+		// The status filter matches BOTH wire forms: the string the server now
+		// writes, and the legacy integer 2 still held by documents that
+		// tools/migrate-rsvp-status.js has not converted yet. Without the 2,
+		// un-migrated waitlisted users would never be promoted. Simplify back to
+		// a plain equality once the migration has run everywhere.
 		opts := options.Find().SetSort(bson.M{"created_at": 1})
-		waitlist, err := e.FindParticipants(ctx, bson.M{"event_id": oid, "status": models.RSVPWaitlist}, opts)
+		waitlistFilter := bson.M{
+			"event_id": oid,
+			"status":   bson.M{"$in": bson.A{models.RSVPWaitlist, 2}},
+		}
+		waitlist, err := e.FindParticipants(ctx, waitlistFilter, opts)
 		if err != nil {
 			e.Logger.Error("Failed to check waitlist. Error: ", err.Error())
 		}

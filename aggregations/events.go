@@ -929,6 +929,12 @@ func BuildEventCorePipeline() bson.A {
 		},
 	}
 
+	// Waitlist status matches BOTH wire forms: the string the server now writes,
+	// and the legacy integer 2 that un-migrated documents still hold. Once
+	// tools/migrate-rsvp-status.js has run everywhere, the legacy 2 can be
+	// dropped and these become a plain $eq/$ne on models.RSVPWaitlist.
+	waitlistValues := bson.A{string(models.RSVPWaitlist), 2}
+
 	// Create participants waitlist pipeline
 	participantsWaitlistPipeline := bson.M{
 		"$addFields": bson.M{
@@ -937,7 +943,7 @@ func BuildEventCorePipeline() bson.A {
 					"input": "$participants",
 					"as":    "p",
 					"cond": bson.M{
-						"$eq": bson.A{"$$p.status", 2}, // Assuming 2 is waitlist status
+						"$in": bson.A{"$$p.status", waitlistValues},
 					},
 				},
 			},
@@ -952,7 +958,9 @@ func BuildEventCorePipeline() bson.A {
 					"input": "$participants",
 					"as":    "p",
 					"cond": bson.M{
-						"$ne": bson.A{"$$p.status", 2}, // Exclude waitlist status
+						"$not": bson.M{
+							"$in": bson.A{"$$p.status", waitlistValues},
+						},
 					},
 				},
 			},
