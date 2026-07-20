@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof" // registers pprof handlers on DefaultServeMux (served on the localhost-only listener in main)
 	"olympsis-server/announcement"
 	"olympsis-server/auth"
+	"olympsis-server/bus"
 	// "olympsis-server/club" // DISABLED 2026-06-15: clubs turned off for now
 	"olympsis-server/database"
 	"olympsis-server/event"
@@ -134,6 +135,21 @@ func main() {
 	// delivering to iOS via APNs and Android via FCM v1.
 	pushSvc := push.New(apnsClient, msgClient, l, d)
 
+	// Set up the RabbitMQ event-bus publisher. The server is a pure publisher:
+	// event.created/team.created feed invite-service, rsvp.created/comment.created
+	// feed notif-service. Its lifecycle gets its own cancellable context so the
+	// background reconnect goroutine stops cleanly on shutdown.
+	//
+	// A connect failure is intentionally NOT fatal — publishing is best effort,
+	// and the publisher retries in the background — so the rest of the API stays
+	// up even when the broker is down.
+	busCtx, busCancel := context.WithCancel(context.Background())
+	rmqConfig := utils.GetRabbitMQConfig()
+	publisher := bus.New(l, rmqConfig.URL, rmqConfig.Exchange)
+	if err := publisher.Connect(busCtx); err != nil {
+		l.Errorf("[Bus] Failed to connect to RabbitMQ: %s", err.Error())
+	}
+
 	// Set up stripe API
 	sc := stripe.NewClient(config.StripeToken)
 
@@ -150,6 +166,8 @@ func main() {
 
 		Notification: notif,   // legacy rich notifications
 		Push:         pushSvc, // loc_key event push notifications
+
+		Bus: publisher, // RabbitMQ domain-event publisher
 	}
 
 	// Set up storage service first (other modules depend on it)
@@ -250,6 +268,13 @@ func main() {
 
 	if err := s.Shutdown(tc); err != nil {
 		l.Errorf("[Core] Server shutdown error: %s", err.Error())
+	}
+
+	// Stop the bus reconnect goroutine and close the broker connection. Safe
+	// here: the HTTP server has drained, so no handler is mid-publish.
+	busCancel()
+	if err := publisher.Close(); err != nil {
+		l.Errorf("[Bus] shutdown error: %s", err.Error())
 	}
 
 	// Drain the notification carousel and the push dispatcher before closing

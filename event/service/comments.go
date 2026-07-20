@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/bus"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -56,11 +57,26 @@ func (s *Service) AddComment() http.HandlerFunc {
 			return
 		}
 
-		// Notify the event's organizers of the new comment (loc_key push,
-		// carrying the comment id so the tap opens this comment).
-		if err = s.Push.Comment(id, cid.Hex()); err != nil {
-			s.Logger.Errorf("Failed to notify event participants. Event ID: %s - Error: %s", id, err.Error())
+		// Announce the comment on the event bus.
+		//
+		// This replaced the in-process push.Comment call: notif-service now owns
+		// "new comment" delivery and resolves recipients itself (all event
+		// participants, including the waitlist, minus the author). Re-adding a
+		// direct push here would double-notify every recipient.
+		//
+		// Best effort by design — the comment is already committed, so a broker
+		// problem is logged and the request still succeeds.
+		text := ""
+		if req.Text != nil {
+			text = *req.Text
 		}
+		s.Bus.Emit(r.Context(), bus.RoutingKeyCommentCreated, models.CommentCreatedMessage{
+			ID:        cid.Hex(),
+			UserID:    uuid,
+			EventID:   id,
+			Text:      text,
+			CreatedAt: time.Now(),
+		})
 
 		w.WriteHeader(http.StatusCreated)
 		w.Write(fmt.Appendf(nil, `{"id": "%s"}`, cid.Hex()))

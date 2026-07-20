@@ -1,6 +1,7 @@
 package service
 
 import (
+	"olympsis-server/bus"
 	"olympsis-server/database"
 	"olympsis-server/notifications"
 	"olympsis-server/push"
@@ -19,7 +20,8 @@ type Service struct {
 	Logger       *logrus.Logger         // logger for logging errors
 	Router       *mux.Router            // router for handling incoming requests
 	Notification *notifications.Service // legacy rich notifications (event create/cancel, kick, etc.)
-	Push         *push.Service          // loc_key event push notifications (reminder, participant, comment)
+	Push         *push.Service          // loc_key event push notifications (reminders only — see Bus)
+	Bus          *bus.Publisher         // domain events for invite-service / notif-service
 }
 
 // Query parameters structure for cleaner handling

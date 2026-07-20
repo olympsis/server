@@ -8,6 +8,7 @@ import (
 	"olympsis-server/aggregations"
 	"olympsis-server/server"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/olympsis/models"
@@ -61,7 +62,8 @@ func (u *Service) CheckUsername() http.HandlerFunc {
 			rw.Write([]byte(`{ "msg": "no userName found in request" }`))
 			return
 		}
-		userName := keys[0]
+		// usernames are always stored lowercase, so normalize before checking
+		userName := strings.ToLower(keys[0])
 
 		// validate username: alphanumeric, underscores, periods, max 30 chars
 		if len(userName) > 30 {
@@ -125,7 +127,7 @@ func (s *Service) CreateUserData() http.HandlerFunc {
 		user := models.User{
 			ID:           bson.NewObjectID(),
 			UserID:       uuid,
-			UserName:     req.UserName,
+			UserName:     strings.ToLower(req.UserName), // usernames are always stored lowercase
 			Sports:       req.Sports,
 			Visibility:   "public",
 			HasOnboarded: req.HasOnboarded,
@@ -225,7 +227,8 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 		filter := bson.M{"user_id": uuid}
 		changes := bson.M{}
 		if req.UserName != nil {
-			changes["username"] = req.UserName
+			// usernames are always stored lowercase
+			changes["username"] = strings.ToLower(*req.UserName)
 		}
 		if req.ImageURL != nil {
 			changes["image_url"] = req.ImageURL
@@ -276,7 +279,7 @@ func (s *Service) UpdateUserData() http.HandlerFunc {
 					HasOnboarded: true,
 				}
 				if req.UserName != nil {
-					user.UserName = *req.UserName
+					user.UserName = strings.ToLower(*req.UserName) // usernames are always stored lowercase
 				}
 				if req.Sports != nil {
 					user.Sports = *req.Sports
@@ -437,6 +440,58 @@ func (u *Service) GetOrganizationInvitations() http.HandlerFunc {
 			TotalInvitations: len(invitations),
 			Invitations:      invitations,
 		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// searchUsersLimit is the maximum number of users returned by SearchUsers (top k).
+const searchUsersLimit = 20
+
+/*
+Search Users (GET /v1/users?username=johndoe)
+
+  - Grabs the username query param
+
+  - Searches the users collection for matching usernames (case-insensitive)
+
+  - Returns up to the top 20 trimmed user snippets
+
+Returns:
+
+	Http handler
+		- Writes { total_users, users } back to the client
+*/
+func (u *Service) SearchUsers() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// grab username from query
+		keys, ok := r.URL.Query()["username"]
+		if !ok || len(keys) < 1 || len(keys[0]) < 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{ "msg": "no username found in request" }`))
+			return
+		}
+		// usernames are stored lowercase, so normalize the query to match
+		username := strings.ToLower(keys[0])
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		users, err := aggregations.AggregateUsersByUsername(ctx, username, searchUsersLimit, u.Database)
+		if err != nil {
+			u.Log.Error(fmt.Sprintf("[User] Failed to search users: %s", err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{ "msg": "internal server error" }`))
+			return
+		}
+
+		response := models.UsersSnippetResponse{
+			TotalUsers: len(users),
+			Users:      users,
+		}
+
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
 	}

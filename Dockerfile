@@ -1,6 +1,18 @@
+# --- Local models context ---
+# The go.mod `replace github.com/olympsis/models => ../models` needs the local
+# models module available at build time. The module builds at /app, so the
+# relative `../models` resolves to /models inside the image.
+#   - Dev:  compose.dev.yaml overrides this named context with the real dir
+#           (`additional_contexts: { models: ../models }`), so /models is populated.
+#   - Prod: the replace is removed from go.mod, so this empty `scratch` fallback
+#           is used and nothing is copied.
+FROM scratch AS models
+
 # --- Build stage ---
 FROM golang:1.25-alpine AS builder
 WORKDIR /app
+# Place the (dev-only) local models module where the go.mod replace expects it.
+COPY --from=models . /models
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .

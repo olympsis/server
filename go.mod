@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.43.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20260513032636-09424ff09a3c
+	github.com/olympsis/models v0.0.0-20260720174846-5e781eb45e84
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.203.0
 )
@@ -55,6 +55,7 @@ require (
 
 require (
 	cloud.google.com/go/vision/v2 v2.9.2
+	github.com/rabbitmq/amqp091-go v1.12.0
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/stripe/stripe-go/v82 v82.3.0
 	go.mongodb.org/mongo-driver/v2 v2.5.0
@@ -75,7 +76,13 @@ require (
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
 )
 
-// DEV ONLY: pick up the local models change (NewEventCommentType -> "event_comment")
-// before it is committed + tagged. For the production cut, commit/push the models
-// repo, `go get github.com/olympsis/models@<new-pseudo-version>`, then remove this.
+// DEV ONLY. The require above is pinned to the real published commit
+// (d270b67 — rsvp codecs + NewTeamDao), so this replace is no longer needed to
+// pick up unpushed changes. It stays only because models is a PRIVATE repo:
+// without it the Dockerfile's `go mod download` has no credentials to fetch it,
+// and the dev compose build fails.
+//
+// For the production cut (built on the host with git credentials, not in
+// Docker), delete this line — `go build` then resolves the pinned version
+// directly. Verified to build clean that way.
 replace github.com/olympsis/models => ../models

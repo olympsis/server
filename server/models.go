@@ -1,6 +1,7 @@
 package server
 
 import (
+	"olympsis-server/bus"
 	"olympsis-server/database"
 	"olympsis-server/notifications"
 	"olympsis-server/push"
@@ -27,4 +28,6 @@ type ServerInterface struct {
 	Notification *notifications.Service
 	Push         *push.Service         // event push notifications (iOS APNs + Android FCM)
 	Storage      types.StorageUploader // GCP Storage upload capability
+
+	Bus *bus.Publisher // RabbitMQ publisher for cross-service domain events
 }

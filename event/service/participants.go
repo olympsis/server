@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/bus"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -97,16 +98,18 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 						return
 					}
 
-					// Add participant to notifications
+					// Add participant to notifications. Still required: the
+					// event-id topic is how push.Reminder resolves who to remind,
+					// and reminders remain in-process (notif-service v1 does not
+					// cover them).
 					err = e.Notification.AddUsersToTopic(id, []string{uuid})
 					if err != nil {
 						e.Logger.Errorf("Failed to add user to event notifications topic. Event ID: %s - Error: %s", id, err.Error())
 					}
 
-					// Notify the event's organizers that a new participant joined.
-					if err = e.Push.Participant(id, pid.Hex(), uuid); err != nil {
-						e.Logger.Errorf("Failed to notify organizers of new participant. Event ID: %s - Error: %s", id, err.Error())
-					}
+					// Announce the RSVP. notif-service consumes this and delivers
+					// the "new participant" push.
+					e.publishRSVPCreated(r.Context(), pid, uuid, id, *participant.Status)
 
 					rw.WriteHeader(http.StatusOK)
 					rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
@@ -123,15 +126,16 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			return
 		}
 
-		// Add participant to notifications
+		// Add participant to notifications. Still required: the event-id topic is
+		// how push.Reminder resolves who to remind, and reminders remain
+		// in-process (notif-service v1 does not cover them).
 		if err = e.Notification.AddUsersToTopic(id, []string{uuid}); err != nil {
 			e.Logger.Errorf("Failed to add user to notifications topic. EventID: %s - Error: %s", id, err.Error())
 		}
 
-		// Notify the event's organizers that a new participant joined.
-		if err = e.Push.Participant(id, pid.Hex(), uuid); err != nil {
-			e.Logger.Errorf("Failed to notify organizers of new participant. Event ID: %s - Error: %s", id, err.Error())
-		}
+		// Announce the RSVP. notif-service consumes this and delivers the
+		// "new participant" push.
+		e.publishRSVPCreated(r.Context(), pid, uuid, id, *participant.Status)
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
@@ -205,15 +209,29 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			}
 		}
 
-		// Check waitlist and see if we need to promote another participant
+		// Check waitlist and see if we need to promote another participant.
+		//
+		// The status filter matches BOTH wire forms: the string the server now
+		// writes, and the legacy integer 2 still held by documents that
+		// tools/migrate-rsvp-status.js has not converted yet. Without the 2,
+		// un-migrated waitlisted users would never be promoted. Simplify back to
+		// a plain equality once the migration has run everywhere.
 		opts := options.Find().SetSort(bson.M{"created_at": 1})
-		waitlist, err := e.FindParticipants(ctx, bson.M{"event_id": oid, "status": models.RSVPWaitlist}, opts)
+		waitlistFilter := bson.M{
+			"event_id": oid,
+			"status":   bson.M{"$in": bson.A{models.RSVPWaitlist, 2}},
+		}
+		waitlist, err := e.FindParticipants(ctx, waitlistFilter, opts)
 		if err != nil {
 			e.Logger.Error("Failed to check waitlist. Error: ", err.Error())
 		}
 		if len(waitlist) > 0 {
 			participant := waitlist[0]
-			err := e.UpdateParticipant(ctx, bson.M{"_id": participant.ID}, bson.M{"status": models.RSVPYes})
+			// The update MUST be wrapped in $set. A bare {"status": ...} document
+			// is rejected by the driver ("update document must contain key
+			// beginning with '$'"), which is why promotion only ever produced an
+			// error log and never actually promoted anyone.
+			err := e.UpdateParticipant(ctx, bson.M{"_id": participant.ID}, bson.M{"$set": bson.M{"status": models.RSVPYes}})
 			if err != nil {
 				e.Logger.Error("Failed to promote participant from waitlist. Error: ", err.Error())
 			} else {
@@ -262,6 +280,25 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
+}
+
+// publishRSVPCreated announces a new RSVP on the event bus.
+//
+// This replaced the in-process push.Participant call: notif-service now owns
+// "new participant" delivery, and it resolves recipients itself (event host,
+// minus the joiner) by reading the event directly. Re-adding a direct push here
+// would double-notify every recipient.
+//
+// Best effort by design — the participant row is already committed, so a broker
+// problem is logged and the request still succeeds.
+func (e *Service) publishRSVPCreated(ctx context.Context, participantID bson.ObjectID, userID, eventID string, status models.RSVPStatus) {
+	e.Bus.Emit(ctx, bus.RoutingKeyRSVPCreated, models.RSVPCreatedMessage{
+		ID:        participantID.Hex(),
+		UserID:    userID,
+		EventID:   eventID,
+		Status:    status,
+		CreatedAt: time.Now(),
+	})
 }
 
 /*****************

@@ -25,7 +25,7 @@ func NewUserAPI(i *server.ServerInterface) *UserAPI {
 }
 
 func (u *UserAPI) Ready(firebase *auth.Client) {
-	// search username availability
+	// check in
 	u.Router.Handle("/v1/users/check-in",
 		middleware.Chain(
 			u.Service.CheckIn(),
@@ -59,6 +59,15 @@ func (u *UserAPI) Ready(firebase *auth.Client) {
 			middleware.UserMiddleware(firebase),
 		),
 	).Methods("POST", "OPTIONS")
+
+	// search users by username (top 20)
+	u.Router.Handle("/v1/users",
+		middleware.Chain(
+			u.Service.SearchUsers(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("GET", "OPTIONS")
 
 	// update user data
 	u.Router.Handle("/v1/users/user",
