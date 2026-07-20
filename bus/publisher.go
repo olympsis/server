@@ -75,7 +75,7 @@ type message struct {
 //
 // amqp Channels are NOT safe for concurrent use. Only the worker goroutine
 // publishes, but the reconnect goroutine swaps the channel out underneath it, so
-// conn/ch/closed are all guarded by mu.
+// conn/ch and the close listeners are all guarded by mu.
 type Publisher struct {
 	logger   *logrus.Logger
 	url      string
@@ -83,11 +83,16 @@ type Publisher struct {
 
 	queue chan message
 
-	mu      sync.Mutex
-	conn    *amqp.Connection
-	ch      *amqp.Channel
-	closed  chan *amqp.Error // fires on connection OR channel close
-	closing bool             // set by Close; stops dial from installing a new conn
+	mu   sync.Mutex
+	conn *amqp.Connection
+	ch   *amqp.Channel
+	// Signalled by amqp when the connection or the channel dies; maintain waits
+	// on both. Kept separate because amqp closes each registered listener
+	// itself — sharing one channel across the two NotifyClose calls would close
+	// it twice and panic the process on shutdown.
+	connClosed chan *amqp.Error
+	chanClosed chan *amqp.Error
+	closing    bool // set by Close; stops dial from installing a new conn
 
 	stop chan struct{}
 	once sync.Once
@@ -166,9 +171,15 @@ func (p *Publisher) dial() error {
 	// ACCESS_REFUSED, any broker-initiated channel close) kills the channel while
 	// leaving the connection healthy. Watching only the connection would leave a
 	// dead channel in place and silently drop every message until a restart.
-	closed := make(chan *amqp.Error, 2)
-	conn.NotifyClose(closed)
-	ch.NotifyClose(closed)
+	//
+	// These MUST be two separate Go channels. amqp closes every registered
+	// listener when its owner shuts down, so handing the same channel to both
+	// NotifyClose calls gets it closed twice — a "close of closed channel" panic
+	// that takes down the process on every clean shutdown.
+	connClosed := make(chan *amqp.Error, 1)
+	chanClosed := make(chan *amqp.Error, 1)
+	conn.NotifyClose(connClosed)
+	ch.NotifyClose(chanClosed)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -182,7 +193,8 @@ func (p *Publisher) dial() error {
 
 	p.conn = conn
 	p.ch = ch
-	p.closed = closed
+	p.connClosed = connClosed
+	p.chanClosed = chanClosed
 	return nil
 }
 
@@ -209,18 +221,25 @@ func (p *Publisher) maintain(ctx context.Context) {
 	defer p.wg.Done()
 	for {
 		p.mu.Lock()
-		closed := p.closed
+		connClosed, chanClosed := p.connClosed, p.chanClosed
 		p.mu.Unlock()
 
-		if closed != nil {
+		if connClosed != nil || chanClosed != nil {
+			// Whichever fires first wins; a dropped connection takes its channel
+			// with it, so both may fire and the loser is simply discarded when
+			// dial() installs fresh listeners.
 			select {
 			case <-ctx.Done():
 				return
 			case <-p.stop:
 				return
-			case amqpErr := <-closed:
+			case amqpErr := <-connClosed:
 				if amqpErr != nil {
 					p.logger.Warnf("[Bus] connection closed (%s); reconnecting", amqpErr.Error())
+				}
+			case amqpErr := <-chanClosed:
+				if amqpErr != nil {
+					p.logger.Warnf("[Bus] channel closed (%s); reconnecting", amqpErr.Error())
 				}
 			}
 		}
