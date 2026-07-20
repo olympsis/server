@@ -55,6 +55,7 @@ require (
 
 require (
 	cloud.google.com/go/vision/v2 v2.9.2
+	github.com/rabbitmq/amqp091-go v1.12.0
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/stripe/stripe-go/v82 v82.3.0
 	go.mongodb.org/mongo-driver/v2 v2.5.0

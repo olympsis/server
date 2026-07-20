@@ -176,6 +176,24 @@ func GetRedisConfig(manager *secrets.Manager) RedisConfig {
 	}
 }
 
+// Reads from OS environment variables to create the event-bus config object.
+//
+// Unlike the database/redis config this does NOT panic when unset. Publishing is
+// best effort by design, so a missing RABBITMQ_URL degrades to "no events
+// published" rather than blocking startup — which is what keeps a dev box
+// without a broker usable.
+func GetRabbitMQConfig() RabbitMQConfig {
+	exchange := os.Getenv("RABBITMQ_EXCHANGE")
+	if exchange == "" {
+		exchange = "olympsis.events"
+	}
+
+	return RabbitMQConfig{
+		URL:      os.Getenv("RABBITMQ_URL"),
+		Exchange: exchange,
+	}
+}
+
 // Reads from OS environment variables to create a collections config object
 func GetCollectionsConfig() CollectionsConfig {
 

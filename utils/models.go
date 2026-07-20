@@ -36,6 +36,14 @@ type RedisConfig struct {
 	Password string
 }
 
+// RabbitMQConfig points the event-bus publisher at the shared broker. Both
+// fields are optional: a blank URL disables publishing so the server still boots
+// on a box without RabbitMQ.
+type RabbitMQConfig struct {
+	URL      string // amqp://user:pass@host:5672/
+	Exchange string // shared durable topic exchange; defaults to olympsis.events
+}
+
 type CollectionsConfig struct {
 	AnnouncementCollection string
 
