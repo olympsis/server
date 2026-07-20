@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"olympsis-server/bus"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -97,16 +98,18 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 						return
 					}
 
-					// Add participant to notifications
+					// Add participant to notifications. Still required: the
+					// event-id topic is how push.Reminder resolves who to remind,
+					// and reminders remain in-process (notif-service v1 does not
+					// cover them).
 					err = e.Notification.AddUsersToTopic(id, []string{uuid})
 					if err != nil {
 						e.Logger.Errorf("Failed to add user to event notifications topic. Event ID: %s - Error: %s", id, err.Error())
 					}
 
-					// Notify the event's organizers that a new participant joined.
-					if err = e.Push.Participant(id, pid.Hex(), uuid); err != nil {
-						e.Logger.Errorf("Failed to notify organizers of new participant. Event ID: %s - Error: %s", id, err.Error())
-					}
+					// Announce the RSVP. notif-service consumes this and delivers
+					// the "new participant" push.
+					e.publishRSVPCreated(r.Context(), pid, uuid, id, *participant.Status)
 
 					rw.WriteHeader(http.StatusOK)
 					rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
@@ -123,15 +126,16 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			return
 		}
 
-		// Add participant to notifications
+		// Add participant to notifications. Still required: the event-id topic is
+		// how push.Reminder resolves who to remind, and reminders remain
+		// in-process (notif-service v1 does not cover them).
 		if err = e.Notification.AddUsersToTopic(id, []string{uuid}); err != nil {
 			e.Logger.Errorf("Failed to add user to notifications topic. EventID: %s - Error: %s", id, err.Error())
 		}
 
-		// Notify the event's organizers that a new participant joined.
-		if err = e.Push.Participant(id, pid.Hex(), uuid); err != nil {
-			e.Logger.Errorf("Failed to notify organizers of new participant. Event ID: %s - Error: %s", id, err.Error())
-		}
+		// Announce the RSVP. notif-service consumes this and delivers the
+		// "new participant" push.
+		e.publishRSVPCreated(r.Context(), pid, uuid, id, *participant.Status)
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write(fmt.Appendf(nil, `{"id": "%s"}`, pid.Hex()))
@@ -272,6 +276,25 @@ func (e *Service) NotifyParticipants() http.HandlerFunc {
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`{ "msg": "OK" }`))
 	}
+}
+
+// publishRSVPCreated announces a new RSVP on the event bus.
+//
+// This replaced the in-process push.Participant call: notif-service now owns
+// "new participant" delivery, and it resolves recipients itself (event host,
+// minus the joiner) by reading the event directly. Re-adding a direct push here
+// would double-notify every recipient.
+//
+// Best effort by design — the participant row is already committed, so a broker
+// problem is logged and the request still succeeds.
+func (e *Service) publishRSVPCreated(ctx context.Context, participantID bson.ObjectID, userID, eventID string, status models.RSVPStatus) {
+	e.Bus.Emit(ctx, bus.RoutingKeyRSVPCreated, models.RSVPCreatedMessage{
+		ID:        participantID.Hex(),
+		UserID:    userID,
+		EventID:   eventID,
+		Status:    status,
+		CreatedAt: time.Now(),
+	})
 }
 
 /*****************

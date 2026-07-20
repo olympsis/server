@@ -23,6 +23,11 @@ const (
 
 // Service is the public entry point for sending the event push notifications.
 // It owns the dispatcher (queue + senders) and the data layer.
+//
+// Scope note: as of the notif-service cutover, only Reminder is still wired up.
+// Participant and comment delivery moved onto the event bus; the corresponding
+// methods below are deprecated but retained for rollback. The APNs/FCM clients,
+// encoders and dispatcher all stay because reminders still need them.
 type Service struct {
 	repo       repo
 	dispatcher *dispatcher
@@ -79,6 +84,12 @@ func (s *Service) Reminder(eventID string) error {
 
 // Comment enqueues a "new comment" note to the event's organizer members,
 // excluding the event poster (preserving the prior recipient semantics).
+//
+// Deprecated: notif-service owns comment delivery — the server publishes
+// `comment.created` instead (see event/service/comments.go). This is kept, and
+// deliberately left unwired, so delivery can be restored by re-adding the single
+// call if notif-service has to be rolled back. Calling it while notif-service is
+// consuming would double-notify every recipient.
 func (s *Service) Comment(eventID, commentID string) error {
 	event, err := s.event(eventID)
 	if err != nil {
@@ -103,6 +114,11 @@ func (s *Service) Comment(eventID, commentID string) error {
 
 // Participant enqueues a "new participant" note to the event's organizers only,
 // excluding the user who just joined.
+//
+// Deprecated: notif-service owns participant delivery — the server publishes
+// `rsvp.created` instead (see event/service/participants.go). Kept unwired for
+// the same rollback reason as Comment; calling it while notif-service is
+// consuming would double-notify.
 func (s *Service) Participant(eventID, participantID, joinerUserID string) error {
 	event, err := s.event(eventID)
 	if err != nil {
