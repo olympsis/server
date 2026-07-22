@@ -14,8 +14,8 @@ import (
 // supply the display data (event title, team name) and are already loaded by the
 // caller, so these methods do no extra reads beyond an optional applicant lookup.
 
-// derefString safely dereferences an optional string field for display.
-func derefString(s *string) string {
+// teamNoteString safely dereferences an optional string field for display.
+func teamNoteString(s *string) string {
 	if s == nil {
 		return ""
 	}
@@ -33,14 +33,14 @@ func teamNoteData(t models.NotificationType, event *models.EventDao, team *model
 		if event.ID != nil {
 			data["event_id"] = event.ID.Hex()
 		}
-		data["event_name"] = derefString(event.Title)
-		data["event_media_url"] = derefString(event.MediaURL)
+		data["event_name"] = teamNoteString(event.Title)
+		data["event_media_url"] = teamNoteString(event.MediaURL)
 	}
 	if team != nil {
 		if team.ID != nil {
 			data["team_id"] = team.ID.Hex()
 		}
-		data["team_name"] = derefString(team.Name)
+		data["team_name"] = teamNoteString(team.Name)
 	}
 	return data
 }
@@ -62,7 +62,7 @@ func (n *Service) TeamApplication(event *models.EventDao, team *models.TeamDao, 
 	note := models.PushNotification{
 		ID:        bson.NewObjectID(),
 		Title:     "New team application!",
-		Body:      derefString(team.Name),
+		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
 		Data:      data,
@@ -86,7 +86,7 @@ func (n *Service) TeamApplicationUpdate(event *models.EventDao, team *models.Tea
 	note := models.PushNotification{
 		ID:        bson.NewObjectID(),
 		Title:     title,
-		Body:      derefString(team.Name),
+		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
 		Data:      teamNoteData(models.TeamApplicationUpdateType, event, team),
@@ -105,7 +105,7 @@ func (n *Service) TeamKick(event *models.EventDao, team *models.TeamDao, kickedU
 	note := models.PushNotification{
 		ID:        bson.NewObjectID(),
 		Title:     "You've been removed from the team.",
-		Body:      derefString(team.Name),
+		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
 		Data:      teamNoteData(models.TeamKickType, event, team),
@@ -132,7 +132,7 @@ func (n *Service) TeamMemberRoleChange(event *models.EventDao, team *models.Team
 	note := models.PushNotification{
 		ID:        bson.NewObjectID(),
 		Title:     title,
-		Body:      derefString(team.Name),
+		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
 		Data:      data,
@@ -153,7 +153,7 @@ func (n *Service) TeamDeleted(event *models.EventDao, team *models.TeamDao, reci
 	note := models.PushNotification{
 		ID:        bson.NewObjectID(),
 		Title:     "Your team was disbanded and your RSVP cancelled.",
-		Body:      derefString(team.Name),
+		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
 		Data:      teamNoteData(models.TeamDeletedType, event, team),

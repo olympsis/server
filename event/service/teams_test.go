@@ -90,44 +90,6 @@ func TestCanLeaveTeam(t *testing.T) {
 	}
 }
 
-// --- ownership transfer -------------------------------------------------------
-
-func TestApplyOwnershipTransfer(t *testing.T) {
-	members := []models.TeamMemberDao{
-		member("owner", models.OwnerMember),
-		member("m2", models.MemberMember),
-	}
-	updated, err := applyOwnershipTransfer(members, "owner", "m2")
-	if err != nil {
-		t.Fatalf("transfer: %v", err)
-	}
-
-	owners := 0
-	roleOf := map[string]models.MemberRole{}
-	for _, m := range updated {
-		roleOf[*m.UserID] = *m.Role
-		if *m.Role == models.OwnerMember {
-			owners++
-		}
-	}
-	if owners != 1 {
-		t.Fatalf("expected exactly one owner after transfer, got %d", owners)
-	}
-	if roleOf["m2"] != models.OwnerMember {
-		t.Errorf("m2 should be OWNER, got %s", roleOf["m2"])
-	}
-	if roleOf["owner"] != models.MemberMember {
-		t.Errorf("old owner should be MEMBER, got %s", roleOf["owner"])
-	}
-}
-
-func TestApplyOwnershipTransferToNonMember(t *testing.T) {
-	members := []models.TeamMemberDao{member("owner", models.OwnerMember)}
-	if _, err := applyOwnershipTransfer(members, "owner", "ghost"); !errors.Is(err, errNewOwnerNotFound) {
-		t.Fatalf("expected errNewOwnerNotFound, got %v", err)
-	}
-}
-
 // --- capacity / duplicates ----------------------------------------------------
 
 func TestCanAddTeamMember(t *testing.T) {

@@ -276,12 +276,17 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 			},
 			Options: options.Index().SetName("team_id_status_index"),
 		},
-		{ // A user may only have one application per team
+		{ // A user may have at most one PENDING application per team. Partial on
+			// status so a denied/accepted application doesn't permanently block the
+			// user from re-applying later.
 			Keys: bson.D{
 				{Key: "team_id", Value: 1},
 				{Key: "applicant", Value: 1},
 			},
-			Options: options.Index().SetName("team_applicant_compound_index").SetUnique(true),
+			Options: options.Index().
+				SetName("team_applicant_pending_index").
+				SetUnique(true).
+				SetPartialFilterExpression(bson.M{"status": "PENDING"}),
 		},
 	}
 

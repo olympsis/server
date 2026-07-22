@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -146,7 +147,8 @@ func (s *Service) GetTeamApplications() http.HandlerFunc {
 			return
 		}
 
-		status := models.ApplicationStatus(r.URL.Query().Get("status"))
+		// Normalize so ?status=pending works as well as PENDING; default to pending.
+		status := models.ApplicationStatus(strings.ToUpper(r.URL.Query().Get("status")))
 		if status == "" {
 			status = models.PendingApplicationStatus
 		}

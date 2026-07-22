@@ -128,8 +128,9 @@ func (s *Service) CreateTeam() http.HandlerFunc {
 			return
 		}
 
-		// Fan the invitees out to invite records via invite-service.
-		s.publishInviteRequest(ctx, models.InviteTypeTeam, tid.Hex(), userID, req.Invitees)
+		// Fan the invitees out to invite records via invite-service, skipping
+		// anyone already on a team for this event.
+		s.publishInviteRequest(ctx, models.InviteTypeTeam, tid.Hex(), userID, s.inviteesNotOnATeam(ctx, oid, req.Invitees))
 
 		w.WriteHeader(http.StatusCreated)
 		w.Write(fmt.Appendf(nil, `{"id": "%s"}`, tid.Hex()))
@@ -221,10 +222,8 @@ func (s *Service) RemoveTeam() http.HandlerFunc {
 // Sentinel errors for the pure team-membership helpers. Handlers map these to
 // HTTP statuses; the invite-accept consumer treats them as non-fatal.
 var (
-	errTeamFull         = errors.New("team is at capacity")
-	errAlreadyMember    = errors.New("user is already a member")
-	errNotAMember       = errors.New("user is not a member")
-	errNewOwnerNotFound = errors.New("new owner is not a member of the team")
+	errTeamFull      = errors.New("team is at capacity")
+	errAlreadyMember = errors.New("user is already a member")
 )
 
 // teamRSVPRequired reports whether the event is in team-RSVP mode, i.e. users
@@ -288,6 +287,35 @@ func teamMemberIDs(team *models.TeamDao) []string {
 	return ids
 }
 
+// inviteesNotOnATeam drops any invitee already on a team for this event. A user
+// can only RSVP with one team, so inviting someone who's already on another team
+// is meaningless — and their acceptance would be rejected by the unique
+// {event_id, members.user_id} index anyway. Best-effort: on a read error it
+// returns the list unfiltered rather than blocking the invite.
+func (s *Service) inviteesNotOnATeam(ctx context.Context, eventOID bson.ObjectID, invitees []string) []string {
+	if len(invitees) == 0 {
+		return invitees
+	}
+	teams, err := s.FindTeams(ctx, bson.M{"event_id": eventOID}, nil)
+	if err != nil {
+		s.Logger.Errorf("Failed to load teams while filtering invitees. Event: %s - Error: %s", eventOID.Hex(), err.Error())
+		return invitees
+	}
+	taken := make(map[string]bool)
+	for i := range teams {
+		for _, uid := range teamMemberIDs(&teams[i]) {
+			taken[uid] = true
+		}
+	}
+	filtered := make([]string, 0, len(invitees))
+	for _, uid := range invitees {
+		if !taken[uid] {
+			filtered = append(filtered, uid)
+		}
+	}
+	return filtered
+}
+
 // canManageTeam reports whether userID may manage/remove the given team: either
 // they own it (OWNER role, falling back to creator for legacy teams) or they
 // host the event.
@@ -339,37 +367,6 @@ func addTeamMember(members []models.TeamMemberDao, userID string, maxTeamSize *i
 		IsAnonymous: &isAnonymous,
 		JoinedAt:    &joinedAt,
 	}), nil
-}
-
-// applyOwnershipTransfer moves the OWNER role from the current owner to
-// newOwnerID. Both must be members; afterwards exactly one OWNER exists. Pure so
-// the invariant can be unit-tested; the handler performs the same change via an
-// atomic Mongo update with arrayFilters.
-func applyOwnershipTransfer(members []models.TeamMemberDao, currentOwnerID, newOwnerID string) ([]models.TeamMemberDao, error) {
-	var foundNew bool
-	for i := range members {
-		if members[i].UserID != nil && *members[i].UserID == newOwnerID {
-			foundNew = true
-		}
-	}
-	if !foundNew {
-		return members, errNewOwnerNotFound
-	}
-
-	owner := models.OwnerMember
-	member := models.MemberMember
-	for i := range members {
-		if members[i].UserID == nil {
-			continue
-		}
-		switch *members[i].UserID {
-		case newOwnerID:
-			members[i].Role = &owner
-		case currentOwnerID:
-			members[i].Role = &member
-		}
-	}
-	return members, nil
 }
 
 // JoinTeam adds the caller to an OPEN team (self-join on RSVP). Closed teams
@@ -488,7 +485,9 @@ func (s *Service) InviteToTeam() http.HandlerFunc {
 			return
 		}
 
-		s.publishInviteRequest(ctx, models.InviteTypeTeam, teamID, userID, req.Invitees)
+		// Skip invitees already on a team for this event — you can't invite
+		// someone who's already RSVP'd with another team.
+		s.publishInviteRequest(ctx, models.InviteTypeTeam, teamID, userID, s.inviteesNotOnATeam(ctx, eventOID, req.Invitees))
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"msg": "OK"}`))
@@ -675,13 +674,24 @@ func (s *Service) TransferTeamOwnership() http.HandlerFunc {
 			return
 		}
 
-		updated, err := applyOwnershipTransfer(teamMembers(team), userID, req.NewOwnerID)
-		if err != nil {
+		if !isTeamMember(team, req.NewOwnerID) {
 			http.Error(w, `{"msg": "new owner must be a member of the team"}`, http.StatusBadRequest)
 			return
 		}
 
-		if err = s.UpdateTeam(ctx, bson.M{"_id": teamOID}, bson.M{"$set": bson.M{"members": updated}}); err != nil {
+		// Swap the two roles atomically with arrayFilters rather than $set-ing the
+		// whole members array — a concurrent join/leave must not be clobbered.
+		newOwnerRole := models.OwnerMember
+		demotedRole := models.MemberMember
+		update := bson.M{"$set": bson.M{
+			"members.$[old].role": demotedRole,
+			"members.$[new].role": newOwnerRole,
+		}}
+		opts := options.UpdateOne().SetArrayFilters([]interface{}{
+			bson.M{"old.user_id": userID},
+			bson.M{"new.user_id": req.NewOwnerID},
+		})
+		if _, err = s.Database.EventTeamsCollection.UpdateOne(ctx, bson.M{"_id": teamOID}, update, opts); err != nil {
 			s.Logger.Errorf("Failed to transfer team ownership. Team: %s - Error: %s", teamID, err.Error())
 			http.Error(w, `{"msg": "failed to transfer ownership"}`, http.StatusInternalServerError)
 			return
