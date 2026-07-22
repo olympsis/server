@@ -152,6 +152,15 @@ func (s *Service) AddTeamMemberAtomic(ctx context.Context, teamID bson.ObjectID,
 
 	res, err := s.Database.EventTeamsCollection.UpdateOne(ctx, filter, bson.M{"$push": bson.M{"members": member}})
 	if err != nil {
+		// A cross-team unique-index violation ({event_id, members.user_id}) means
+		// the user is already on ANOTHER team for this event — e.g. they were
+		// invited, joined a different team, then accepted the stale invite. That's
+		// a benign "can't add", not a failure: report not-added so callers no-op
+		// (a 409 for JoinTeam, a harmless accept for the invite path) instead of
+		// erroring, which on the invite-accept path would loop forever on retry.
+		if mongo.IsDuplicateKeyError(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	return res.ModifiedCount > 0, nil
