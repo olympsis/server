@@ -60,6 +60,13 @@ func (e *Service) AddParticipant() http.HandlerFunc {
 			return
 		}
 
+		// Team-RSVP events don't take individual RSVPs — the user must create or
+		// join a team instead (membership = the RSVP).
+		if teamRSVPRequired(event) {
+			http.Error(rw, `{ "msg": "this event requires RSVPing as a team" }`, http.StatusConflict)
+			return
+		}
+
 		// Check if participant already exists
 		participants, err := e.FindParticipants(context.TODO(), bson.M{"event_id": oid}, nil)
 		if err != nil {

@@ -85,6 +85,7 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 		{config.EventLogsCollection, true, "timestamp"},
 		{config.EventViewsCollection, true, "view_time"},
 		{config.EventTeamsCollection, false, ""},
+		{config.EventTeamApplicationsCollection, false, ""},
 		{config.EventCommentsCollection, false, ""},
 		{config.EventInvitationsCollection, false, ""},
 		{config.EventParticipantsCollection, false, ""},
@@ -110,6 +111,7 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 	d.EventLogsCollection = db.Collection(config.EventLogsCollection)
 	d.EventViewsCollection = db.Collection(config.EventViewsCollection)
 	d.EventTeamsCollection = db.Collection(config.EventTeamsCollection)
+	d.EventTeamApplicationsCollection = db.Collection(config.EventTeamApplicationsCollection)
 	d.EventCommentsCollection = db.Collection(config.EventCommentsCollection)
 	d.EventInvitationsCollection = db.Collection(config.EventInvitationsCollection)
 	d.EventParticipantsCollection = db.Collection(config.EventParticipantsCollection)
@@ -232,12 +234,54 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 			Options: options.Index().SetName("name_text_index"),
 		},
 		{
-			Keys:    bson.D{{Key: "members.user", Value: 1}},
-			Options: options.Index().SetName("members_user_index"),
+			Keys:    bson.D{{Key: "members.user_id", Value: 1}},
+			Options: options.Index().SetName("members_user_id_index"),
 		},
 		{
 			Keys:    bson.D{{Key: "created_at", Value: -1}},
 			Options: options.Index().SetName("created_at_index"),
+		},
+		{
+			// A user may be on at most one team per event (and not twice on the
+			// same team). event_id is scalar and members.user_id is the only array
+			// field, so this is a legal multikey compound unique index. The
+			// application-level checks return a friendly 409 before this fires; this
+			// is the DB backstop. Requires no pre-existing duplicate memberships.
+			Keys: bson.D{
+				{Key: "event_id", Value: 1},
+				{Key: "members.user_id", Value: 1},
+			},
+			Options: options.Index().SetName("event_member_compound_index").SetUnique(true),
+		},
+	}
+
+	// Create indexes for EventTeamApplicationsCollection
+	eventTeamApplicationsIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("event_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "team_id", Value: 1}},
+			Options: options.Index().SetName("team_id_index"),
+		},
+		{
+			Keys:    bson.D{{Key: "status", Value: 1}},
+			Options: options.Index().SetName("status_index"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "team_id", Value: 1},
+				{Key: "status", Value: 1},
+			},
+			Options: options.Index().SetName("team_id_status_index"),
+		},
+		{ // A user may only have one application per team
+			Keys: bson.D{
+				{Key: "team_id", Value: 1},
+				{Key: "applicant", Value: 1},
+			},
+			Options: options.Index().SetName("team_applicant_compound_index").SetUnique(true),
 		},
 	}
 
@@ -337,13 +381,14 @@ func (d *Database) SetUpEventCollections(db *mongo.Database, config *utils.Colle
 		collection *mongo.Collection
 		indexes    []mongo.IndexModel
 	}{
-		"events":            {d.EventsCollection, eventIndexes},
-		"eventLogs":         {d.EventLogsCollection, eventLogsIndexes},
-		"eventViews":        {d.EventViewsCollection, eventViewsIndexes},
-		"eventTeams":        {d.EventTeamsCollection, eventTeamsIndexes},
-		"eventComments":     {d.EventCommentsCollection, eventCommentsIndexes},
-		"eventInvitations":  {d.EventInvitationsCollection, eventInvitationsIndexes},
-		"eventParticipants": {d.EventParticipantsCollection, eventParticipantsIndexes},
+		"events":                {d.EventsCollection, eventIndexes},
+		"eventLogs":             {d.EventLogsCollection, eventLogsIndexes},
+		"eventViews":            {d.EventViewsCollection, eventViewsIndexes},
+		"eventTeams":            {d.EventTeamsCollection, eventTeamsIndexes},
+		"eventTeamApplications": {d.EventTeamApplicationsCollection, eventTeamApplicationsIndexes},
+		"eventComments":         {d.EventCommentsCollection, eventCommentsIndexes},
+		"eventInvitations":      {d.EventInvitationsCollection, eventInvitationsIndexes},
+		"eventParticipants":     {d.EventParticipantsCollection, eventParticipantsIndexes},
 	}
 
 	for name, info := range collectionsIndexes {

@@ -11,6 +11,7 @@ import (
 	"olympsis-server/database"
 	"olympsis-server/event"
 	eventService "olympsis-server/event/service"
+	"olympsis-server/grpcapi"
 	"olympsis-server/health"
 	"olympsis-server/locales"
 	mapsnapshots "olympsis-server/map-snapshots"
@@ -28,6 +29,7 @@ import (
 	"olympsis-server/utils"
 	"olympsis-server/utils/secrets"
 
+	"net"
 	"olympsis-server/venue"
 	"os"
 	"os/signal"
@@ -41,6 +43,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stripe/stripe-go/v82"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -225,6 +228,34 @@ func main() {
 	go eventPolling.Start(pollCtx)
 	l.Info("[E-Polling] Initialized...")
 
+	// Internal gRPC server (EventTeamService). invite-service calls AddTeamMember
+	// on it when a user accepts a TEAM invite, so the main server — the only
+	// writer of eventTeams — adds them to the roster. Not exposed publicly.
+	//
+	// A listen failure is intentionally non-fatal (mirroring the bus publisher):
+	// the rest of the API keeps serving even if the gRPC port is unavailable. Set
+	// GRPC_PORT=off to disable the listener entirely.
+	grpcPort := os.Getenv("GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "50051"
+	}
+	var grpcServer *grpc.Server
+	if grpcPort != "off" {
+		grpcServer = grpcapi.NewGRPCServer(eventAPI.Service, l)
+		grpcLis, err := net.Listen("tcp", ":"+grpcPort)
+		if err != nil {
+			l.Errorf("[gRPC] failed to listen on :%s: %s", grpcPort, err.Error())
+			grpcServer = nil
+		} else {
+			go func() {
+				l.Infof("[gRPC] EventTeamService listening on :%s", grpcPort)
+				if serveErr := grpcServer.Serve(grpcLis); serveErr != nil {
+					l.Errorf("[gRPC] server stopped: %s", serveErr.Error())
+				}
+			}()
+		}
+	}
+
 	// Set up server configuration
 	s := &http.Server{
 		Addr:         `:` + config.Port,
@@ -262,6 +293,11 @@ func main() {
 
 	// Stop the event polling ticker goroutine before tearing down dependencies.
 	pollCancel()
+
+	// Stop accepting new gRPC calls and let in-flight AddTeamMember calls finish.
+	if grpcServer != nil {
+		grpcServer.GracefulStop()
+	}
 
 	tc, c := context.WithTimeout(context.Background(), 30*time.Second)
 	defer c()

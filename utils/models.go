@@ -66,13 +66,14 @@ type CollectionsConfig struct {
 	OrganizationMembersCollection string
 
 	// Events
-	EventsCollection            string
-	EventLogsCollection         string
-	EventViewsCollection        string
-	EventTeamsCollection        string
-	EventCommentsCollection     string
-	EventInvitationsCollection  string
-	EventParticipantsCollection string
+	EventsCollection                string
+	EventLogsCollection             string
+	EventViewsCollection            string
+	EventTeamsCollection            string
+	EventTeamApplicationsCollection string
+	EventCommentsCollection         string
+	EventInvitationsCollection      string
+	EventParticipantsCollection     string
 
 	// Venues
 	VenuesCollection       string

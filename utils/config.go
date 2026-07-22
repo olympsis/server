@@ -273,6 +273,13 @@ func GetCollectionsConfig() CollectionsConfig {
 	if eventTeamsCollection == "" {
 		panic("event teams collection name required in config")
 	}
+	// Defaulted (not panicked) on purpose: this collection was introduced with the
+	// team-RSVP feature, so existing dev/prod .env files don't set it. Falling back
+	// to a sensible default keeps those deployments booting without an env change.
+	eventTeamApplicationsCollection := os.Getenv("EVENT_TEAM_APPLICATIONS_COLLECTION")
+	if eventTeamApplicationsCollection == "" {
+		eventTeamApplicationsCollection = "eventTeamApplications"
+	}
 	eventCommentsCollection := os.Getenv("EVENT_COMMENTS_COLLECTION")
 	if eventCommentsCollection == "" {
 		panic("event comments collection name required in config")
@@ -433,13 +440,14 @@ func GetCollectionsConfig() CollectionsConfig {
 		OrgApplicationCollection:      orgApplicationCollection,
 		OrganizationMembersCollection: organizationMembersCollection,
 
-		EventsCollection:            eventsCollection,
-		EventLogsCollection:         eventLogsCollection,
-		EventViewsCollection:        eventViewsCollection,
-		EventTeamsCollection:        eventTeamsCollection,
-		EventCommentsCollection:     eventCommentsCollection,
-		EventInvitationsCollection:  eventInvitationsCollection,
-		EventParticipantsCollection: eventParticipantsCollection,
+		EventsCollection:                eventsCollection,
+		EventLogsCollection:             eventLogsCollection,
+		EventViewsCollection:            eventViewsCollection,
+		EventTeamsCollection:            eventTeamsCollection,
+		EventTeamApplicationsCollection: eventTeamApplicationsCollection,
+		EventCommentsCollection:         eventCommentsCollection,
+		EventInvitationsCollection:      eventInvitationsCollection,
+		EventParticipantsCollection:     eventParticipantsCollection,
 
 		VenuesCollection:       venuesCollection,
 		VenueUnitsCollection:   venueUnitsCollection,

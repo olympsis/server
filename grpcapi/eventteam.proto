@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package eventteam;
+
+// Generated Go lands in grpcapi/eventteampb (package eventteampb). Regenerate
+// with `make proto` after changing this file; the generated *.pb.go files are
+// committed so building the server never requires protoc.
+option go_package = "olympsis-server/grpcapi/eventteampb;eventteampb";
+
+// EventTeamService is the internal, inter-service write API for event teams. It
+// is NOT exposed through the public gateway — only other olympsis services call
+// it. Today its sole caller is invite-service, which invokes AddTeamMember when
+// a user accepts a TEAM invite (membership = the RSVP).
+service EventTeamService {
+  rpc AddTeamMember(AddTeamMemberRequest) returns (AddTeamMemberResponse);
+}
+
+message AddTeamMemberRequest {
+  string team_id = 1; // hex ObjectID of the team the user was invited to
+  string user_id = 2; // firebase uid of the accepting user
+}
+
+message AddTeamMemberResponse {
+  // added is true only when this call newly added the member. It is false (with
+  // no error) for the harmless idempotent cases: the user is already on the
+  // team, the team is at capacity, or the team no longer exists.
+  bool added = 1;
+  string reason = 2; // "" when added; otherwise "already_member" | "team_full" | "team_not_found"
+}

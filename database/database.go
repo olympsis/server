@@ -43,6 +43,7 @@ type Database struct {
 	EventLogsCollection                 *mongo.Collection
 	EventViewsCollection                *mongo.Collection
 	EventTeamsCollection                *mongo.Collection
+	EventTeamApplicationsCollection     *mongo.Collection
 	EventCommentsCollection             *mongo.Collection
 	EventInvitationsCollection          *mongo.Collection
 	EventParticipantsCollection         *mongo.Collection

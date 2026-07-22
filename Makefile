@@ -6,9 +6,19 @@ PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
-.PHONY: all dep build clean test coverage coverhtml lint
+.PHONY: all dep build clean test coverage coverhtml lint proto
 
 all: build
+
+# Regenerate Go from grpcapi/eventteam.proto into grpcapi/eventteampb. Dev-only:
+# the generated *.pb.go files are committed so the hosting box just needs
+# `go build`. Requires protoc + protoc-gen-go + protoc-gen-go-grpc on PATH
+# (see invite-service/Makefile for the one-time install commands).
+proto:
+	PATH="$$PATH:$$(go env GOPATH)/bin" protoc \
+		--go_out=. --go_opt=module=olympsis-server \
+		--go-grpc_out=. --go-grpc_opt=module=olympsis-server \
+		grpcapi/eventteam.proto
 
 lint: ## Lint the files
 	golint -set_exit_status ${PKG_LIST}

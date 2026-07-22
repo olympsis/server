@@ -174,6 +174,78 @@ func (e *EventAPI) Ready(firebase *auth.Client) {
 		),
 	).Methods("DELETE", "OPTIONS")
 
+	// join an open team
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/join",
+		middleware.Chain(
+			e.Service.JoinTeam(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// invite more users to a team (owner only)
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/invites",
+		middleware.Chain(
+			e.Service.InviteToTeam(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// transfer team ownership (owner only)
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/owner",
+		middleware.Chain(
+			e.Service.TransferTeamOwnership(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("PUT", "OPTIONS")
+
+	// leave a team (self)
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/members",
+		middleware.Chain(
+			e.Service.LeaveTeam(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("DELETE", "OPTIONS")
+
+	// kick a member from a team (owner only)
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/members/{memberUserID}",
+		middleware.Chain(
+			e.Service.KickTeamMember(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("DELETE", "OPTIONS")
+
+	// apply to a closed team
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/applications",
+		middleware.Chain(
+			e.Service.CreateTeamApplication(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("POST", "OPTIONS")
+
+	// list a team's applications (owner only)
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/applications",
+		middleware.Chain(
+			e.Service.GetTeamApplications(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("GET", "OPTIONS")
+
+	// approve/deny a team application (owner only)
+	e.Router.Handle("/v1/events/{id}/teams/{teamID}/applications/{applicationID}",
+		middleware.Chain(
+			e.Service.UpdateTeamApplication(),
+			middleware.Logging(),
+			middleware.UserMiddleware(firebase),
+		),
+	).Methods("PUT", "OPTIONS")
+
 	/*
 		EVENT COMMENTS
 	*/
