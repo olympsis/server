@@ -7,12 +7,14 @@ package eventteam;
 // committed so building the server never requires protoc.
 option go_package = "olympsis-server/grpcapi/eventteampb;eventteampb";
 
-// EventTeamService is the internal, inter-service write API for event teams. It
-// is NOT exposed through the public gateway — only other olympsis services call
-// it. Today its sole caller is invite-service, which invokes AddTeamMember when
-// a user accepts a TEAM invite (membership = the RSVP).
+// EventTeamService is the internal, inter-service write API for event teams and
+// participants. It is NOT exposed through the public gateway — only other
+// olympsis services call it. Its sole caller is invite-service, which invokes
+// AddTeamMember when a user accepts a TEAM invite (membership = the RSVP) and
+// AddParticipant when a user accepts an EVENT invite (an individual RSVP row).
 service EventTeamService {
   rpc AddTeamMember(AddTeamMemberRequest) returns (AddTeamMemberResponse);
+  rpc AddParticipant(AddParticipantRequest) returns (AddParticipantResponse);
 }
 
 message AddTeamMemberRequest {
@@ -26,4 +28,19 @@ message AddTeamMemberResponse {
   // team, the team is at capacity, or the team no longer exists.
   bool added = 1;
   string reason = 2; // "" when added; otherwise "already_member" | "team_full" | "team_not_found"
+}
+
+message AddParticipantRequest {
+  string event_id = 1; // hex ObjectID of the event the user was invited to
+  string user_id = 2;  // firebase uid of the accepting user
+}
+
+message AddParticipantResponse {
+  // added is true only when this call newly created the participant. It is false
+  // (with no error) for the harmless idempotent cases: the user is already a
+  // participant, the event no longer exists, the event is team-RSVP only, or an
+  // existing non-confirmed RSVP was upgraded to YES ("promoted" — a status
+  // change, not a new row, so added stays false).
+  bool added = 1;
+  string reason = 2; // "" when added; otherwise "already_participant" | "event_not_found" | "team_rsvp_required" | "promoted"
 }

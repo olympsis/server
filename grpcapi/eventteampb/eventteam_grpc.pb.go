@@ -19,19 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	EventTeamService_AddTeamMember_FullMethodName = "/eventteam.EventTeamService/AddTeamMember"
+	EventTeamService_AddTeamMember_FullMethodName  = "/eventteam.EventTeamService/AddTeamMember"
+	EventTeamService_AddParticipant_FullMethodName = "/eventteam.EventTeamService/AddParticipant"
 )
 
 // EventTeamServiceClient is the client API for EventTeamService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// EventTeamService is the internal, inter-service write API for event teams. It
-// is NOT exposed through the public gateway — only other olympsis services call
-// it. Today its sole caller is invite-service, which invokes AddTeamMember when
-// a user accepts a TEAM invite (membership = the RSVP).
+// EventTeamService is the internal, inter-service write API for event teams and
+// participants. It is NOT exposed through the public gateway — only other
+// olympsis services call it. Its sole caller is invite-service, which invokes
+// AddTeamMember when a user accepts a TEAM invite (membership = the RSVP) and
+// AddParticipant when a user accepts an EVENT invite (an individual RSVP row).
 type EventTeamServiceClient interface {
 	AddTeamMember(ctx context.Context, in *AddTeamMemberRequest, opts ...grpc.CallOption) (*AddTeamMemberResponse, error)
+	AddParticipant(ctx context.Context, in *AddParticipantRequest, opts ...grpc.CallOption) (*AddParticipantResponse, error)
 }
 
 type eventTeamServiceClient struct {
@@ -52,16 +55,28 @@ func (c *eventTeamServiceClient) AddTeamMember(ctx context.Context, in *AddTeamM
 	return out, nil
 }
 
+func (c *eventTeamServiceClient) AddParticipant(ctx context.Context, in *AddParticipantRequest, opts ...grpc.CallOption) (*AddParticipantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddParticipantResponse)
+	err := c.cc.Invoke(ctx, EventTeamService_AddParticipant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EventTeamServiceServer is the server API for EventTeamService service.
 // All implementations must embed UnimplementedEventTeamServiceServer
 // for forward compatibility.
 //
-// EventTeamService is the internal, inter-service write API for event teams. It
-// is NOT exposed through the public gateway — only other olympsis services call
-// it. Today its sole caller is invite-service, which invokes AddTeamMember when
-// a user accepts a TEAM invite (membership = the RSVP).
+// EventTeamService is the internal, inter-service write API for event teams and
+// participants. It is NOT exposed through the public gateway — only other
+// olympsis services call it. Its sole caller is invite-service, which invokes
+// AddTeamMember when a user accepts a TEAM invite (membership = the RSVP) and
+// AddParticipant when a user accepts an EVENT invite (an individual RSVP row).
 type EventTeamServiceServer interface {
 	AddTeamMember(context.Context, *AddTeamMemberRequest) (*AddTeamMemberResponse, error)
+	AddParticipant(context.Context, *AddParticipantRequest) (*AddParticipantResponse, error)
 	mustEmbedUnimplementedEventTeamServiceServer()
 }
 
@@ -74,6 +89,9 @@ type UnimplementedEventTeamServiceServer struct{}
 
 func (UnimplementedEventTeamServiceServer) AddTeamMember(context.Context, *AddTeamMemberRequest) (*AddTeamMemberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddTeamMember not implemented")
+}
+func (UnimplementedEventTeamServiceServer) AddParticipant(context.Context, *AddParticipantRequest) (*AddParticipantResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddParticipant not implemented")
 }
 func (UnimplementedEventTeamServiceServer) mustEmbedUnimplementedEventTeamServiceServer() {}
 func (UnimplementedEventTeamServiceServer) testEmbeddedByValue()                          {}
@@ -114,6 +132,24 @@ func _EventTeamService_AddTeamMember_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EventTeamService_AddParticipant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddParticipantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EventTeamServiceServer).AddParticipant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EventTeamService_AddParticipant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EventTeamServiceServer).AddParticipant(ctx, req.(*AddParticipantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EventTeamService_ServiceDesc is the grpc.ServiceDesc for EventTeamService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -124,6 +160,10 @@ var EventTeamService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddTeamMember",
 			Handler:    _EventTeamService_AddTeamMember_Handler,
+		},
+		{
+			MethodName: "AddParticipant",
+			Handler:    _EventTeamService_AddParticipant_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -128,6 +128,113 @@ func (x *AddTeamMemberResponse) GetReason() string {
 	return ""
 }
 
+type AddParticipantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"` // hex ObjectID of the event the user was invited to
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`    // firebase uid of the accepting user
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddParticipantRequest) Reset() {
+	*x = AddParticipantRequest{}
+	mi := &file_grpcapi_eventteam_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddParticipantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddParticipantRequest) ProtoMessage() {}
+
+func (x *AddParticipantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_grpcapi_eventteam_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddParticipantRequest.ProtoReflect.Descriptor instead.
+func (*AddParticipantRequest) Descriptor() ([]byte, []int) {
+	return file_grpcapi_eventteam_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AddParticipantRequest) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *AddParticipantRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type AddParticipantResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// added is true only when this call newly created the participant. It is false
+	// (with no error) for the harmless idempotent cases: the user is already a
+	// participant, the event no longer exists, or the event is team-RSVP only.
+	Added         bool   `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"` // "" when added; otherwise "already_participant" | "event_not_found" | "team_rsvp_required"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddParticipantResponse) Reset() {
+	*x = AddParticipantResponse{}
+	mi := &file_grpcapi_eventteam_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddParticipantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddParticipantResponse) ProtoMessage() {}
+
+func (x *AddParticipantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_grpcapi_eventteam_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddParticipantResponse.ProtoReflect.Descriptor instead.
+func (*AddParticipantResponse) Descriptor() ([]byte, []int) {
+	return file_grpcapi_eventteam_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AddParticipantResponse) GetAdded() bool {
+	if x != nil {
+		return x.Added
+	}
+	return false
+}
+
+func (x *AddParticipantResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 var File_grpcapi_eventteam_proto protoreflect.FileDescriptor
 
 const file_grpcapi_eventteam_proto_rawDesc = "" +
@@ -138,9 +245,16 @@ const file_grpcapi_eventteam_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\"E\n" +
 	"\x15AddTeamMemberResponse\x12\x14\n" +
 	"\x05added\x18\x01 \x01(\bR\x05added\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason2f\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"K\n" +
+	"\x15AddParticipantRequest\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"F\n" +
+	"\x16AddParticipantResponse\x12\x14\n" +
+	"\x05added\x18\x01 \x01(\bR\x05added\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason2\xbd\x01\n" +
 	"\x10EventTeamService\x12R\n" +
-	"\rAddTeamMember\x12\x1f.eventteam.AddTeamMemberRequest\x1a .eventteam.AddTeamMemberResponseB1Z/olympsis-server/grpcapi/eventteampb;eventteampbb\x06proto3"
+	"\rAddTeamMember\x12\x1f.eventteam.AddTeamMemberRequest\x1a .eventteam.AddTeamMemberResponse\x12U\n" +
+	"\x0eAddParticipant\x12 .eventteam.AddParticipantRequest\x1a!.eventteam.AddParticipantResponseB1Z/olympsis-server/grpcapi/eventteampb;eventteampbb\x06proto3"
 
 var (
 	file_grpcapi_eventteam_proto_rawDescOnce sync.Once
@@ -154,16 +268,20 @@ func file_grpcapi_eventteam_proto_rawDescGZIP() []byte {
 	return file_grpcapi_eventteam_proto_rawDescData
 }
 
-var file_grpcapi_eventteam_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_grpcapi_eventteam_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_grpcapi_eventteam_proto_goTypes = []any{
-	(*AddTeamMemberRequest)(nil),  // 0: eventteam.AddTeamMemberRequest
-	(*AddTeamMemberResponse)(nil), // 1: eventteam.AddTeamMemberResponse
+	(*AddTeamMemberRequest)(nil),   // 0: eventteam.AddTeamMemberRequest
+	(*AddTeamMemberResponse)(nil),  // 1: eventteam.AddTeamMemberResponse
+	(*AddParticipantRequest)(nil),  // 2: eventteam.AddParticipantRequest
+	(*AddParticipantResponse)(nil), // 3: eventteam.AddParticipantResponse
 }
 var file_grpcapi_eventteam_proto_depIdxs = []int32{
 	0, // 0: eventteam.EventTeamService.AddTeamMember:input_type -> eventteam.AddTeamMemberRequest
-	1, // 1: eventteam.EventTeamService.AddTeamMember:output_type -> eventteam.AddTeamMemberResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: eventteam.EventTeamService.AddParticipant:input_type -> eventteam.AddParticipantRequest
+	1, // 2: eventteam.EventTeamService.AddTeamMember:output_type -> eventteam.AddTeamMemberResponse
+	3, // 3: eventteam.EventTeamService.AddParticipant:output_type -> eventteam.AddParticipantResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -180,7 +298,7 @@ func file_grpcapi_eventteam_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_grpcapi_eventteam_proto_rawDesc), len(file_grpcapi_eventteam_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
