@@ -130,12 +130,32 @@ unsecure-server: #Un-secure server with http
 # Unlike the server, those modules carry no `replace => ../models`, so models
 # can only come from AR and their builds need credentials. The token is
 # short-lived, hence regenerating on every dev-up. files/ is gitignored.
+#
+# Override the account with `make dev-up GCLOUD_ACCOUNT=someone@example.com`.
+#
+# The token is checked against the registry BEFORE writing it. An account
+# without artifactregistry.reader still mints a perfectly valid token, and AR
+# answers 403 to every request with it — including for public modules, which
+# Go does not treat as fall-through (only 404/410), so the failure surfaces as
+# a confusing "403 on cloud.google.com/go" ten layers deep in a docker build.
+ACCT_FLAG := $(if $(GCLOUD_ACCOUNT),--account=$(GCLOUD_ACCOUNT))
 dev-netrc:
-	@gcloud auth print-access-token >/dev/null 2>&1 || \
+	@gcloud auth print-access-token $(ACCT_FLAG) >/dev/null 2>&1 || \
 		{ echo "run 'gcloud auth login' first"; exit 1; }
-	@umask 077; printf 'machine $(AR_LOCATION)-go.pkg.dev\nlogin oauth2accesstoken\npassword %s\n' \
-		"$$(gcloud auth print-access-token)" > files/netrc
-	@echo "wrote files/netrc"
+	@T=$$(gcloud auth print-access-token $(ACCT_FLAG)); \
+	ACCT=$${GCLOUD_ACCOUNT:-$$(gcloud config get-value account 2>/dev/null)}; \
+	CODE=$$(curl -s -o /dev/null -w '%{http_code}' -u "oauth2accesstoken:$$T" \
+		"https://$(AR_LOCATION)-go.pkg.dev/$(PROJECT_ID)/go-modules/github.com/olympsis/models/@v/list"); \
+	if [ "$$CODE" != "200" ]; then \
+		echo "Artifact Registry rejected $$ACCT (HTTP $$CODE)."; \
+		echo "That account needs roles/artifactregistry.reader on $(PROJECT_ID)."; \
+		echo "Either grant it, or use an account that already has it:"; \
+		echo "    make dev-up GCLOUD_ACCOUNT=<email>"; \
+		echo "    gcloud config set account <email>"; \
+		exit 1; \
+	fi; \
+	umask 077; printf 'machine $(AR_LOCATION)-go.pkg.dev\nlogin oauth2accesstoken\npassword %s\n' "$$T" > files/netrc; \
+	echo "wrote files/netrc (account: $$ACCT)"
 
 dev-up: dev-netrc #Runs the docker-compose stack to set up local environment
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-dev-server" | xargs -I {} docker rmi {}
