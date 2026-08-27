@@ -3,3 +3,7 @@
 files/
 tools/
 *.md
+# GitHub Actions credential files. google-github-actions/auth writes these into
+# the workspace root, which is the docker build context — without this they land
+# in the builder layer and, via `cache-to: type=gha`, in the Actions cache.
+gha-creds-*.json
