@@ -26,7 +26,7 @@ PKG := "$(SERVICE_NAME)"
 PKG_LIST := $( go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
-.PHONY: all dep build clean test coverage coverhtml lint proto release artifact deploy-mac-mini
+.PHONY: all dep build clean test coverage coverhtml lint proto release artifact deploy-mac-mini dev-netrc
 
 all: build
 
@@ -126,7 +126,18 @@ unsecure-server: #Un-secure server with http
 		--env-file .env.dev \
 		-p 80:80 $(SERVICE_NAME)-unsecure:latest
 
-dev-up: #Runs the docker-compose stack to set up local environment
+# Artifact Registry token for the invite/notif image builds in compose.dev.
+# Unlike the server, those modules carry no `replace => ../models`, so models
+# can only come from AR and their builds need credentials. The token is
+# short-lived, hence regenerating on every dev-up. files/ is gitignored.
+dev-netrc:
+	@gcloud auth print-access-token >/dev/null 2>&1 || \
+		{ echo "run 'gcloud auth login' first"; exit 1; }
+	@umask 077; printf 'machine $(AR_LOCATION)-go.pkg.dev\nlogin oauth2accesstoken\npassword %s\n' \
+		"$$(gcloud auth print-access-token)" > files/netrc
+	@echo "wrote files/netrc"
+
+dev-up: dev-netrc #Runs the docker-compose stack to set up local environment
 	docker images --format '{{.Repository}}:{{.Tag}}' | grep "olympsis-dev-server" | xargs -I {} docker rmi {}
 	docker-compose -f compose.dev.yaml up -d
 

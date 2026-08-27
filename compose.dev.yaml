@@ -20,6 +20,13 @@ secrets:
         environment: APPLE_TEAM_ID
     mapkit_token:
         environment: MAPKIT_TOKEN
+    # Artifact Registry token for the invite/notif image builds. Unlike the
+    # server, those modules have no `replace => ../models`, so models can only
+    # come from AR and the build needs credentials. `make dev-netrc` writes this
+    # from gcloud; `make dev-up` regenerates it first because the token is
+    # short-lived. Mounted as a BuildKit secret, so it never lands in a layer.
+    netrc:
+        file: ./files/netrc
 
 services:
     gateway:
@@ -34,13 +41,10 @@ services:
             # Published on :80 because the iOS dev client resolves apiHost to a
             # bare "localhost" with no port. The server moved to :8080 to free it.
             - 80:8080
-        extra_hosts:
-            # Lets the gateway reach invite-service/notif-service, which run as
-            # host processes (`make run`) rather than containers. Implicit on
-            # Docker Desktop, required on a Linux host.
-            - "host.docker.internal:host-gateway"
         depends_on:
             - server
+            - invite-service
+            - notif-service
     server:
         build:
             context: .
@@ -58,10 +62,9 @@ services:
             # owns :80 now; this stays published so curl/seed scripts can hit a
             # handler without a matching KrakenD endpoint declaration.
             - 8080:80
-            # Internal gRPC (EventTeamService). Published so invite-service —
-            # which runs on the host, not in this stack — can reach it on
-            # localhost:50051 to add members/participants when an invite is
-            # accepted. Without this, accepting a TEAM/EVENT invite 502s in dev.
+            # Internal gRPC (EventTeamService). invite-service now reaches this
+            # in-network as server:50051; the publish stays for grpcurl and for
+            # running invite-service on the host with `make run` instead.
             - 50051:50051
         volumes:
             - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
@@ -71,9 +74,76 @@ services:
             - ./files/AuthKey_5PR7XV2XXL.p8:/app/AuthKey_5PR7XV2XXL.p8:ro
             - ./files/AuthKey_FQ38XX3HXG.p8:/app/AuthKey_FQ38XX3HXG.p8:ro
         env_file: .env.dev
+        environment:
+            # invite-service is in this stack now, so reach it by service name.
+            # .env.dev still says host.docker.internal:9082, which was correct
+            # only while it ran on the host under `make run`.
+            INVITE_GRPC_ADDR: invite-service:9082
         depends_on:
             - mongo
             - redis
+            - rabbitmq
+
+    # Both services build from their sibling checkouts so local edits land in
+    # the dev stack, matching how `server` is built above. Their ports stay
+    # published for direct curl/grpcurl — which also means `make run` copies on
+    # the host must be stopped first, or the bind fails.
+    invite-service:
+        build:
+            context: ../invite-service
+            secrets:
+                - netrc
+            args:
+                GOPROXY: https://northamerica-northeast1-go.pkg.dev/olympsis-485522/go-modules,https://proxy.golang.org,direct
+                GONOSUMDB: github.com/olympsis/*
+        container_name: invite-service
+        restart: always
+        ports:
+            - 8082:8082
+            - 9082:9082
+        volumes:
+            - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
+        # env_file gives MODE=DEVELOPMENT and the in-stack RABBITMQ_URL;
+        # `environment` supplies the names this service uses that differ from
+        # the server's (MONGO_URI vs MONGO_ADDRESS) and so must win.
+        env_file: .env.dev
+        environment:
+            PORT: "8082"
+            GRPC_PORT: "9082"
+            MONGO_URI: mongodb://admin:olympsis@mongo:27017
+            MONGO_DB: olympsis
+            SERVER_GRPC_ADDR: server:50051
+            FIREBASE_FILE_PATH: /app/firebase-credentials.json
+        depends_on:
+            - mongo
+            - rabbitmq
+
+    notif-service:
+        build:
+            context: ../notif-service
+            secrets:
+                - netrc
+            args:
+                GOPROXY: https://northamerica-northeast1-go.pkg.dev/olympsis-485522/go-modules,https://proxy.golang.org,direct
+                GONOSUMDB: github.com/olympsis/*
+        container_name: notif-service
+        restart: always
+        ports:
+            - 8083:8083
+            - 9083:9083
+        volumes:
+            - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
+            - ./files/AuthKey_5PR7XV2XXL.p8:/app/AuthKey_5PR7XV2XXL.p8:ro
+        env_file: .env.dev
+        environment:
+            PORT: "8083"
+            GRPC_PORT: "9083"
+            MONGO_URI: mongodb://admin:olympsis@mongo:27017
+            MONGO_DB: olympsis
+            FIREBASE_FILE_PATH: /app/firebase-credentials.json
+            APNS_FILE_PATH: /app/AuthKey_5PR7XV2XXL.p8
+        depends_on:
+            - mongo
             - rabbitmq
 
     mongo:

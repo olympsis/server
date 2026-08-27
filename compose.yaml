@@ -53,6 +53,13 @@ services:
             # resolves to the server itself, so the invite client never reached
             # invite-service at all (check-in silently returns no invites).
             INVITE_GRPC_ADDR: invite-service:9082
+            # .env.prod carries no RabbitMQ settings at all, and the bus treats
+            # a blank URL as "publishing disabled" — so the server has been
+            # publishing no events, while invite-service and notif-service
+            # consume from that exchange. Same required variable those two use,
+            # so one .env value wires all three to the same broker.
+            RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in the .env beside compose.yaml}
+            RABBITMQ_EXCHANGE: olympsis.events
         depends_on:
             - invite-service
 

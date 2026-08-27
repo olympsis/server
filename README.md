@@ -229,8 +229,31 @@ in ways that do not announce themselves:
    stack, and a wrong broker URL fails open — the services start cleanly and
    silently consume nothing. Compose refuses to start without it.
 
+   The **server** now reads the same variable. `.env.prod` carried no RabbitMQ
+   settings at all, and the bus treats a blank URL as "publishing disabled" —
+   so the server was publishing nothing while these two consumed from that
+   exchange. One `.env` value now wires all three to the same broker.
+
 > The services publish a binary as well as an image, so the pm2 path still
 > works as a fallback — `make deploy-mac-mini V=...` in either repo.
+
+### The dev stack
+
+`compose.dev.yaml` runs all three plus its own RabbitMQ, so dev is
+self-contained. Both services **build from their sibling checkouts**
+(`../invite-service`, `../notif-service`), so local edits land in the stack the
+same way `server` does.
+
+One wrinkle: unlike the server, neither carries a `replace => ../models`, so
+models can only come from Artifact Registry and their image builds need a
+token. `make dev-up` handles it — it runs `dev-netrc` first, which writes
+`files/netrc` from `gcloud auth print-access-token` and hands it to BuildKit as
+a secret (never a layer). It regenerates every time because the token is
+short-lived, so `gcloud auth login` must be current.
+
+Their ports are published (`8082/9082`, `8083/9083`) for direct curl and
+grpcurl, which means any `make run` copies on the host must be stopped first or
+the bind fails.
 
 ### Manual / local builds
 
