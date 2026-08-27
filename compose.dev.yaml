@@ -24,13 +24,23 @@ secrets:
 services:
     gateway:
         container_name: gateway
-        image: apache/apisix
+        image: krakend:2.10
         restart: always
         volumes:
-            - ./files/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
-            - ./files/apisix-routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+            # The image's default command is `krakend run -c krakend.json` from
+            # WORKDIR /etc/krakend, so the config has to land on this exact path.
+            - ./files/krakend.dev.json:/etc/krakend/krakend.json:ro
         ports:
-            - 9080:9080
+            # Published on :80 because the iOS dev client resolves apiHost to a
+            # bare "localhost" with no port. The server moved to :8080 to free it.
+            - 80:8080
+        extra_hosts:
+            # Lets the gateway reach invite-service/notif-service, which run as
+            # host processes (`make run`) rather than containers. Implicit on
+            # Docker Desktop, required on a Linux host.
+            - "host.docker.internal:host-gateway"
+        depends_on:
+            - server
     server:
         build:
             context: .
@@ -44,7 +54,10 @@ services:
         container_name: server
         restart: always
         ports:
-            - 80:80
+            # Direct access to the server, bypassing the gateway. The gateway
+            # owns :80 now; this stays published so curl/seed scripts can hit a
+            # handler without a matching KrakenD endpoint declaration.
+            - 8080:80
             # Internal gRPC (EventTeamService). Published so invite-service —
             # which runs on the host, not in this stack — can reach it on
             # localhost:50051 to add members/participants when an invite is
@@ -59,7 +72,6 @@ services:
             - ./files/AuthKey_FQ38XX3HXG.p8:/app/AuthKey_FQ38XX3HXG.p8:ro
         env_file: .env.dev
         depends_on:
-            - gateway
             - mongo
             - redis
             - rabbitmq

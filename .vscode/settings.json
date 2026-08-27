@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "artifactregistry",
         "bbox",
         "coverhtml",
         "dsphere",
@@ -11,11 +12,14 @@
         "Infof",
         "INITDB",
         "joels",
+        "krakend",
+        "ldflags",
         "MAPKIT",
         "mapsnapshots",
         "moid",
         "msan",
         "myserver",
+        "northamerica",
         "Rvme",
         "seti",
         "UVUNV",
