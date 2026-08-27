@@ -191,7 +191,7 @@ GitHub-hosted runners cannot reach the Mac mini, so CD publishes to a registry
 the mini **pulls from** rather than pushing to it:
 
 ```sh
-make deploy-mac-mini V=v0.9.5   # gcloud download -> chmod +x -> pm2 restart
+make deploy-mac-mini V=v0.8.0   # gcloud download -> chmod +x -> pm2 restart
 ```
 
 For the container host, bump the tag in `compose.yaml` and:
@@ -199,6 +199,38 @@ For the container host, bump the tag in `compose.yaml` and:
 ```sh
 docker compose pull server && docker compose up -d server
 ```
+
+### invite-service / notif-service in the stack
+
+Both now run as containers in `compose.yaml` rather than as pm2 processes.
+The stack reaches them by container name, so the gateway's four invite and two
+notif routes moved from `host.docker.internal:{8082,8083}` to
+`invite-service:8082` / `notif-service:8083`.
+
+Three things must be true before `docker compose up`, or the cutover misbehaves
+in ways that do not announce themselves:
+
+1. **Stop the pm2 instances first.**
+   ```sh
+   sudo env PATH=/opt/homebrew/bin:$PATH HOME=/Users/joel pm2 stop invite-service notif-service
+   ```
+   Both consume from the same RabbitMQ queues. Leaving pm2 running alongside
+   the containers means two consumers competing for each message, so roughly
+   half of all invites and notifications get handled by the old binary. Nothing
+   errors — the work just lands in the wrong process.
+
+2. **Ship the updated `krakend.prod.json`.** It is gitignored (`/files/*`), so
+   CD never touches it; copy it to the deploy directory by hand. Until then the
+   gateway still resolves `host.docker.internal`, reaching the stopped pm2
+   processes and returning 502 on those six routes.
+
+3. **Set `RABBITMQ_URL` in the `.env` beside `compose.yaml`.** It has no
+   default on purpose: RabbitMQ still runs on the host under pm2, not in this
+   stack, and a wrong broker URL fails open — the services start cleanly and
+   silently consume nothing. Compose refuses to start without it.
+
+> The services publish a binary as well as an image, so the pm2 path still
+> works as a fallback — `make deploy-mac-mini V=...` in either repo.
 
 ### Manual / local builds
 

@@ -1,5 +1,3 @@
-version: "3.0"
-
 volumes:
     mongo-data:
         external: true
@@ -23,13 +21,11 @@ services:
         ports:
             # Same host port apisix used, so whatever fronts this needs no change.
             - 9080:8080
-        extra_hosts:
-            # invite-service and notif-service run on the host under pm2, not in
-            # this stack, so the gateway reaches them via the host gateway IP.
-            - "host.docker.internal:host-gateway"
         depends_on:
             - server
             - storage
+            - invite-service
+            - notif-service
 
     server:
         container_name: server
@@ -49,6 +45,14 @@ services:
             - ./AuthKey_PWK5QB5Z6R.p8:/app/AuthKey_PWK5QB5Z6R.p8:ro
             - ./firebase-credentials.json:/app/firebase-credentials.json:ro
         env_file: .env.prod
+        environment:
+            # In-network address for invite-service's gRPC listener. Overrides
+            # the localhost:9082 in .env.prod, which from inside this container
+            # resolves to the server itself, so the invite client never reached
+            # invite-service at all (check-in silently returns no invites).
+            INVITE_GRPC_ADDR: invite-service:9082
+        depends_on:
+            - invite-service
 
     storage:
         container_name: storage
@@ -88,6 +92,77 @@ services:
             - 6379:6379
         volumes:
             - redis-data:/data
+
+    invite-service:
+        container_name: invite-service
+        # Published by the invite-service repo's release workflow on `v*` tags.
+        image: northamerica-northeast1-docker.pkg.dev/olympsis-485522/docker-images/invite-service:v0.1.0
+        restart: always
+        pull_policy: always
+        networks:
+            - olympsis
+        # No host ports published on purpose: the only callers are the gateway
+        # (HTTP) and the server (gRPC), both in-network. Publishing 8082 would
+        # also collide with the pm2-managed instance until that one is stopped.
+        extra_hosts:
+            # RabbitMQ still runs on the host under pm2, not in this stack.
+            - "host.docker.internal:host-gateway"
+        volumes:
+            - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+        # env_file carries the shared secrets (MODE, Apple keys). `environment`
+        # then overrides the names this service uses, which differ from the
+        # server's — MONGO_URI here vs MONGO_ADDRESS there — and so must win
+        # over the server-shaped values inherited from the same file.
+        env_file: .env.prod
+        environment:
+            PORT: "8082"
+            GRPC_PORT: "9082"
+            MONGO_DB: olympsis
+            # Same in-stack mongo and root credentials declared for the mongo
+            # service below; this service reads MONGO_URI, not MONGO_ADDRESS.
+            MONGO_URI: mongodb://admin:olympsis@mongo:27017
+            # Required, no default: the host broker's real credentials are not
+            # guessable, and a wrong URL would fail open as "no events" rather
+            # than erroring. Set it in the .env next to this file.
+            RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in the .env beside compose.yaml}
+            RABBITMQ_EXCHANGE: olympsis.events
+            SERVER_GRPC_ADDR: server:50051
+            FIREBASE_FILE_PATH: /app/firebase-credentials.json
+        depends_on:
+            - mongo
+
+    notif-service:
+        container_name: notif-service
+        # Published by the notif-service repo's release workflow on `v*` tags.
+        image: northamerica-northeast1-docker.pkg.dev/olympsis-485522/docker-images/notif-service:v0.1.0
+        restart: always
+        pull_policy: always
+        networks:
+            - olympsis
+        # See invite-service: reached only in-network, and 8083 would collide
+        # with the pm2-managed instance.
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        volumes:
+            - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+            - ./AuthKey_PWK5QB5Z6R.p8:/app/AuthKey_PWK5QB5Z6R.p8:ro
+        env_file: .env.prod
+        environment:
+            PORT: "8083"
+            GRPC_PORT: "9083"
+            MONGO_DB: olympsis
+            # Same in-stack mongo and root credentials declared for the mongo
+            # service below; this service reads MONGO_URI, not MONGO_ADDRESS.
+            MONGO_URI: mongodb://admin:olympsis@mongo:27017
+            # Required, no default — see invite-service.
+            RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in the .env beside compose.yaml}
+            RABBITMQ_EXCHANGE: olympsis.events
+            FIREBASE_FILE_PATH: /app/firebase-credentials.json
+            # APPLE_KEY_ID / APPLE_TEAM_ID come from .env.prod — the same APNs
+            # key the server uses.
+            APNS_FILE_PATH: /app/AuthKey_PWK5QB5Z6R.p8
+        depends_on:
+            - mongo
 
 networks:
     olympsis:
