@@ -198,7 +198,7 @@ func (e *Service) RemoveParticipant() http.HandlerFunc {
 			}
 
 			// Notify the user that they have been removed
-			if err = e.Notification.ParticipantKick(event, participant); err != nil {
+			if err = e.Notification.ParticipantKick(event, participant, uuid); err != nil {
 				e.Logger.Errorf("Failed to notify user. Event ID: %s - Error: %s", eventID, err.Error())
 			}
 		} else { // User removing themselves from the list

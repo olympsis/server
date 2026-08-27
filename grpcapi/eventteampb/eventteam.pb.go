@@ -184,9 +184,11 @@ type AddParticipantResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// added is true only when this call newly created the participant. It is false
 	// (with no error) for the harmless idempotent cases: the user is already a
-	// participant, the event no longer exists, or the event is team-RSVP only.
+	// participant, the event no longer exists, the event is team-RSVP only, or an
+	// existing non-confirmed RSVP was upgraded to YES ("promoted" — a status
+	// change, not a new row, so added stays false).
 	Added         bool   `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
-	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"` // "" when added; otherwise "already_participant" | "event_not_found" | "team_rsvp_required"
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"` // "" when added; otherwise "already_participant" | "event_not_found" | "team_rsvp_required" | "promoted"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

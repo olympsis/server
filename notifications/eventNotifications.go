@@ -72,6 +72,8 @@ func (n *Service) NewEvent(id *bson.ObjectID, event *models.EventDao) error {
 			"event_media_url": event.MediaURL,
 			"username":        user.UserName,
 			"image_url":       user.ImageURL,
+			// Whoever created the event is the actor here.
+			"actor_id": *event.PosterID,
 		},
 		CreatedAt: timestamp,
 	}
@@ -145,6 +147,8 @@ func (n *Service) CancelEvent(id *bson.ObjectID, actor string) error {
 			"event_id":        id.Hex(),
 			"event_name":      event.Title,
 			"event_media_url": event.MediaURL,
+			// The organizer who cancelled it.
+			"actor_id": actor,
 		},
 		CreatedAt: timestamp,
 	}
@@ -158,7 +162,7 @@ func (n *Service) CancelEvent(id *bson.ObjectID, actor string) error {
 }
 
 // Someone commented
-func (n *Service) NewEventComment(id bson.ObjectID, comment string) error {
+func (n *Service) NewEventComment(id bson.ObjectID, comment, actorID string) error {
 	// Fetch event data
 	event, err := n.findEvent(id)
 	if err != nil {
@@ -207,8 +211,11 @@ func (n *Service) NewEventComment(id bson.ObjectID, comment string) error {
 		users = append(users, k)
 	}
 
-	// Fetch poster data
-	user, err := n.findUser(*event.PosterID)
+	// Fetch the COMMENTER, not the event poster. This previously looked up
+	// *event.PosterID, so every "new comment" notification showed the event's
+	// host as the author regardless of who actually commented. Now that the
+	// actor is plumbed through, use it.
+	user, err := n.findUser(actorID)
 	if err != nil {
 		return err
 	}
@@ -229,6 +236,8 @@ func (n *Service) NewEventComment(id bson.ObjectID, comment string) error {
 			"event_comment":   comment,
 			"username":        user.UserName,
 			"image_url":       user.ImageURL,
+			// The comment's author.
+			"actor_id": actorID,
 		},
 		CreatedAt: timestamp,
 	}
@@ -280,7 +289,7 @@ func (n *Service) EventReminder(id string) error {
 }
 
 // Event participant kicked
-func (n *Service) ParticipantKick(event *models.EventDao, participant *models.ParticipantDao) error {
+func (n *Service) ParticipantKick(event *models.EventDao, participant *models.ParticipantDao, actorID string) error {
 	// Create notification object
 	timestamp := bson.NewDateTimeFromTime(time.Now())
 	note := models.PushNotification{
@@ -294,6 +303,8 @@ func (n *Service) ParticipantKick(event *models.EventDao, participant *models.Pa
 			"event_id":        event.ID,
 			"event_name":      event.Title,
 			"event_media_url": event.MediaURL,
+			// The organizer who removed them.
+			"actor_id": actorID,
 		},
 		CreatedAt: timestamp,
 	}
@@ -318,6 +329,8 @@ func (n *Service) WaitlistPromotion(event *models.EventDao, participant *models.
 		Type:     "push",
 		Category: "events",
 		Data: map[string]any{
+			// No actor_id: a waitlist promotion is a side effect of someone
+			// else leaving, not an action taken against this recipient.
 			"type":            models.EventParticipantWaitlistUpgradeType,
 			"event_id":        event.ID,
 			"event_name":      event.Title,

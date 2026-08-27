@@ -30,4 +30,9 @@ type ServerInterface struct {
 	Storage      types.StorageUploader // GCP Storage upload capability
 
 	Bus *bus.Publisher // RabbitMQ publisher for cross-service domain events
+
+	// Invites reads a user's invites from invite-service over gRPC (used by
+	// check-in). May be nil if the client couldn't be built or was disabled, so
+	// consumers must nil-check and degrade rather than fail.
+	Invites types.InviteReader
 }

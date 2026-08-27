@@ -36,6 +36,8 @@ func (n *Service) NewApplication(id *bson.ObjectID, application *models.ClubAppl
 			"group_logo_url": club.Logo,
 			"username":       user.UserName,
 			"image_url":      user.ImageURL,
+			// The applicant is the actor here.
+			"actor_id": *application.Applicant,
 		},
 		CreatedAt: timestamp,
 	}
@@ -46,7 +48,7 @@ func (n *Service) NewApplication(id *bson.ObjectID, application *models.ClubAppl
 	return n.carousel.AddJob(1, request)
 }
 
-func (n *Service) ApplicationUpdate(id bson.ObjectID, app *models.ClubApplicationDao) error {
+func (n *Service) ApplicationUpdate(id bson.ObjectID, app *models.ClubApplicationDao, actorID string) error {
 	// Load club info
 	club, err := n.findClub(id)
 	if err != nil {
@@ -69,6 +71,8 @@ func (n *Service) ApplicationUpdate(id bson.ObjectID, app *models.ClubApplicatio
 			"group_id":       clubID,
 			"group_name":     name,
 			"group_logo_url": club.Logo,
+			// The admin who approved/denied the application.
+			"actor_id": actorID,
 		},
 		CreatedAt: timestamp,
 	}
@@ -79,7 +83,7 @@ func (n *Service) ApplicationUpdate(id bson.ObjectID, app *models.ClubApplicatio
 	return n.carousel.AddJob(1, request)
 }
 
-func (n *Service) ChangedRole(id bson.ObjectID, userID string, previous models.MemberRole, new models.MemberRole) error {
+func (n *Service) ChangedRole(id bson.ObjectID, userID string, previous models.MemberRole, new models.MemberRole, actorID string) error {
 	// Load club info
 	club, err := n.findClub(id)
 	if err != nil {
@@ -102,6 +106,8 @@ func (n *Service) ChangedRole(id bson.ObjectID, userID string, previous models.M
 			"group_id":       clubID,
 			"group_name":     name,
 			"group_logo_url": club.Logo,
+			// The admin who changed their role.
+			"actor_id": actorID,
 		},
 		CreatedAt: timestamp,
 	}
@@ -112,11 +118,11 @@ func (n *Service) ChangedRole(id bson.ObjectID, userID string, previous models.M
 	return n.carousel.AddJob(1, request)
 }
 
-func (n *Service) Suspended(id *bson.ObjectID, member *models.MemberDao) error {
+func (n *Service) Suspended(id *bson.ObjectID, member *models.MemberDao, actorID string) error {
 	return n.carousel.AddJob(1, models.NotificationPushRequest{})
 }
 
-func (n *Service) Kicked(id *bson.ObjectID, member *models.MemberDao) error {
+func (n *Service) Kicked(id *bson.ObjectID, member *models.MemberDao, actorID string) error {
 	// Load club info
 	club, err := n.findClub(*id)
 	if err != nil {
@@ -139,6 +145,8 @@ func (n *Service) Kicked(id *bson.ObjectID, member *models.MemberDao) error {
 			"group_id":       clubID,
 			"group_name":     name,
 			"group_logo_url": club.Logo,
+			// The admin who removed them.
+			"actor_id": actorID,
 		},
 		CreatedAt: timestamp,
 	}

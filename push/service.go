@@ -90,7 +90,7 @@ func (s *Service) Reminder(eventID string) error {
 // deliberately left unwired, so delivery can be restored by re-adding the single
 // call if notif-service has to be rolled back. Calling it while notif-service is
 // consuming would double-notify every recipient.
-func (s *Service) Comment(eventID, commentID string) error {
+func (s *Service) Comment(eventID, commentID, authorUserID string) error {
 	event, err := s.event(eventID)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (s *Service) Comment(eventID, commentID string) error {
 		return err
 	}
 
-	note, err := NewComment(eventID, derefStr(event.Title), derefStr(event.MediaURL), commentID)
+	note, err := NewComment(eventID, derefStr(event.Title), derefStr(event.MediaURL), commentID, authorUserID)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (s *Service) Participant(eventID, participantID, joinerUserID string) error
 		return err
 	}
 
-	note, err := NewParticipant(eventID, derefStr(event.Title), derefStr(event.MediaURL), participantID)
+	note, err := NewParticipant(eventID, derefStr(event.Title), derefStr(event.MediaURL), participantID, joinerUserID)
 	if err != nil {
 		return err
 	}

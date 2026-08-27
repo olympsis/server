@@ -18,11 +18,11 @@ func notes(t *testing.T) map[string]EventNote {
 	if err != nil {
 		t.Fatalf("NewReminder: %v", err)
 	}
-	participant, err := NewParticipant("evt1", "Pickup Soccer", absImage, "part1")
+	participant, err := NewParticipant("evt1", "Pickup Soccer", absImage, "part1", "actor-1")
 	if err != nil {
 		t.Fatalf("NewParticipant: %v", err)
 	}
-	comment, err := NewComment("evt1", "Pickup Soccer", absImage, "cmt1")
+	comment, err := NewComment("evt1", "Pickup Soccer", absImage, "cmt1", "actor-1")
 	if err != nil {
 		t.Fatalf("NewComment: %v", err)
 	}
@@ -215,9 +215,9 @@ func TestLocKeysMatchContract(t *testing.T) {
 // event_comment, this fails — catching the missing bump before deploy.
 func TestTypeRoutingStrings(t *testing.T) {
 	want := map[models.NotificationType]string{
-		models.EventReminderType:          "event_reminder",
-		models.EventParticipantUpdateType: "event_participant_update",
-		models.NewEventCommentType:        "event_comment",
+		models.EventReminderType:          "EVENT_REMINDER",
+		models.EventParticipantUpdateType: "EVENT_PARTICIPANT_UPDATE",
+		models.NewEventCommentType:        "EVENT_COMMENT",
 	}
 	for typ, str := range want {
 		if string(typ) != str {

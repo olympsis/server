@@ -173,6 +173,29 @@ func main() {
 		Bus: publisher, // RabbitMQ domain-event publisher
 	}
 
+	// Read client for invite-service's internal gRPC API. Check-in uses it to
+	// embed the user's pending invites, saving the app a second round trip at
+	// launch.
+	//
+	// Non-fatal, like the bus publisher: a bad address just means check-in
+	// returns no invites. Set INVITE_GRPC_ADDR=off to disable it entirely.
+	inviteGRPCAddr := os.Getenv("INVITE_GRPC_ADDR")
+	if inviteGRPCAddr == "" {
+		inviteGRPCAddr = "localhost:9082"
+	}
+	if inviteGRPCAddr != "off" {
+		// Assign through the concrete pointer and only store it on the interface
+		// field when non-nil: a typed nil in an interface is NOT nil, so the
+		// handler's `s.Invites != nil` guard would wrongly pass.
+		inviteClient, err := grpcapi.NewInviteClient(inviteGRPCAddr, l)
+		if err != nil {
+			l.Errorf("[gRPC] invite client unavailable, check-in will omit invites: %s", err.Error())
+		} else {
+			serverInterface.Invites = inviteClient
+			defer inviteClient.Close()
+		}
+	}
+
 	// Set up storage service first (other modules depend on it)
 	storageModule := storageAPI.NewStorageAPI(serverInterface)
 	if err := storageModule.Service.ConnectToClient(config.GCPCredentialsFilePath); err != nil {

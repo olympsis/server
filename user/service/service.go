@@ -9,6 +9,7 @@ import (
 	"olympsis-server/server"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/olympsis/models"
@@ -36,6 +37,7 @@ func NewUserService(i *server.ServerInterface) *Service {
 		Router:       i.Router,
 		Database:     i.Database,
 		Notification: i.Notification,
+		Invites:      i.Invites,
 	}
 }
 
@@ -629,26 +631,77 @@ func (u *Service) SearchUserByUUID() http.HandlerFunc {
 	}
 }
 
+const (
+	// How many pending invites check-in embeds. A launch-time badge/inbox only
+	// needs the recent ones; the full history lives on invite-service's
+	// paginated REST endpoint.
+	checkInInviteLimit = 20
+
+	// Upper bound on the invite fetch. Check-in is on the app's launch critical
+	// path, so a slow invite-service must not hold it hostage.
+	checkInInviteTimeout = 2 * time.Second
+)
+
 func (s *Service) CheckIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uuid := r.Header.Get("userID")
 		response := models.CheckIn{}
 
-		// Check-in only resolves the user's own profile. Clubs and orgs are
-		// intentionally not embedded here — orgs are served on their own
-		// /v1/organizations routes, and clubs are disabled for now. Since that
-		// leaves a single aggregation, the previous goroutine fan-out (user +
-		// clubs + orgs guarded by a WaitGroup/mutex) is unnecessary; we call
-		// AggregateUser directly. Clubs/Organizations are omitempty on
-		// models.CheckIn, so leaving them nil drops them from the JSON response.
-		user, err := aggregations.AggregateUser(r.Context(), &uuid, s.Database)
-		if err != nil {
-			s.Log.Error("Failed to find user. Error: ", err.Error())
+		// Two independent reads: the user's profile from Mongo, and their pending
+		// invites from invite-service over gRPC. They run concurrently so check-in
+		// latency is max(profile, invites) rather than the sum.
+		//
+		// Clubs and orgs are still intentionally not embedded — orgs are served on
+		// their own /v1/organizations routes, and clubs are disabled for now. Both
+		// are omitempty on models.CheckIn, so leaving them nil drops them from the
+		// JSON response.
+		var (
+			wg      sync.WaitGroup
+			user    *models.UserData
+			userErr error
+			invites []models.InviteResponse
+		)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			user, userErr = aggregations.AggregateUser(r.Context(), &uuid, s.Database)
+		}()
+
+		// Nil when the gRPC client isn't configured (INVITE_GRPC_ADDR=off, or it
+		// failed to build at startup).
+		if s.Invites != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// Best-effort: invite-service being down or slow must never fail
+				// check-in. The client simply sees no invites this session.
+				ctx, cancel := context.WithTimeout(r.Context(), checkInInviteTimeout)
+				defer cancel()
+
+				res, err := s.Invites.GetUserInvites(ctx, uuid, models.InviteStatusPending, checkInInviteLimit)
+				if err != nil {
+					s.Log.Warn("Check-in: failed to fetch invites. Error: ", err.Error())
+					return
+				}
+				invites = res
+			}()
+		}
+
+		// Each goroutine writes a distinct variable and Wait happens-before the
+		// reads below, so no mutex is needed.
+		wg.Wait()
+
+		if userErr != nil {
+			s.Log.Error("Failed to find user. Error: ", userErr.Error())
 			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 		if user != nil {
 			response.User = *user
+		}
+		if len(invites) > 0 {
+			response.Invitations = &invites
 		}
 
 		w.WriteHeader(http.StatusOK)

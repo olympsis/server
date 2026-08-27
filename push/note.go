@@ -42,6 +42,12 @@ type EventNote struct {
 
 	ParticipantID string // participant note only — routes the tap to the Participants screen
 	CommentID     string // comment note only — routes the tap to the specific comment
+
+	// ActorID is the user who triggered the note (the joiner, the commenter).
+	// Empty for system-triggered notes like reminders, where there is no actor.
+	// Deliberately separate from the routing ids above: it says who caused this,
+	// not where tapping it should go.
+	ActorID string
 }
 
 // LocKey returns the on-device localization key for this note's type.
@@ -66,7 +72,7 @@ func NewReminder(eventID, title, imagePath string, minutes int) (EventNote, erro
 
 // NewParticipant builds a "new participant joined" note. participantID routes the
 // notification tap; it must be present.
-func NewParticipant(eventID, title, imagePath, participantID string) (EventNote, error) {
+func NewParticipant(eventID, title, imagePath, participantID, actorID string) (EventNote, error) {
 	if title == "" || participantID == "" {
 		return EventNote{}, fmt.Errorf("participant: title and participantID required")
 	}
@@ -76,13 +82,14 @@ func NewParticipant(eventID, title, imagePath, participantID string) (EventNote,
 		Title:         title,
 		ImagePath:     imagePath,
 		ParticipantID: participantID,
+		ActorID:       actorID,
 		LocArgs:       []string{},
 	}, nil
 }
 
 // NewComment builds a "new comment on event" note. commentID routes the tap to
 // the specific comment; it must be present.
-func NewComment(eventID, title, imagePath, commentID string) (EventNote, error) {
+func NewComment(eventID, title, imagePath, commentID, actorID string) (EventNote, error) {
 	if title == "" || commentID == "" {
 		return EventNote{}, fmt.Errorf("comment: title and commentID required")
 	}
@@ -92,6 +99,7 @@ func NewComment(eventID, title, imagePath, commentID string) (EventNote, error) 
 		Title:     title,
 		ImagePath: imagePath,
 		CommentID: commentID,
+		ActorID:   actorID,
 		LocArgs:   []string{},
 	}, nil
 }
@@ -111,6 +119,11 @@ func (n EventNote) auditData() map[string]any {
 	}
 	if n.CommentID != "" {
 		data["comment_id"] = n.CommentID
+	}
+	// Omitted rather than empty when there's no actor, so a client can treat
+	// presence as "there is someone to show".
+	if n.ActorID != "" {
+		data["actor_id"] = n.ActorID
 	}
 	return data
 }

@@ -264,7 +264,7 @@ func (s *Service) UpdateTeamApplication() http.HandlerFunc {
 				return
 			}
 
-			if err = s.Notification.TeamApplicationUpdate(event, team, applicant, true); err != nil {
+			if err = s.Notification.TeamApplicationUpdate(event, team, applicant, true, userID); err != nil {
 				s.Logger.Errorf("Failed to notify applicant. Team: %s - Error: %s", teamID, err.Error())
 			}
 
@@ -279,7 +279,7 @@ func (s *Service) UpdateTeamApplication() http.HandlerFunc {
 			http.Error(w, `{"msg": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
-		if err = s.Notification.TeamApplicationUpdate(event, team, applicant, false); err != nil {
+		if err = s.Notification.TeamApplicationUpdate(event, team, applicant, false, userID); err != nil {
 			s.Logger.Errorf("Failed to notify applicant. Team: %s - Error: %s", teamID, err.Error())
 		}
 

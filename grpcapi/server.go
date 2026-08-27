@@ -1,13 +1,17 @@
-// Package grpcapi hosts the server's internal, inter-service gRPC endpoints.
+// Package grpcapi holds the server's internal, inter-service gRPC surface —
+// both the endpoints it hosts and the clients it uses to call other services.
 //
-// Today it exposes a single service, EventTeamService, whose sole caller is
-// invite-service: when a user accepts a TEAM invite, invite-service calls
-// AddTeamMember here so the main server (the only writer of the eventTeams
-// collection) adds them to the roster. Team membership IS the RSVP, so this is
-// what turns an accepted invite into an attendee.
+// Hosted: EventTeamService (this file), whose sole caller is invite-service.
+// When a user accepts a TEAM invite, invite-service calls AddTeamMember here so
+// the main server (the only writer of the eventTeams collection) adds them to
+// the roster. Team membership IS the RSVP, so this is what turns an accepted
+// invite into an attendee.
 //
-// This listener is NOT exposed through the public gateway — it is reachable only
-// by other olympsis services on the internal network.
+// Consumed: InviteService (inviteclient.go), invite-service's read API. The
+// check-in handler calls GetUserInvites to embed a user's pending invites.
+//
+// Neither is exposed through the public gateway — both are reachable only by
+// olympsis services on the internal network.
 package grpcapi
 
 import (

@@ -150,6 +150,11 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*15)
 		defer cancel()
 
+		// The admin acting on the application — recorded as the notification's
+		// actor so the applicant can see who approved or denied it. Set by
+		// UserMiddleware, which this route is behind.
+		uuid := r.Header.Get("userID")
+
 		// Validate club ID
 		id := mux.Vars(r)["id"]
 		oid, err := utils.ValidateObjectID(id)
@@ -222,7 +227,7 @@ func (c *Service) UpdateApplication() http.HandlerFunc {
 			}
 
 			// Notify the user that they've been accepted
-			if err = c.Notification.ApplicationUpdate(oid, &app); err != nil {
+			if err = c.Notification.ApplicationUpdate(oid, &app, uuid); err != nil {
 				c.Logger.Errorf("Failed to notify user. Club ID: %s - Error: %s", id, err.Error())
 			}
 

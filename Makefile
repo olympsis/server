@@ -10,15 +10,17 @@ GO_FILES := $( find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
 all: build
 
-# Regenerate Go from grpcapi/eventteam.proto into grpcapi/eventteampb. Dev-only:
-# the generated *.pb.go files are committed so the hosting box just needs
-# `go build`. Requires protoc + protoc-gen-go + protoc-gen-go-grpc on PATH
+# Regenerate Go from the protos: eventteam.proto (hosted here, called by
+# invite-service) -> grpcapi/eventteampb, and invite.proto (a copy of
+# invite-service's contract, called from here at check-in) -> grpcapi/invitepb.
+# Dev-only: the generated *.pb.go files are committed so the hosting box just
+# needs `go build`. Requires protoc + protoc-gen-go + protoc-gen-go-grpc on PATH
 # (see invite-service/Makefile for the one-time install commands).
 proto:
 	PATH="$$PATH:$$(go env GOPATH)/bin" protoc \
 		--go_out=. --go_opt=module=olympsis-server \
 		--go-grpc_out=. --go-grpc_opt=module=olympsis-server \
-		grpcapi/eventteam.proto
+		grpcapi/eventteam.proto grpcapi/invite.proto
 
 lint: ## Lint the files
 	golint -set_exit_status ${PKG_LIST}

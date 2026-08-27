@@ -24,10 +24,18 @@ func teamNoteString(s *string) string {
 
 // teamNoteData assembles the common data payload every team push carries so the
 // iOS/Android handlers can route and deep-link consistently.
-func teamNoteData(t models.NotificationType, event *models.EventDao, team *models.TeamDao) map[string]any {
+//
+// actorID is whoever performed the action (the applicant, the owner approving or
+// kicking, the outgoing owner). It's omitted rather than sent empty when there
+// is no single actor, so clients can treat its presence as "there is someone to
+// show".
+func teamNoteData(t models.NotificationType, event *models.EventDao, team *models.TeamDao, actorID string) map[string]any {
 	data := map[string]any{
 		"type":       t,
 		"group_type": "team",
+	}
+	if actorID != "" {
+		data["actor_id"] = actorID
 	}
 	if event != nil {
 		if event.ID != nil {
@@ -52,7 +60,7 @@ func (n *Service) TeamApplication(event *models.EventDao, team *models.TeamDao, 
 		return nil
 	}
 
-	data := teamNoteData(models.TeamApplicationType, event, team)
+	data := teamNoteData(models.TeamApplicationType, event, team, applicantUserID)
 	// Best-effort applicant enrichment so the owner sees who applied.
 	if user, err := n.findUser(applicantUserID); err == nil && user != nil {
 		data["username"] = user.UserName
@@ -76,7 +84,7 @@ func (n *Service) TeamApplication(event *models.EventDao, team *models.TeamDao, 
 
 // TeamApplicationUpdate notifies the applicant that their application was
 // approved or denied.
-func (n *Service) TeamApplicationUpdate(event *models.EventDao, team *models.TeamDao, applicantUserID string, approved bool) error {
+func (n *Service) TeamApplicationUpdate(event *models.EventDao, team *models.TeamDao, applicantUserID string, approved bool, actorID string) error {
 	users := []string{applicantUserID}
 	title := "Your team application was denied."
 	if approved {
@@ -89,7 +97,7 @@ func (n *Service) TeamApplicationUpdate(event *models.EventDao, team *models.Tea
 		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
-		Data:      teamNoteData(models.TeamApplicationUpdateType, event, team),
+		Data:      teamNoteData(models.TeamApplicationUpdateType, event, team, actorID),
 		CreatedAt: bson.NewDateTimeFromTime(time.Now()),
 	}
 	return n.carousel.AddJob(1, models.NotificationPushRequest{
@@ -100,7 +108,7 @@ func (n *Service) TeamApplicationUpdate(event *models.EventDao, team *models.Tea
 
 // TeamKick notifies a member that the owner removed them from the team (which
 // cancels their RSVP for the event).
-func (n *Service) TeamKick(event *models.EventDao, team *models.TeamDao, kickedUserID string) error {
+func (n *Service) TeamKick(event *models.EventDao, team *models.TeamDao, kickedUserID, actorID string) error {
 	users := []string{kickedUserID}
 	note := models.PushNotification{
 		ID:        bson.NewObjectID(),
@@ -108,7 +116,7 @@ func (n *Service) TeamKick(event *models.EventDao, team *models.TeamDao, kickedU
 		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
-		Data:      teamNoteData(models.TeamKickType, event, team),
+		Data:      teamNoteData(models.TeamKickType, event, team, actorID),
 		CreatedAt: bson.NewDateTimeFromTime(time.Now()),
 	}
 	return n.carousel.AddJob(1, models.NotificationPushRequest{
@@ -119,14 +127,14 @@ func (n *Service) TeamKick(event *models.EventDao, team *models.TeamDao, kickedU
 
 // TeamMemberRoleChange notifies a member that their role changed — used when
 // ownership is transferred to them.
-func (n *Service) TeamMemberRoleChange(event *models.EventDao, team *models.TeamDao, userID string, newRole models.MemberRole) error {
+func (n *Service) TeamMemberRoleChange(event *models.EventDao, team *models.TeamDao, userID string, newRole models.MemberRole, actorID string) error {
 	users := []string{userID}
 	title := "Your team role changed."
 	if newRole == models.OwnerMember {
 		title = "You're now the team owner."
 	}
 
-	data := teamNoteData(models.TeamMemberRoleChangeType, event, team)
+	data := teamNoteData(models.TeamMemberRoleChangeType, event, team, actorID)
 	data["role"] = newRole
 
 	note := models.PushNotification{
@@ -146,7 +154,7 @@ func (n *Service) TeamMemberRoleChange(event *models.EventDao, team *models.Team
 
 // TeamDeleted notifies the given members that the team was disbanded and their
 // RSVP for the event has been cancelled.
-func (n *Service) TeamDeleted(event *models.EventDao, team *models.TeamDao, recipients []string) error {
+func (n *Service) TeamDeleted(event *models.EventDao, team *models.TeamDao, recipients []string, actorID string) error {
 	if len(recipients) == 0 {
 		return nil
 	}
@@ -156,7 +164,7 @@ func (n *Service) TeamDeleted(event *models.EventDao, team *models.TeamDao, reci
 		Body:      teamNoteString(team.Name),
 		Type:      "push",
 		Category:  "events",
-		Data:      teamNoteData(models.TeamDeletedType, event, team),
+		Data:      teamNoteData(models.TeamDeletedType, event, team, actorID),
 		CreatedAt: bson.NewDateTimeFromTime(time.Now()),
 	}
 	return n.carousel.AddJob(1, models.NotificationPushRequest{

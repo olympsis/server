@@ -3,6 +3,7 @@ package service
 import (
 	"olympsis-server/database"
 	"olympsis-server/notifications"
+	"olympsis-server/types"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -24,4 +25,8 @@ type Service struct {
 
 	// Notification service
 	Notification *notifications.Service
+
+	// Reads pending invites from invite-service for the check-in response.
+	// Nil when the gRPC client isn't configured — check-in then omits invites.
+	Invites types.InviteReader
 }

@@ -486,7 +486,7 @@ func (p *Service) AddComment() http.HandlerFunc {
 			return
 		}
 
-		if err = p.Notification.NewEventComment(oid, *req.Text); err != nil {
+		if err = p.Notification.NewEventComment(oid, *req.Text, uuid); err != nil {
 			p.Logger.Errorf("Failed to notify users of new comment. Event ID: %s - Error: %s", id, err.Error())
 		}
 

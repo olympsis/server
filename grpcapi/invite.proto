@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package invite;
+
+// Client-side copy of invite-service's InviteService contract. invite-service
+// owns and hosts this service (see invite-service/invite.proto); the main server
+// calls GetUserInvites during check-in to embed a user's pending invites in the
+// response. The two modules can't share a Go package — invite-service's stubs
+// live under its internal/ — so each generates its own from an identical .proto;
+// wire compatibility is by proto contract, not Go type. Keep the two files in
+// sync.
+//
+// Generated Go lands in grpcapi/invitepb (package invitepb). Regenerate with
+// `make proto`; the generated *.pb.go files are committed.
+option go_package = "olympsis-server/grpcapi/invitepb;invitepb";
+
+// InviteService is the internal, inter-service read API. It is NOT exposed
+// through the public gateway — only other olympsis services call it (e.g. the
+// main server aggregating a user's notifications).
+service InviteService {
+  rpc GetUserInvites(GetUserInvitesRequest) returns (GetUserInvitesResponse);
+}
+
+// Mirrors models.InviteType. UNSPECIFIED is the proto3 zero value.
+enum InviteType {
+  INVITE_TYPE_UNSPECIFIED = 0;
+  EVENT = 1;
+  TEAM = 2;
+  CLUB = 3;
+  ORG = 4;
+}
+
+// Mirrors models.InviteStatus. UNSPECIFIED doubles as "no filter" on requests.
+enum InviteStatus {
+  INVITE_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  ACCEPTED = 2;
+  DECLINED = 3;
+}
+
+// Invite is the wire form of models.InviteRequest: the id is a hex string and
+// timestamps are unix milliseconds (what bson.DateTime stores natively).
+message Invite {
+  string id = 1;
+  InviteType type = 2;
+  string context_id = 3;
+  string invitee_id = 4;
+  string requestor_id = 5;
+  InviteStatus status = 6;
+  int64 created_at = 7; // unix millis
+  int64 updated_at = 8; // unix millis
+}
+
+message GetUserInvitesRequest {
+  string user_id = 1;
+  InviteStatus status = 2; // UNSPECIFIED = all statuses
+  int32 limit = 3;         // <= 0 applies the server default
+  string cursor = 4;       // hex id from a previous page; empty for the first
+}
+
+message GetUserInvitesResponse {
+  repeated Invite invites = 1;
+  string next_cursor = 2; // empty when there are no more pages
+}

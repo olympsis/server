@@ -467,7 +467,7 @@ func (c *Service) ChangeMemberRank() http.HandlerFunc {
 			}
 		}
 
-		if err = c.Notification.ChangedRole(oid, member.UserID, models.MemberRole(member.Role), models.MemberRole(req.Role)); err != nil {
+		if err = c.Notification.ChangedRole(oid, member.UserID, models.MemberRole(member.Role), models.MemberRole(req.Role), uuid); err != nil {
 			c.Logger.Errorf("Failed to notify user of role change. Club ID: %s - Error: %s", id, err.Error())
 		}
 
@@ -536,7 +536,7 @@ func (c *Service) KickMember() http.HandlerFunc {
 			return
 		}
 
-		if err = c.Notification.Kicked(&oid, member); err != nil {
+		if err = c.Notification.Kicked(&oid, member, uuid); err != nil {
 			c.Logger.Errorf("Failed to notify user. Club ID: %s - Error: %s", id, err.Error())
 		}
 

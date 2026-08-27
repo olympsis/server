@@ -209,7 +209,7 @@ func (s *Service) RemoveTeam() http.HandlerFunc {
 
 		// Disbanding a team cancels every member's RSVP; let them know.
 		if len(recipients) > 0 {
-			if err = s.Notification.TeamDeleted(event, team, recipients); err != nil {
+			if err = s.Notification.TeamDeleted(event, team, recipients, userID); err != nil {
 				s.Logger.Errorf("Failed to notify members of team deletion. Team: %s - Error: %s", teamID, err.Error())
 			}
 		}
@@ -552,7 +552,7 @@ func (s *Service) KickTeamMember() http.HandlerFunc {
 		if err = s.Notification.RemoveUsersFromTopic(eventID, []string{targetID}); err != nil {
 			s.Logger.Errorf("Failed to remove user from event topic. Event: %s - Error: %s", eventID, err.Error())
 		}
-		if err = s.Notification.TeamKick(event, team, targetID); err != nil {
+		if err = s.Notification.TeamKick(event, team, targetID, callerID); err != nil {
 			s.Logger.Errorf("Failed to notify kicked member. Team: %s - Error: %s", teamID, err.Error())
 		}
 
@@ -697,7 +697,7 @@ func (s *Service) TransferTeamOwnership() http.HandlerFunc {
 			return
 		}
 
-		if err = s.Notification.TeamMemberRoleChange(event, team, req.NewOwnerID, models.OwnerMember); err != nil {
+		if err = s.Notification.TeamMemberRoleChange(event, team, req.NewOwnerID, models.OwnerMember, userID); err != nil {
 			s.Logger.Errorf("Failed to notify new owner. Team: %s - Error: %s", teamID, err.Error())
 		}
 

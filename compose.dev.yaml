@@ -45,6 +45,11 @@ services:
         restart: always
         ports:
             - 80:80
+            # Internal gRPC (EventTeamService). Published so invite-service —
+            # which runs on the host, not in this stack — can reach it on
+            # localhost:50051 to add members/participants when an invite is
+            # accepted. Without this, accepting a TEAM/EVENT invite 502s in dev.
+            - 50051:50051
         volumes:
             - ./files/firebase-credentials.json:/app/firebase-credentials.json:ro
             - ./files/storage-credentials.json:/app/storage-credentials.json:ro
