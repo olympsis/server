@@ -13,10 +13,34 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 # Place the (dev-only) local models module where the go.mod replace expects it.
 COPY --from=models . /models
+# CI resolves the private `github.com/olympsis/models` module from Artifact
+# Registry instead of the local ../models context above. Both paths are
+# supported so `make dev-up` keeps working with no credentials at all:
+#   - Dev:  no build args, no secret. The go.mod `replace` points at /models.
+#   - CI:   GOPROXY/GONOSUMDB point at the AR Go repo and the netrc secret
+#           carries the token. The workflow drops the `replace` first.
+ARG GOPROXY
+ARG GONOSUMDB
+ENV GOPROXY=${GOPROXY:-https://proxy.golang.org,direct}
+ENV GONOSUMDB=${GONOSUMDB}
+
 COPY go.mod go.sum ./
-RUN go mod download
+# The secret mount is optional — BuildKit simply omits the file when the build
+# supplies no `netrc` secret, which is what dev builds do. Mounting it (rather
+# than COPYing) keeps the token out of the image layers.
+RUN --mount=type=secret,id=netrc,target=/root/.netrc,mode=0600 go mod download
 COPY . .
-RUN go build -o /server
+
+# Build identity, welded into the binary at link time. Defaults keep plain
+# `docker build` working; the release workflow passes the real tag/sha/time.
+# See package version for why these are linker flags and not env vars.
+ARG VERSION=dev
+ARG COMMIT=none
+ARG BUILD_TIME=unknown
+RUN go build -trimpath -ldflags "-s -w \
+      -X olympsis-server/version.Version=${VERSION} \
+      -X olympsis-server/version.Commit=${COMMIT} \
+      -X olympsis-server/version.BuildTime=${BUILD_TIME}" -o /server
 
 # --- Runtime stage ---
 FROM alpine:latest

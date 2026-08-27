@@ -1,0 +1,294 @@
+# Release CD for olympsis-server.
+#
+# Trigger: pushing a semver tag (e.g. `git tag v0.9.5 && git push origin v0.9.5`).
+# The tag is the single source of truth for the version — it flows into the
+# binary via -ldflags, into the image tag, and into the AR generic package
+# version, so those three can never disagree. See package version.
+#
+# Publishes, both tagged with the version AND (for stable releases) `latest`:
+#   - Docker image -> northamerica-northeast1-docker.pkg.dev/olympsis-485522/server
+#   - darwin/arm64 binary -> AR generic repo `server-bin` (the Mac mini pulls it)
+#
+# Note: GitHub-hosted runners cannot reach the Mac mini, so this publishes to a
+# place the Mac mini pulls FROM. Deployment stays a pull on that host.
+#
+# Required repo secret: GCP_SA_KEY — a service-account JSON key with
+#   roles/artifactregistry.writer on the olympsis-485522 project.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and publish (e.g. v0.9.5)'
+        required: true
+
+env:
+  GCP_PROJECT: olympsis-485522
+  AR_LOCATION: northamerica-northeast1
+  DOCKER_IMAGE: northamerica-northeast1-docker.pkg.dev/olympsis-485522/server
+  AR_GO_REPO: go-modules
+  AR_BIN_REPO: server-bin
+  BIN_NAME: olympsis-server
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Resolve the version/commit/timestamp ONCE so the image and the binary are
+  # stamped with byte-identical values.
+  # ---------------------------------------------------------------------------
+  meta:
+    name: Resolve build metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      commit: ${{ steps.meta.outputs.commit }}
+      build_time: ${{ steps.meta.outputs.build_time }}
+      is_stable: ${{ steps.meta.outputs.is_stable }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve
+        id: meta
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          [ -n "$VERSION" ] || VERSION="${GITHUB_REF#refs/tags/}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VERSION' is not valid semver (need vX.Y.Z or vX.Y.Z-suffix)"
+            exit 1
+          fi
+
+          # A pre-release (v1.0.0-rc1) must never move `latest`, or a `pull_policy:
+          # always` box would silently roll onto an unfinished build.
+          case "$VERSION" in
+            *-*) IS_STABLE=false ;;
+            *)   IS_STABLE=true  ;;
+          esac
+
+          echo "version=$VERSION"                                  >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short HEAD)"              >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"         >> "$GITHUB_OUTPUT"
+          echo "is_stable=$IS_STABLE"                              >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Docker image (linux/amd64, matching the current `make artifact` target).
+  # ---------------------------------------------------------------------------
+  image:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+
+      # Needed for the `go mod edit` step below. Without this the job silently
+      # depends on whichever Go the runner image happens to ship.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: google-github-actions/auth@v2
+        id: auth
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          token_format: access_token
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker "${{ env.AR_LOCATION }}-docker.pkg.dev" --quiet
+
+      # The checked-in go.mod carries a dev-only `replace ... => ../models`
+      # that cannot resolve in CI. Drop it here (on the runner, before the
+      # build context is sent) so the module resolves from Artifact Registry
+      # instead. The working tree is throwaway — nothing is committed back.
+      - name: Drop dev-only models replace
+        run: |
+          go mod edit -dropreplace=github.com/olympsis/models
+          git --no-pager diff --stat go.mod
+
+      # Credentials for the private module, handed to BuildKit as a secret so
+      # the token never lands in an image layer.
+      - name: Write Artifact Registry netrc
+        run: |
+          umask 077
+          cat > "${RUNNER_TEMP}/netrc" <<EOF
+          machine ${{ env.AR_LOCATION }}-go.pkg.dev
+          login oauth2accesstoken
+          password ${{ steps.auth.outputs.access_token }}
+          EOF
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ needs.meta.outputs.version }}
+            ${{ needs.meta.outputs.is_stable == 'true' && format('{0}:latest', env.DOCKER_IMAGE) || '' }}
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version }}
+            COMMIT=${{ needs.meta.outputs.commit }}
+            BUILD_TIME=${{ needs.meta.outputs.build_time }}
+            GOPROXY=https://${{ env.AR_LOCATION }}-go.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_GO_REPO }},https://proxy.golang.org,direct
+            GONOSUMDB=github.com/olympsis/*
+          secret-files: |
+            netrc=${{ runner.temp }}/netrc
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Reads the version back out of the image it just pushed. Catches a
+      # mis-wired ldflags path, which otherwise fails silently — the build
+      # succeeds and the binary just reports "dev" forever.
+      - name: Verify stamped version
+        run: |
+          GOT=$(docker run --rm --entrypoint sh \
+            "${{ env.DOCKER_IMAGE }}:${{ needs.meta.outputs.version }}" \
+            -c 'strings /app/server | grep -m1 -F "${{ needs.meta.outputs.version }}"' || true)
+          if [ -z "$GOT" ]; then
+            echo "::error::version string not found in the built binary — check the -X ldflags paths"
+            exit 1
+          fi
+          echo "stamped OK: $GOT"
+
+  # ---------------------------------------------------------------------------
+  # darwin/arm64 binary for the Mac mini, published to the AR generic repo.
+  # Runs on a macOS runner (billed at 10x the Linux rate, but this is a ~2min
+  # job). CGO is off so the result is a static, dependency-free binary.
+  # ---------------------------------------------------------------------------
+  binary:
+    name: Build and publish darwin/arm64 binary
+    runs-on: macos-14
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: google-github-actions/auth@v2
+        id: auth
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          token_format: access_token
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Same story as the image job: the dev-only replace cannot resolve here,
+      # so the module comes from Artifact Registry over an authenticated proxy.
+      - name: Resolve models from Artifact Registry
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          umask 077
+          cat > "$HOME/.netrc" <<EOF
+          machine ${{ env.AR_LOCATION }}-go.pkg.dev
+          login oauth2accesstoken
+          password ${ACCESS_TOKEN}
+          EOF
+          go mod edit -dropreplace=github.com/olympsis/models
+          {
+            echo "GOPROXY=https://${{ env.AR_LOCATION }}-go.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_GO_REPO }},https://proxy.golang.org,direct"
+            echo "GONOSUMDB=github.com/olympsis/*"
+          } >> "$GITHUB_ENV"
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: darwin
+          GOARCH: arm64
+        run: |
+          go build -trimpath -ldflags "-s -w \
+            -X olympsis-server/version.Version=${{ needs.meta.outputs.version }} \
+            -X olympsis-server/version.Commit=${{ needs.meta.outputs.commit }} \
+            -X olympsis-server/version.BuildTime=${{ needs.meta.outputs.build_time }}" \
+            -o "${{ env.BIN_NAME }}" .
+
+      # Same guard as the image job — confirm the linker actually wrote the
+      # version in rather than leaving the "dev" default.
+      - name: Verify stamped version
+        run: |
+          grep -qa -F "${{ needs.meta.outputs.version }}" "${{ env.BIN_NAME }}" || {
+            echo "::error::version string not found in the binary — check the -X ldflags paths"; exit 1; }
+          shasum -a 256 "${{ env.BIN_NAME }}" | tee "${{ env.BIN_NAME }}.sha256"
+
+      - name: Upload to Artifact Registry
+        run: |
+          gcloud artifacts generic upload \
+            --project="${{ env.GCP_PROJECT }}" \
+            --location="${{ env.AR_LOCATION }}" \
+            --repository="${{ env.AR_BIN_REPO }}" \
+            --package="${{ env.BIN_NAME }}" \
+            --version="${{ needs.meta.outputs.version }}" \
+            --source="${{ env.BIN_NAME }}"
+
+          gcloud artifacts generic upload \
+            --project="${{ env.GCP_PROJECT }}" \
+            --location="${{ env.AR_LOCATION }}" \
+            --repository="${{ env.AR_BIN_REPO }}" \
+            --package="${{ env.BIN_NAME }}" \
+            --version="${{ needs.meta.outputs.version }}" \
+            --source="${{ env.BIN_NAME }}.sha256"
+
+      # Generic repo versions are immutable, so "latest" cannot be a moving
+      # alias the way a Docker tag is. Re-uploading the same bytes under the
+      # literal version "latest" gives the Mac mini a stable pull target.
+      # Stable releases only — never a pre-release.
+      - name: Republish as latest
+        if: needs.meta.outputs.is_stable == 'true'
+        run: |
+          gcloud artifacts generic upload \
+            --project="${{ env.GCP_PROJECT }}" \
+            --location="${{ env.AR_LOCATION }}" \
+            --repository="${{ env.AR_BIN_REPO }}" \
+            --package="${{ env.BIN_NAME }}" \
+            --version="latest" \
+            --source="${{ env.BIN_NAME }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BIN_NAME }}-darwin-arm64-${{ needs.meta.outputs.version }}
+          path: |
+            ${{ env.BIN_NAME }}
+            ${{ env.BIN_NAME }}.sha256
+
+  # ---------------------------------------------------------------------------
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [meta, image, binary]
+    steps:
+      - name: Write summary
+        run: |
+          V="${{ needs.meta.outputs.version }}"
+          {
+            echo "## Released \`$V\`"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${{ needs.meta.outputs.commit }}\` |"
+            echo "| Built | ${{ needs.meta.outputs.build_time }} |"
+            echo "| Moves \`latest\` | ${{ needs.meta.outputs.is_stable }} |"
+            echo
+            echo "### Deploy the image"
+            echo '```bash'
+            echo "# bump compose.yaml to :$V, then on the host:"
+            echo "docker compose pull server && docker compose up -d server"
+            echo '```'
+            echo
+            echo "### Deploy the binary (Mac mini)"
+            echo '```bash'
+            echo "gcloud artifacts generic download \\"
+            echo "  --project=${{ env.GCP_PROJECT }} \\"
+            echo "  --location=${{ env.AR_LOCATION }} \\"
+            echo "  --repository=${{ env.AR_BIN_REPO }} \\"
+            echo "  --package=${{ env.BIN_NAME }} --version=$V \\"
+            echo "  --destination=."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

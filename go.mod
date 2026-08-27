@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.43.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
-	github.com/olympsis/models v0.0.0-20260826182018-4dc49bd036a7
+	github.com/olympsis/models v0.1.1
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.203.0
 )
@@ -76,13 +76,13 @@ require (
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
 )
 
-// DEV ONLY. The require above is pinned to the real published commit
-// (d270b67 — rsvp codecs + NewTeamDao), so this replace is no longer needed to
-// pick up unpushed changes. It stays only because models is a PRIVATE repo:
-// without it the Dockerfile's `go mod download` has no credentials to fetch it,
-// and the dev compose build fails.
+// DEV ONLY. The require above is pinned to models v0.1.1, published to the
+// Artifact Registry Go repo, so this replace is not needed to resolve the
+// module — it stays purely as a convenience: it lets local and
+// `compose.dev.yaml` builds pick up unpushed ../models edits without a tag,
+// and needs no registry credentials.
 //
-// For the production cut (built on the host with git credentials, not in
-// Docker), delete this line — `go build` then resolves the pinned version
-// directly. Verified to build clean that way.
+// CI drops this line (`go mod edit -dropreplace`) and resolves v0.1.1 from
+// Artifact Registry over GOPROXY instead. See .github/workflows/release.yml.
+// Delete it here too once every dev has gcloud auth set up.
 replace github.com/olympsis/models => ../models

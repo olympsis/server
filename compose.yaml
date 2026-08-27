@@ -9,19 +9,36 @@ volumes:
 services:
     gateway:
         container_name: gateway
-        image: apache/apisix
+        image: krakend:2.10
         restart: always
         volumes:
-            - ./apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
-            - ./apisix-routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+            # The image's default command is `krakend run -c krakend.json` from
+            # WORKDIR /etc/krakend, so the config has to land on this exact path.
+            - ./krakend.prod.json:/etc/krakend/krakend.json:ro
+            # Uncomment together with the "tls" block in krakend.prod.json if
+            # KrakenD should terminate TLS itself instead of sitting behind an LB.
+            # - /etc/letsencrypt:/etc/letsencrypt:ro
         networks:
             - olympsis
         ports:
-            - 9080:9080
-            
+            # Same host port apisix used, so whatever fronts this needs no change.
+            - 9080:8080
+        extra_hosts:
+            # invite-service and notif-service run on the host under pm2, not in
+            # this stack, so the gateway reaches them via the host gateway IP.
+            - "host.docker.internal:host-gateway"
+        depends_on:
+            - server
+            - storage
+
     server:
         container_name: server
-        image: us-central1-docker.pkg.dev/olympsis-485522/server/release:v0.8.1
+        # Published by .github/workflows/release.yml on every `v*` tag push.
+        # Bump this per release; `:latest` also tracks the newest stable build
+        # if you would rather not pin. Note the registry moved region
+        # (us-central1 -> northamerica-northeast1) and dropped the `/release`
+        # sub-path, so tags older than v0.9.5 do not exist at this address.
+        image: northamerica-northeast1-docker.pkg.dev/olympsis-485522/server:v0.9.5
         restart: always
         pull_policy: always
         ports:

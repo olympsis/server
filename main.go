@@ -28,6 +28,7 @@ import (
 	"olympsis-server/user"
 	"olympsis-server/utils"
 	"olympsis-server/utils/secrets"
+	"olympsis-server/version"
 
 	"net"
 	"olympsis-server/venue"
@@ -49,6 +50,11 @@ import (
 func main() {
 	// Set up logger
 	l := logrus.New()
+
+	// Log the build identity first thing, so every process's log stream opens
+	// with the exact version and commit it is running. These values are set at
+	// link time by the release build — see package version.
+	l.Infof("[Core] olympsis-server %s", version.String())
 
 	// Constrained-hardware runtime tuning. An explicit GOMEMLIMIT env var (e.g.
 	// from the PM2 ecosystem env) takes precedence; this only sets a conservative

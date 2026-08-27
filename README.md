@@ -151,20 +151,114 @@ make lint   # golint
 
 ## Building & deployment
 
+### Cutting a release
+
+The **git tag is the single source of truth** for a version. Pushing a `v*` tag
+triggers `.github/workflows/release.yml`, which builds and publishes everything:
+
 ```sh
+make release V=v0.9.5      # tags, pushes, and lets CD take over
+```
+
+That one tag flows into three places that therefore cannot drift apart:
+
+| Artifact | Destination |
+| --- | --- |
+| Docker image | `northamerica-northeast1-docker.pkg.dev/olympsis-485522/server:<VERSION>` (and `:latest`) |
+| darwin/arm64 binary | AR generic repo `server-bin`, package `olympsis-server`, version `<VERSION>` |
+| Binary build stamp | linked in via `-ldflags`, served at `GET /v1/health` |
+
+Pre-release tags (`v1.0.0-rc1`) publish under their own version but deliberately
+do **not** move `latest`, so a `pull_policy: always` host never rolls onto an
+unfinished build.
+
+### What the running server reports
+
+```console
+$ curl -s https://<host>/v1/health
+{"msg":"OK","build":{"version":"v0.9.5","commit":"6351f14","buildTime":"2026-08-27T02:45:00Z"}}
+```
+
+Those values come from `package version`, set at **link time** — not from the
+environment. An env var can be changed without a rebuild, which would let the
+server report a version it is not actually running; a linker-set value is welded
+to the binary. A local `go build` reports `dev`/`none`/`unknown`, which is the
+correct answer for a non-release build.
+
+### Deploying
+
+GitHub-hosted runners cannot reach the Mac mini, so CD publishes to a registry
+the mini **pulls from** rather than pushing to it:
+
+```sh
+make deploy-mac-mini V=v0.9.5   # gcloud download -> chmod +x -> pm2 restart
+```
+
+For the container host, bump the tag in `compose.yaml` and:
+
+```sh
+docker compose pull server && docker compose up -d server
+```
+
+### Manual / local builds
+
+```sh
+make build          # stamped binary via git describe
 make docker-build   # build a local (unsecure) image
-make artifact       # build, tag, and push the release image to GCP Artifact Registry
+make artifact       # manual image push (prefer `make release`)
 make server         # build a TLS image (local CA certs) and run it on :443
 make unsecure-server# build a plain-HTTP image and run it on :80
 ```
 
-Images are published to GCP Artifact Registry under
-`us-central1-docker.pkg.dev/olympsis-485522/server/release:<VERSION>`.
+### The private `models` dependency
 
-> The compiled `olympsis-server` binary is tracked with **Git LFS** (see
-> `.gitattributes`). The `make mac-mini` target builds the binary, ships it to the
-> deployment host, and tags the release. Bump `VERSION` at the top of the `Makefile`
-> before cutting a release.
+`github.com/olympsis/models` lives in its own repo. `go.mod` carries a dev-only
+`replace ... => ../models` so local and `compose.dev.yaml` builds resolve it from
+the sibling checkout — which also means unpushed edits are picked up without
+cutting a tag.
+
+> The repo is currently **public**, so the public proxy can serve it. Publishing
+> to Artifact Registry is what makes the setup work if it ever goes private —
+> see "Going private" below.
+
+CI cannot use that path, so both release jobs run
+`go mod edit -dropreplace=github.com/olympsis/models` on the runner and resolve
+the module from Artifact Registry instead:
+
+```sh
+GOPROXY=https://northamerica-northeast1-go.pkg.dev/olympsis-485522/go-modules,https://proxy.golang.org,direct
+GONOSUMDB=github.com/olympsis/*
+```
+
+> Use `GONOSUMDB`, **not** `GOPRIVATE`. `GOPRIVATE` implies `GONOPROXY`, which
+> would bypass the very proxy we need.
+
+Publishing a new models version is `olympsis/models`' own
+`.github/workflows/publish.yml`, triggered the same way — by pushing a `v*` tag.
+
+#### Going private
+
+Making `olympsis/models` private does **not** break anything currently pinned:
+`proxy.golang.org` caches module versions permanently and immutably, so every
+version the six services pin today stays resolvable even after the repo is
+locked down. It does change three things:
+
+1. **New versions stop resolving publicly.** The five services that still pin
+   pseudo-versions (`invite-service`, `notif-service`, `chat`, `notif`,
+   `search`) resolve models through the public proxy and carry no `replace`.
+   They keep building, but any future bump needs the same treatment `server`
+   got: pin a published tag and point `GOPROXY` at the AR repo, or set
+   `GOPRIVATE` and give the builder git credentials.
+2. **`server` is already immune** — its release workflow resolves from Artifact
+   Registry with its own credentials.
+3. **It does not retract what is already public.** Everything cached in
+   `proxy.golang.org` and notarized in `sum.golang.org` stays world-readable
+   forever, source zips included. Going private protects future commits, not
+   past ones.
+
+> **Retired:** the old flow committed the 42 MB `olympsis-server` binary to Git
+> LFS on every release and scp'd it to the mini (`make mac-mini`). That target
+> now errors with a pointer to the commands above.
 
 ## Runtime behavior
 

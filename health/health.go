@@ -1,9 +1,11 @@
 package health
 
 import (
+	"encoding/json"
 	"net/http"
 	"olympsis-server/middleware"
 	"olympsis-server/server"
+	"olympsis-server/version"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -37,16 +39,26 @@ func (h *HealthAPI) Ready() {
 	).Methods("GET", "OPTIONS")
 }
 
+// healthResponse keeps the original "msg" field so existing clients that just
+// check for "OK" are unaffected; the build block is purely additive. It is what
+// makes a running process traceable back to an exact commit and image tag.
+type healthResponse struct {
+	Msg   string       `json:"msg"`
+	Build version.Info `json:"build"`
+}
+
 func HealthCheckHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{ "msg": "OK" }`))
+		json.NewEncoder(w).Encode(healthResponse{Msg: "OK", Build: version.Get()})
 	}
 }
 
 func HandleWhatsGood() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{ "msg": "OK" }`))
+		json.NewEncoder(w).Encode(healthResponse{Msg: "OK", Build: version.Get()})
 	}
 }
