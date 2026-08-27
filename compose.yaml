@@ -33,8 +33,10 @@ services:
         # Bump this per release; `:latest` also tracks the newest stable build
         # if you would rather not pin. Note the registry moved region
         # (us-central1 -> northamerica-northeast1) and dropped the `/release`
-        # sub-path, so nothing published before v0.8.0 exists at this address.
-        image: northamerica-northeast1-docker.pkg.dev/olympsis-485522/docker-images/server:v0.8.0
+        # sub-path, so nothing published before v0.8.1 exists at this address.
+        # (v0.8.0 was tagged but never published — its run failed before the
+        # image push, so that version does not exist in the registry.)
+        image: northamerica-northeast1-docker.pkg.dev/olympsis-485522/docker-images/server:v0.8.1
         restart: always
         pull_policy: always
         ports:
