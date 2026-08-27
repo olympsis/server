@@ -213,14 +213,38 @@ jobs:
             -X olympsis-server/version.BuildTime=${{ needs.meta.outputs.build_time }}" \
             -o "${{ env.BIN_NAME }}" .
 
-      # Same guard as the image job — confirm the linker actually wrote the
-      # version in rather than leaving the "dev" default.
+      # Confirms the linker actually wrote the version in rather than leaving
+      # the "dev" default — a mis-typed -X path fails silently otherwise.
+      #
+      # Uses `strings` rather than `grep -a`: searching a binary with grep is
+      # implementation-dependent (BSD and GNU differ on how they handle NUL
+      # bytes), and a check that exists to catch a silent mis-stamp must not
+      # itself be the unreliable part. A missing file is reported separately —
+      # the previous single `grep ||` form blamed the ldflags for that too.
       - name: Verify stamped version
         run: |
-          grep -qa -F "${{ needs.meta.outputs.version }}" "${{ env.BIN_NAME }}" || {
-            echo "::error::version string not found in the binary — check the -X ldflags paths"; exit 1; }
-          shasum -a 256 "${{ env.BIN_NAME }}" | tee "${{ env.BIN_NAME }}.sha256"
+          BIN="${{ env.BIN_NAME }}"
+          WANT="${{ needs.meta.outputs.version }}"
 
+          if [ ! -f "$BIN" ]; then
+            echo "::error::$BIN does not exist after the build step"
+            ls -la
+            exit 1
+          fi
+          echo "built: $(wc -c < "$BIN") bytes — $(file -b "$BIN")"
+
+          if strings "$BIN" | grep -q -F -- "$WANT"; then
+            echo "stamped OK: $WANT"
+          else
+            echo "::error::version string '$WANT' not found in $BIN — check the -X ldflags paths"
+            echo "--- version-like strings actually present ---"
+            strings "$BIN" | grep -Eo '^v?[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*' | sort -u | head -20 || true
+            echo "--- is the 'dev' default still in place? ---"
+            strings "$BIN" | grep -c '^dev$' || true
+            exit 1
+          fi
+
+          shasum -a 256 "$BIN" | tee "$BIN.sha256"
       # --skip-existing is only supported for DIRECTORY uploads, not single-file
       # ones, so both artifacts are staged into a directory and uploaded in one
       # call. That flag is what makes a re-run safe: generic repo versions are
