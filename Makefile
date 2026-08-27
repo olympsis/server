@@ -18,8 +18,8 @@ PROJECT_ID := olympsis-485522
 AR_LOCATION := northamerica-northeast1
 LOCATION := northamerica-northeast1-docker.pkg.dev
 # Trailing image name is required by AR: PROJECT/REPOSITORY/IMAGE.
-DOCKER_IMAGE := $(LOCATION)/$(PROJECT_ID)/server/release
-BIN_REPO := server-bin
+DOCKER_IMAGE := $(LOCATION)/$(PROJECT_ID)/docker-images/server
+BIN_REPO := go-binaries
 BIN_NAME := olympsis-server
 SERVICE_NAME := server
 PKG := "$(SERVICE_NAME)"

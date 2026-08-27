@@ -6,9 +6,9 @@
 # version, so those three can never disagree. See package version.
 #
 # Publishes:
-#   - Docker image -> northamerica-northeast1-docker.pkg.dev/olympsis-485522/server/release
+#   - Docker image -> northamerica-northeast1-docker.pkg.dev/olympsis-485522/docker-images/server
 #     tagged with the version, plus `latest` for stable (non-pre-release) cuts
-#   - darwin/arm64 binary -> AR generic repo `server-bin` (the Mac mini pulls it),
+#   - darwin/arm64 binary -> AR generic repo `go-binaries` (the Mac mini pulls it),
 #     versioned only: generic versions are immutable and "latest" is not a valid
 #     version id there, so there is no moving alias to maintain
 #
@@ -34,9 +34,9 @@ env:
   AR_LOCATION: northamerica-northeast1
   # LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/IMAGE — the trailing image name
   # is required; without it AR rejects the manifest push with 400 Bad Request.
-  DOCKER_IMAGE: northamerica-northeast1-docker.pkg.dev/olympsis-485522/server/release
+  DOCKER_IMAGE: northamerica-northeast1-docker.pkg.dev/olympsis-485522/docker-images/server
   AR_GO_REPO: go-modules
-  AR_BIN_REPO: server-bin
+  AR_BIN_REPO: go-binaries
   BIN_NAME: olympsis-server
 
 jobs:
