@@ -92,7 +92,6 @@ jobs:
         id: auth
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-          token_format: access_token
 
       - uses: google-github-actions/setup-gcloud@v2
 
@@ -113,10 +112,11 @@ jobs:
       - name: Write Artifact Registry netrc
         run: |
           umask 077
+          TOKEN="$(gcloud auth print-access-token)"
           cat > "${RUNNER_TEMP}/netrc" <<EOF
           machine ${{ env.AR_LOCATION }}-go.pkg.dev
           login oauth2accesstoken
-          password ${{ steps.auth.outputs.access_token }}
+          password ${TOKEN}
           EOF
 
       - uses: docker/setup-buildx-action@v3
@@ -176,17 +176,15 @@ jobs:
         id: auth
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-          token_format: access_token
 
       - uses: google-github-actions/setup-gcloud@v2
 
       # Same story as the image job: the dev-only replace cannot resolve here,
       # so the module comes from Artifact Registry over an authenticated proxy.
       - name: Resolve models from Artifact Registry
-        env:
-          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           umask 077
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
           cat > "$HOME/.netrc" <<EOF
           machine ${{ env.AR_LOCATION }}-go.pkg.dev
           login oauth2accesstoken
