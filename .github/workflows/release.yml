@@ -221,24 +221,23 @@ jobs:
             echo "::error::version string not found in the binary — check the -X ldflags paths"; exit 1; }
           shasum -a 256 "${{ env.BIN_NAME }}" | tee "${{ env.BIN_NAME }}.sha256"
 
+      # --skip-existing is only supported for DIRECTORY uploads, not single-file
+      # ones, so both artifacts are staged into a directory and uploaded in one
+      # call. That flag is what makes a re-run safe: generic repo versions are
+      # immutable, so re-uploading an existing version errors, which would
+      # otherwise force a new version number just to retry a workflow bug.
       - name: Upload to Artifact Registry
         run: |
+          STAGE="${RUNNER_TEMP}/upload"
+          mkdir -p "$STAGE"
+          cp "${{ env.BIN_NAME }}" "${{ env.BIN_NAME }}.sha256" "$STAGE/"
           gcloud artifacts generic upload \
             --project="${{ env.GCP_PROJECT }}" \
             --location="${{ env.AR_LOCATION }}" \
             --repository="${{ env.AR_BIN_REPO }}" \
             --package="${{ env.BIN_NAME }}" \
             --version="${{ needs.meta.outputs.version }}" \
-            --source="${{ env.BIN_NAME }}" \
-            --skip-existing
-
-          gcloud artifacts generic upload \
-            --project="${{ env.GCP_PROJECT }}" \
-            --location="${{ env.AR_LOCATION }}" \
-            --repository="${{ env.AR_BIN_REPO }}" \
-            --package="${{ env.BIN_NAME }}" \
-            --version="${{ needs.meta.outputs.version }}" \
-            --source="${{ env.BIN_NAME }}.sha256" \
+            --source-directory="$STAGE" \
             --skip-existing
 
       - uses: actions/upload-artifact@v4
