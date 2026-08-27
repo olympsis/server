@@ -83,6 +83,12 @@ services:
         restart: always
         networks:
             - olympsis
+        healthcheck:
+            test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            interval: 5s
+            timeout: 5s
+            retries: 12
+            start_period: 10s
         environment:
             MONGO_INITDB_ROOT_USERNAME: admin
             MONGO_INITDB_ROOT_PASSWORD: olympsis
@@ -137,8 +143,13 @@ services:
             RABBITMQ_EXCHANGE: olympsis.events
             SERVER_GRPC_ADDR: server:50051
             FIREBASE_FILE_PATH: /app/firebase-credentials.json
+        # Waits for mongo to accept connections, not merely to start. Both
+        # services abandon the event bus permanently if their first broker
+        # connect fails, so a slow dependency at boot leaves them running
+        # silently degraded rather than crashing.
         depends_on:
-            - mongo
+            mongo:
+                condition: service_healthy
 
     notif-service:
         container_name: notif-service
@@ -170,8 +181,13 @@ services:
             # APPLE_KEY_ID / APPLE_TEAM_ID come from .env.prod — the same APNs
             # key the server uses.
             APNS_FILE_PATH: /app/AuthKey_PWK5QB5Z6R.p8
+        # Waits for mongo to accept connections, not merely to start. Both
+        # services abandon the event bus permanently if their first broker
+        # connect fails, so a slow dependency at boot leaves them running
+        # silently degraded rather than crashing.
         depends_on:
-            - mongo
+            mongo:
+                condition: service_healthy
 
 networks:
     olympsis:

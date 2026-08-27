@@ -80,9 +80,12 @@ services:
             # only while it ran on the host under `make run`.
             INVITE_GRPC_ADDR: invite-service:9082
         depends_on:
-            - mongo
-            - redis
-            - rabbitmq
+            mongo:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+            redis:
+                condition: service_started
 
     # Both services build from their sibling checkouts so local edits land in
     # the dev stack, matching how `server` is built above. Their ports stay
@@ -115,8 +118,10 @@ services:
             SERVER_GRPC_ADDR: server:50051
             FIREBASE_FILE_PATH: /app/firebase-credentials.json
         depends_on:
-            - mongo
-            - rabbitmq
+            mongo:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
 
     notif-service:
         build:
@@ -143,13 +148,21 @@ services:
             FIREBASE_FILE_PATH: /app/firebase-credentials.json
             APNS_FILE_PATH: /app/AuthKey_5PR7XV2XXL.p8
         depends_on:
-            - mongo
-            - rabbitmq
+            mongo:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
 
     mongo:
         container_name: mongo
         image: mongo
         restart: always
+        healthcheck:
+            test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            interval: 5s
+            timeout: 5s
+            retries: 12
+            start_period: 10s
         environment:
             MONGO_INITDB_ROOT_USERNAME: admin
             MONGO_INITDB_ROOT_PASSWORD: olympsis
@@ -171,6 +184,18 @@ services:
         container_name: rabbitmq
         image: rabbitmq:3-management-alpine
         restart: always
+        # Dependents wait on this rather than on the container merely starting.
+        # The broker takes several seconds to accept AMQP, and both services
+        # give up on the bus PERMANENTLY if their first connect fails — they
+        # set their publisher to nil and never retry, so they would come up
+        # silently consuming nothing. The server survives it (it reconnects in
+        # the background) but logs errors on the way.
+        healthcheck:
+            test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            interval: 5s
+            timeout: 10s
+            retries: 12
+            start_period: 20s
         environment:
             # Dedicated user — the default guest account is refused over the
             # published port since it's restricted to loopback connections.
