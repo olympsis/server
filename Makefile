@@ -17,7 +17,8 @@ LDFLAGS := -s -w \
 PROJECT_ID := olympsis-485522
 AR_LOCATION := northamerica-northeast1
 LOCATION := northamerica-northeast1-docker.pkg.dev
-DOCKER_IMAGE := $(LOCATION)/$(PROJECT_ID)/server
+# Trailing image name is required by AR: PROJECT/REPOSITORY/IMAGE.
+DOCKER_IMAGE := $(LOCATION)/$(PROJECT_ID)/server/release
 BIN_REPO := server-bin
 BIN_NAME := olympsis-server
 SERVICE_NAME := server

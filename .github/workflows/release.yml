@@ -5,9 +5,12 @@
 # binary via -ldflags, into the image tag, and into the AR generic package
 # version, so those three can never disagree. See package version.
 #
-# Publishes, both tagged with the version AND (for stable releases) `latest`:
-#   - Docker image -> northamerica-northeast1-docker.pkg.dev/olympsis-485522/server
-#   - darwin/arm64 binary -> AR generic repo `server-bin` (the Mac mini pulls it)
+# Publishes:
+#   - Docker image -> northamerica-northeast1-docker.pkg.dev/olympsis-485522/server/release
+#     tagged with the version, plus `latest` for stable (non-pre-release) cuts
+#   - darwin/arm64 binary -> AR generic repo `server-bin` (the Mac mini pulls it),
+#     versioned only: generic versions are immutable and "latest" is not a valid
+#     version id there, so there is no moving alias to maintain
 #
 # Note: GitHub-hosted runners cannot reach the Mac mini, so this publishes to a
 # place the Mac mini pulls FROM. Deployment stays a pull on that host.
@@ -29,7 +32,9 @@ on:
 env:
   GCP_PROJECT: olympsis-485522
   AR_LOCATION: northamerica-northeast1
-  DOCKER_IMAGE: northamerica-northeast1-docker.pkg.dev/olympsis-485522/server
+  # LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/IMAGE — the trailing image name
+  # is required; without it AR rejects the manifest push with 400 Bad Request.
+  DOCKER_IMAGE: northamerica-northeast1-docker.pkg.dev/olympsis-485522/server/release
   AR_GO_REPO: go-modules
   AR_BIN_REPO: server-bin
   BIN_NAME: olympsis-server
@@ -224,7 +229,8 @@ jobs:
             --repository="${{ env.AR_BIN_REPO }}" \
             --package="${{ env.BIN_NAME }}" \
             --version="${{ needs.meta.outputs.version }}" \
-            --source="${{ env.BIN_NAME }}"
+            --source="${{ env.BIN_NAME }}" \
+            --skip-existing
 
           gcloud artifacts generic upload \
             --project="${{ env.GCP_PROJECT }}" \
@@ -232,22 +238,8 @@ jobs:
             --repository="${{ env.AR_BIN_REPO }}" \
             --package="${{ env.BIN_NAME }}" \
             --version="${{ needs.meta.outputs.version }}" \
-            --source="${{ env.BIN_NAME }}.sha256"
-
-      # Generic repo versions are immutable, so "latest" cannot be a moving
-      # alias the way a Docker tag is. Re-uploading the same bytes under the
-      # literal version "latest" gives the Mac mini a stable pull target.
-      # Stable releases only — never a pre-release.
-      - name: Republish as latest
-        if: needs.meta.outputs.is_stable == 'true'
-        run: |
-          gcloud artifacts generic upload \
-            --project="${{ env.GCP_PROJECT }}" \
-            --location="${{ env.AR_LOCATION }}" \
-            --repository="${{ env.AR_BIN_REPO }}" \
-            --package="${{ env.BIN_NAME }}" \
-            --version="latest" \
-            --source="${{ env.BIN_NAME }}"
+            --source="${{ env.BIN_NAME }}.sha256" \
+            --skip-existing
 
       - uses: actions/upload-artifact@v4
         with:

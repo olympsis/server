@@ -164,8 +164,8 @@ That one tag flows into three places that therefore cannot drift apart:
 
 | Artifact | Destination |
 | --- | --- |
-| Docker image | `northamerica-northeast1-docker.pkg.dev/olympsis-485522/server:<VERSION>` (and `:latest`) |
-| darwin/arm64 binary | AR generic repo `server-bin`, package `olympsis-server`, version `<VERSION>` |
+| Docker image | `northamerica-northeast1-docker.pkg.dev/olympsis-485522/server/release:<VERSION>` (and `:latest`) |
+| darwin/arm64 binary | AR generic repo `server-bin`, package `olympsis-server`, version `<VERSION>` (no `latest` — generic versions are immutable and `latest` is not a valid version id, so pull by explicit version) |
 | Binary build stamp | linked in via `-ldflags`, served at `GET /v1/health` |
 
 Pre-release tags (`v1.0.0-rc1`) publish under their own version but deliberately
